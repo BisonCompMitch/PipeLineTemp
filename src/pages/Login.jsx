@@ -1,0 +1,74 @@
+import React, { useState } from 'react';
+import logo from '../assets/BisonWorksFavicon.png';
+import { loginRequest } from '../api.js';
+
+export default function Login({ onLogin }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setError('Enter a username and password.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const response = await loginRequest(username.trim(), password);
+      if (!response.ok) {
+        const message =
+          response.status === 401
+            ? 'Invalid username or password.'
+            : `Sign in failed (${response.status}).`;
+        throw new Error(message);
+      }
+      const payload = await response.json();
+      const canonicalUsername = String(payload?.username || payload?.login_username || username.trim()).trim();
+      onLogin?.(canonicalUsername, payload);
+    } catch (err) {
+      setError(err.message || 'Unable to sign in.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="login">
+      <div className="login-card">
+        <div className="login-brand">
+          <img src={logo} alt="BisonWorks" className="login-logo" />
+          <div>
+            <h2>BisonWorks</h2>
+            <p className="muted">Please sign in.</p>
+          </div>
+        </div>
+        {error ? <div className="alert">{error}</div> : null}
+        <form onSubmit={handleSubmit} className="login-form">
+          <label>
+            Username
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Username"
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+            />
+          </label>
+          <button className="primary login-button" type="submit" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
