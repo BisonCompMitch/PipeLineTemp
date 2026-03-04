@@ -1,4 +1,5 @@
 const LOCAL_API_FALLBACK = 'http://localhost:8000';
+const PRODUCTION_API_FALLBACK = 'https://api.scottsdaleutah.com';
 const ALLOW_API_OVERRIDE =
   String(import.meta.env.VITE_ALLOW_API_OVERRIDE || '')
     .trim()
@@ -57,6 +58,10 @@ export function getApiBase() {
   }
   if (isIpAddress(hostname)) {
     return `http://${hostname}:8000`;
+  }
+  const lowerHost = String(hostname || '').toLowerCase();
+  if (lowerHost.endsWith('github.io') || lowerHost === 'pipeline.scottsdaleutah.com') {
+    return PRODUCTION_API_FALLBACK;
   }
   return origin;
 }
