@@ -1025,6 +1025,11 @@ body::before {
   color: var(--text);
   border-bottom: 1px solid var(--border);
   border-radius: 18px 18px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 10px;
 }
 
 .pipeline-detail-title {
@@ -1041,6 +1046,25 @@ body::before {
   color: var(--text);
   border-color: var(--border);
   background: var(--panel-2);
+}
+
+.pipeline-detail-tabs-wrap {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-bottom: 2px;
+}
+
+.pipeline-detail-header .detail-tabs .stage-tab {
+  background: var(--panel-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.pipeline-detail-header .detail-tabs .stage-tab.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.28);
 }
 
 .pipeline-detail-body {
@@ -4561,6 +4585,14 @@ body[data-theme='light'] .progress-pill {
   .panel {
     padding: 14px;
     border-radius: 14px;
+  }
+
+  .pipeline-detail-header {
+    grid-template-columns: 1fr;
+  }
+
+  .pipeline-detail-header .detail-header-actions {
+    justify-content: flex-start;
   }
 }
 

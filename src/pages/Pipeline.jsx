@@ -1263,13 +1263,8 @@ export default function Pipeline({
                     Close
                   </button>
                 </div>
-              </div>
-              <div className="pipeline-detail-body">
-                {detailLoading ? <p className="muted">Loading project details...</p> : null}
-                {detailError ? <div className="alert">{detailError}</div> : null}
-                {detailStatus ? <p className="muted">{detailStatus}</p> : null}
                 {detailProject ? (
-                  <div className="stage-tabs detail-tabs" role="tablist" aria-label="Project detail sections">
+                  <div className="stage-tabs detail-tabs pipeline-detail-tabs-wrap" role="tablist" aria-label="Project detail sections">
                     {DETAIL_TABS.map((tab) => (
                       <button
                         key={tab.id}
@@ -1284,6 +1279,11 @@ export default function Pipeline({
                     ))}
                   </div>
                 ) : null}
+              </div>
+              <div className="pipeline-detail-body">
+                {detailLoading ? <p className="muted">Loading project details...</p> : null}
+                {detailError ? <div className="alert">{detailError}</div> : null}
+                {detailStatus ? <p className="muted">{detailStatus}</p> : null}
                 {detailProject ? (
                   <div className="project-detail-grid">
                 {detailTab === 'project' ? (
