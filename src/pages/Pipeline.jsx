@@ -1103,7 +1103,7 @@ export default function Pipeline({
         onClick={() => openDetails(row)}
       >
         <td className={showHoverNotes ? 'dashboard-name-with-notes' : ''} title={projectNotesTitle}>
-          {row.name}
+          {row.projectNumber ? `${row.projectNumber} - ${row.name}` : row.name}
         </td>
         <td>
           <span
