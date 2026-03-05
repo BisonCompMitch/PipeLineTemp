@@ -989,6 +989,10 @@ body::before {
   justify-content: center;
 }
 
+.pipeline-detail-backdrop {
+  padding: 10px;
+}
+
 .modal {
   width: min(1100px, 100%);
   max-height: 90vh;
@@ -998,6 +1002,70 @@ body::before {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   padding: 18px;
+}
+
+.pipeline-detail-modal {
+  width: min(1320px, 100%);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.pipeline-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 16px 18px;
+  background: var(--panel);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  border-radius: 18px 18px 0 0;
+}
+
+.pipeline-detail-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pipeline-detail-header .ghost {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--panel-2);
+}
+
+.pipeline-detail-body {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 18px 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.pipeline-detail-body > *,
+.pipeline-detail-modal .project-detail-grid,
+.pipeline-detail-modal .detail-card,
+.pipeline-detail-modal .project-detail-form {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pipeline-detail-modal .project-stage-table {
+  max-height: min(44vh, 460px);
+}
+
+.pipeline-detail-modal .table-scroll {
+  max-height: min(44vh, 460px);
 }
 
 .user-modal {
@@ -4238,7 +4306,33 @@ body[data-theme='light'] .progress-pill {
 }
 
 .dashboard-table-scroll {
-  max-height: 392px;
+  max-height: none;
+}
+
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.dashboard-split-scroll {
+  max-height: none;
+}
+
+.dashboard-split-table.project-table {
+  min-width: 100% !important;
+  table-layout: fixed;
+}
+
+.dashboard-split-table th:nth-child(1),
+.dashboard-split-table td:nth-child(1) {
+  width: 60%;
+}
+
+.dashboard-split-table th:nth-child(2),
+.dashboard-split-table td:nth-child(2) {
+  width: 40%;
 }
 
 .project-stage-table .project-table {
@@ -4583,6 +4677,10 @@ body[data-theme='light'] .progress-pill {
 }
 
 @media (max-width: 1100px) {
+  .dashboard-columns {
+    grid-template-columns: 1fr;
+  }
+
   .panel-detail-view .project-detail-form {
     grid-template-columns: 1fr !important;
   }
@@ -4608,4 +4706,102 @@ body[data-theme='light'] .status-banner.success {
   background: rgba(34, 197, 94, 0.14);
   border-color: rgba(34, 197, 94, 0.35);
   color: #166534;
+}
+
+/* --- Theme-consistent title/subtitle colors --- */
+body[data-theme='dark'] .panel-header h2,
+body[data-theme='dark'] .panel-header h3,
+body[data-theme='dark'] .detail-card h3,
+body[data-theme='dark'] .modal-title,
+body[data-theme='dark'] .pipeline-detail-title,
+body[data-theme='dark'] .login-card h1,
+body[data-theme='dark'] .login-brand h2,
+body[data-theme='light'] .panel-header h2,
+body[data-theme='light'] .panel-header h3,
+body[data-theme='light'] .detail-card h3,
+body[data-theme='light'] .modal-title,
+body[data-theme='light'] .pipeline-detail-title,
+body[data-theme='light'] .login-card h1,
+body[data-theme='light'] .login-brand h2 {
+  color: var(--text) !important;
+}
+
+body[data-theme='dark'] .panel-header p,
+body[data-theme='dark'] .muted,
+body[data-theme='dark'] .muted-label,
+body[data-theme='dark'] .login-brand .muted,
+body[data-theme='dark'] .area-editor-hint,
+body[data-theme='dark'] .customer-progress-sub,
+body[data-theme='dark'] .progress-meta .muted,
+body[data-theme='light'] .panel-header p,
+body[data-theme='light'] .muted,
+body[data-theme='light'] .muted-label,
+body[data-theme='light'] .login-brand .muted,
+body[data-theme='light'] .area-editor-hint,
+body[data-theme='light'] .customer-progress-sub,
+body[data-theme='light'] .progress-meta .muted {
+  color: var(--muted) !important;
+}
+
+/* --- Mobile dashboard fixes --- */
+@media (max-width: 760px) {
+  .panel-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .panel-header > div:first-child {
+    min-width: 0;
+  }
+
+  .panel-header > div:first-child p {
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .panel-header .detail-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    justify-content: stretch;
+  }
+
+  .panel-header .pipeline-area-select {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+
+  .panel-header .pipeline-area-select select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .panel-header .switch-field--pill {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+
+  .dashboard-table.project-table {
+    min-width: 100% !important;
+    table-layout: fixed;
+  }
+
+  .dashboard-table th:nth-child(1),
+  .dashboard-table td:nth-child(1) {
+    width: 58%;
+  }
+
+  .dashboard-table th:nth-child(2),
+  .dashboard-table td:nth-child(2) {
+    width: 42%;
+  }
 }

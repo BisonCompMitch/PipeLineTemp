@@ -32,6 +32,7 @@ const TONE_LABELS = {
   neutral: 'On Time'
 };
 const AREA_COLORS = {
+  plans_received: '#D9D5FF',
   budget: '#C9D1DA',
   money_design: '#C4CEDB',
   design: '#A5C9FF',
@@ -46,12 +47,14 @@ const AREA_COLORS = {
 };
 
 const DETAIL_TABS = [
-  { id: 'details', label: 'Details' },
-  { id: 'stages', label: 'Stages' },
+  { id: 'project', label: 'Project' },
   { id: 'files', label: 'Files & Photos' }
 ];
 
+const DASHBOARD_FILTER_ALL = '__all__';
+
 const ALL_AREA_STAGE_IDS = [
+  'plans_received',
   'budget',
   'money_design',
   'design',
@@ -66,6 +69,9 @@ const ALL_AREA_STAGE_IDS = [
 ];
 
 const AREA_FILTER_TO_STAGE_IDS = {
+  'plans recieved': ['plans_received'],
+  'plans received': ['plans_received'],
+  plans_received: ['plans_received'],
   budget: ['budget'],
   'cfs budget': ['budget'],
   'money - d&e': ['money_design'],
@@ -158,6 +164,12 @@ function sortByProjectNumber(a, b) {
     return aNum - bNum;
   }
   return aRaw.localeCompare(bRaw);
+}
+
+function isCompletedDashboardRow(row) {
+  const areaId = String(row?.areaId || '').trim().toLowerCase();
+  const areaName = String(row?.area || '').trim().toLowerCase();
+  return areaId === 'completed' || areaName === 'completed';
 }
 
 function toRow(project) {
@@ -313,6 +325,21 @@ function formatDashboardAreaNotesTooltip(entries = [], areaName = '') {
   return `All notes (${safeAreaName})\n\n${body}`;
 }
 
+function formatStageNotesTooltip(entries = [], stageName = '') {
+  const safeStageName = String(stageName || '').trim() || 'Stage';
+  if (!entries.length) {
+    return `All notes (${safeStageName})\n\nNo notes yet.`;
+  }
+  const body = entries
+    .map((entry) => {
+      const user = String(entry?.created_by || '').trim() || '-';
+      const note = String(entry?.note || '').trim() || '-';
+      return `User: ${user}\nNote:\n${note}`;
+    })
+    .join('\n\n');
+  return `All notes (${safeStageName})\n\n${body}`;
+}
+
 export default function Pipeline({
   canEditProjects = false,
   canEditProjectDetails = false,
@@ -330,7 +357,7 @@ export default function Pipeline({
   const [detailError, setDetailError] = useState('');
   const [detailStatus, setDetailStatus] = useState('');
   const [detailProject, setDetailProject] = useState(null);
-  const [detailTab, setDetailTab] = useState('details');
+  const [detailTab, setDetailTab] = useState('project');
   const [projectActionBusy, setProjectActionBusy] = useState('');
   const [detailForm, setDetailForm] = useState(toEditForm(null));
   const [detailStageNoteDraft, setDetailStageNoteDraft] = useState('');
@@ -360,6 +387,12 @@ export default function Pipeline({
     text: ''
   });
   const [contractorCompanies, setContractorCompanies] = useState([]);
+  const [dashboardRequesterFilter, setDashboardRequesterFilter] = useState(DASHBOARD_FILTER_ALL);
+  const [splitDashboardLayout, setSplitDashboardLayout] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(min-width: 1101px)').matches
+      : true
+  );
 
   const closePreview = useCallback(() => {
     if (preview.url) {
@@ -407,6 +440,46 @@ export default function Pipeline({
     });
     return Array.from(unique.values()).sort((a, b) => a.localeCompare(b));
   }, [rows, detailProject, contractorCompanies]);
+  const dashboardRequesterOptions = useMemo(() => {
+    const unique = new Map();
+    rows.forEach((row) => {
+      const value = String(row?.project?.requester || '').trim();
+      if (!value) return;
+      const key = value.toLowerCase();
+      if (!unique.has(key)) unique.set(key, value);
+    });
+    contractorCompanies.forEach((company) => {
+      const value = String(company || '').trim();
+      if (!value) return;
+      const key = value.toLowerCase();
+      if (!unique.has(key)) unique.set(key, value);
+    });
+    return Array.from(unique.values()).sort((a, b) => a.localeCompare(b));
+  }, [rows, contractorCompanies]);
+  const visibleRows = useMemo(() => {
+    if (dashboardRequesterFilter === DASHBOARD_FILTER_ALL) return rows;
+    const selected = String(dashboardRequesterFilter || '').trim().toLowerCase();
+    if (!selected) return rows;
+    return rows.filter((row) => String(row?.project?.requester || '').trim().toLowerCase() === selected);
+  }, [rows, dashboardRequesterFilter]);
+  const dashboardRows = useMemo(() => {
+    const ordered = [...visibleRows].sort(sortByProjectNumber);
+    const active = [];
+    const completed = [];
+    ordered.forEach((row) => {
+      if (isCompletedDashboardRow(row)) {
+        completed.push(row);
+      } else {
+        active.push(row);
+      }
+    });
+    return [...active, ...completed];
+  }, [visibleRows]);
+  const dashboardColumns = useMemo(() => {
+    if (!dashboardRows.length) return [[], []];
+    const splitIndex = Math.ceil(dashboardRows.length / 2);
+    return [dashboardRows.slice(0, splitIndex), dashboardRows.slice(splitIndex)];
+  }, [dashboardRows]);
 
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
@@ -417,6 +490,10 @@ export default function Pipeline({
   }, [detailProject]);
   const detailCurrentStage = useMemo(
     () => currentStage(detailProject?.stages || []),
+    [detailProject]
+  );
+  const detailProgress = useMemo(
+    () => completionPercent(detailProject?.stages || []),
     [detailProject]
   );
   const stageNoteTooltipByStageId = useMemo(() => {
@@ -432,17 +509,7 @@ export default function Pipeline({
       const entries = [...(grouped.get(stage.id) || [])].sort(
         (a, b) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime()
       );
-      if (!entries.length) {
-        tooltips.set(stage.id, `No notes yet for ${stage.name}.`);
-        return;
-      }
-      const lines = entries.map((entry) => {
-        const when = formatDateTime(entry.created_at);
-        const by = entry.created_by || '-';
-        const note = String(entry.note || '').trim() || '-';
-        return `[${when}] ${by}\n${note}`;
-      });
-      tooltips.set(stage.id, lines.join('\n\n'));
+      tooltips.set(stage.id, formatStageNotesTooltip(entries, stage.name));
     });
     return tooltips;
   }, [stageNotesHistory, detailProject]);
@@ -550,6 +617,17 @@ export default function Pipeline({
   }, [loadProjects]);
 
   useEffect(() => {
+    if (dashboardRequesterFilter === DASHBOARD_FILTER_ALL) return;
+    const selected = String(dashboardRequesterFilter || '').trim().toLowerCase();
+    const stillPresent = dashboardRequesterOptions.some(
+      (option) => String(option || '').trim().toLowerCase() === selected
+    );
+    if (!stillPresent) {
+      setDashboardRequesterFilter(DASHBOARD_FILTER_ALL);
+    }
+  }, [dashboardRequesterFilter, dashboardRequesterOptions]);
+
+  useEffect(() => {
     let active = true;
     const loadCompanies = async () => {
       try {
@@ -574,6 +652,19 @@ export default function Pipeline({
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia('(min-width: 1101px)');
+    const onChange = () => setSplitDashboardLayout(media.matches);
+    onChange();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    }
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
+
+  useEffect(() => {
     if (!detailProject?.stages?.length) {
       setAreaSelection('');
       return;
@@ -594,7 +685,7 @@ export default function Pipeline({
   const openDetails = async (row) => {
     if (!row?.id) return;
     setDetailOpen(true);
-    setDetailTab('details');
+    setDetailTab('project');
     setDetailError('');
     setDetailStatus('');
     setDetailProject(row.project || null);
@@ -620,7 +711,7 @@ export default function Pipeline({
   const closeDetails = () => {
     if (saving) return;
     setDetailOpen(false);
-    setDetailTab('details');
+    setDetailTab('project');
     setDetailError('');
     setDetailStatus('');
     setProjectActionBusy('');
@@ -991,6 +1082,46 @@ export default function Pipeline({
     }
   };
 
+  const renderDashboardRow = (row, idx, keyPrefix = 'row') => {
+    const areaColor = AREA_COLORS[row.areaId] || 'rgba(148, 163, 184, 0.2)';
+    const areaText = textColorForHex(areaColor);
+    const notesKey = dashboardAreaNotesKey(row.id, row.areaId);
+    const cachedAreaNotes = notesKey ? dashboardAreaNotes[notesKey] : null;
+    const areaNoteTitle = showHoverNotes
+      ? cachedAreaNotes?.tooltip || `All notes (${row.area})\n\nLoading notes...`
+      : undefined;
+    const projectSummary = String(row.project?.summary || '').trim();
+    const projectNotesTitle = showHoverNotes
+      ? projectSummary
+        ? `Notes:\n${projectSummary}`
+        : 'Notes:\nNo notes yet.'
+      : undefined;
+    return (
+      <tr
+        key={row.id || `${row.name}-${keyPrefix}-${idx}`}
+        className={row.isDeleted ? 'row-archived' : ''}
+        onClick={() => openDetails(row)}
+      >
+        <td className={showHoverNotes ? 'dashboard-name-with-notes' : ''} title={projectNotesTitle}>
+          {row.name}
+        </td>
+        <td>
+          <span
+            className={`area-pill${showHoverNotes ? ' dashboard-area-with-notes' : ''}`}
+            style={{ backgroundColor: areaColor, color: areaText }}
+            title={areaNoteTitle}
+            onMouseEnter={() => {
+              if (!showHoverNotes || !row.id || !row.areaId) return;
+              loadDashboardAreaNotes(row.id, row.areaId, row.area);
+            }}
+          >
+            {row.area}
+          </span>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <>
       <section className="panel">
@@ -999,170 +1130,163 @@ export default function Pipeline({
             <h2>Dashboard</h2>
             <p className="muted">Click a project row to view details.</p>
           </div>
-          <label className="switch-field switch-field--pill">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
-            />
-            <span className="switch-track" aria-hidden="true">
-              <span className="switch-thumb" />
-            </span>
-            <span className="switch-text">Show archived</span>
-          </label>
+          <div className="detail-header-actions">
+            <label className="pipeline-area-select">
+              <span className="muted">Requester/Contractor</span>
+              <select
+                value={dashboardRequesterFilter}
+                onChange={(event) => setDashboardRequesterFilter(event.target.value)}
+              >
+                <option value={DASHBOARD_FILTER_ALL}>All</option>
+                {dashboardRequesterOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="switch-field switch-field--pill">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(event) => setShowArchived(event.target.checked)}
+              />
+              <span className="switch-track" aria-hidden="true">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-text">Show archived</span>
+            </label>
+          </div>
         </div>
         {loading ? <p className="muted">Loading projects...</p> : null}
         {error ? <div className="alert">{error}</div> : null}
-        <div className="table-scroll dashboard-table-scroll">
-          <table className="project-table dashboard-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Current Area</th>
-                <th>% Complete</th>
-                <th>Project Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length ? rows.map((row, idx) => {
-                const tone = row.statusTone || 'neutral';
-                const statusLabel = TONE_LABELS[tone] || 'On Time';
-                const statusColor = TONE_COLORS[tone] || TONE_COLORS.neutral;
-                const areaColor = AREA_COLORS[row.areaId] || 'rgba(148, 163, 184, 0.2)';
-                const areaText = textColorForHex(areaColor);
-                const notesKey = dashboardAreaNotesKey(row.id, row.areaId);
-                const cachedAreaNotes = notesKey ? dashboardAreaNotes[notesKey] : null;
-                const areaNoteTitle = showHoverNotes
-                  ? cachedAreaNotes?.tooltip || `All notes (${row.area})\n\nLoading notes...`
-                  : undefined;
-                const projectSummary = String(row.project?.summary || '').trim();
-                const projectNotesTitle = showHoverNotes
-                  ? projectSummary
-                    ? `Notes:\n${projectSummary}`
-                    : 'Notes:\nNo notes yet.'
-                  : undefined;
-                return (
-                  <tr
-                    key={row.id || `${row.name}-${idx}`}
-                    className={row.isDeleted ? 'row-archived' : ''}
-                    onClick={() => openDetails(row)}
-                  >
-                    <td>{row.projectNumber || '-'}</td>
-                    <td
-                      className={
-                        showHoverNotes ? 'dashboard-name-with-notes' : ''
-                      }
-                      title={projectNotesTitle}
-                    >
-                      {row.name}
-                    </td>
-                    <td>
-                      <span
-                        className={`area-pill${
-                          showHoverNotes ? ' dashboard-area-with-notes' : ''
-                        }`}
-                        style={{ backgroundColor: areaColor, color: areaText }}
-                        title={areaNoteTitle}
-                        onMouseEnter={() => {
-                          if (!showHoverNotes || !row.id || !row.areaId) return;
-                          loadDashboardAreaNotes(row.id, row.areaId, row.area);
-                        }}
-                      >
-                        {row.area}
-                      </span>
-                    </td>
-                    <td>{`${row.progress || 0}%`}</td>
-                    <td>
-                      <span
-                        className="status-pill"
-                        style={{ backgroundColor: statusColor, color: tone === 'neutral' ? '#e2e8f0' : '#111827' }}
-                      >
-                        {statusLabel}
-                      </span>
-                    </td>
+        {dashboardRows.length ? (
+          splitDashboardLayout ? (
+          <div className="dashboard-columns">
+            {dashboardColumns.map((columnRows, columnIdx) => (
+              <div className="table-scroll dashboard-table-scroll dashboard-split-scroll" key={`dashboard-col-${columnIdx}`}>
+                <table className="project-table dashboard-table dashboard-split-table">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th>Current Stage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {columnRows.map((row, idx) => renderDashboardRow(row, idx, `col-${columnIdx}`))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+          ) : (
+            <div className="table-scroll dashboard-table-scroll">
+              <table className="project-table dashboard-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Current Stage</th>
                   </tr>
-                );
-              }) : (
+                </thead>
+                <tbody>
+                  {dashboardRows.map((row, idx) => renderDashboardRow(row, idx, 'single'))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <div className="table-scroll dashboard-table-scroll">
+            <table className="project-table dashboard-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Current Stage</th>
+                </tr>
+              </thead>
+              <tbody>
                 <tr className="empty-row">
-                  <td colSpan={5}>
-                    {applyAreaFilter && !canViewAllAreas
+                  <td colSpan={2}>
+                    {dashboardRequesterFilter !== DASHBOARD_FILTER_ALL
+                      ? 'No projects match that requester/contractor.'
+                      : applyAreaFilter && !canViewAllAreas
                       ? 'No projects in your assigned areas.'
                       : 'No projects available.'}
                   </td>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {detailOpen ? (
-        <section className="panel panel-detail-view">
-          <div className="detail-card-header">
-            <div>
-              <h3>{detailProject?.name || 'Project details'}</h3>
-              <p className="muted">{detailProject?.project_number || ''}</p>
-            </div>
-            <div className="detail-header-actions">
-              {canEditProjects ? (
-                detailProject?.is_deleted ? (
-                  <>
-                    <button
-                      className="ghost"
-                      type="button"
-                      onClick={handleRestoreProject}
-                      disabled={Boolean(projectActionBusy) || saving}
-                    >
-                      {projectActionBusy === 'restore' ? 'Restoring...' : 'Unarchive'}
-                    </button>
-                    <button
-                      className="ghost danger"
-                      type="button"
-                      onClick={handleDeleteProject}
-                      disabled={Boolean(projectActionBusy) || saving}
-                    >
-                      {projectActionBusy === 'delete' ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="ghost"
-                    type="button"
-                    onClick={handleArchiveProject}
-                    disabled={Boolean(projectActionBusy) || saving}
-                  >
-                    {projectActionBusy === 'archive' ? 'Archiving...' : 'Archive'}
+        <ModalPortal>
+          <div className="modal-backdrop preview-backdrop pipeline-detail-backdrop" onClick={() => !saving && closeDetails()}>
+            <div className="modal pipeline-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="detail-card-header pipeline-detail-header">
+                <div className="pipeline-detail-title">
+                  {`${detailProject?.name || 'Project details'}${detailProject?.project_number ? ` - ${detailProject.project_number}` : ''}`}
+                </div>
+                <div className="detail-header-actions">
+                  {canEditProjects ? (
+                    detailProject?.is_deleted ? (
+                      <>
+                        <button
+                          className="ghost"
+                          type="button"
+                          onClick={handleRestoreProject}
+                          disabled={Boolean(projectActionBusy) || saving}
+                        >
+                          {projectActionBusy === 'restore' ? 'Restoring...' : 'Unarchive'}
+                        </button>
+                        <button
+                          className="ghost danger"
+                          type="button"
+                          onClick={handleDeleteProject}
+                          disabled={Boolean(projectActionBusy) || saving}
+                        >
+                          {projectActionBusy === 'delete' ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={handleArchiveProject}
+                        disabled={Boolean(projectActionBusy) || saving}
+                      >
+                        {projectActionBusy === 'archive' ? 'Archiving...' : 'Archive'}
+                      </button>
+                    )
+                  ) : null}
+                  <button className="ghost" type="button" onClick={closeDetails} disabled={saving}>
+                    Close
                   </button>
-                )
-              ) : null}
-              <button className="ghost" type="button" onClick={closeDetails} disabled={saving}>
-                Close
-              </button>
-            </div>
-          </div>
-          {detailLoading ? <p className="muted">Loading project details...</p> : null}
-          {detailError ? <div className="alert">{detailError}</div> : null}
-          {detailStatus ? <p className="muted">{detailStatus}</p> : null}
-          {detailProject ? (
-            <div className="stage-tabs detail-tabs" role="tablist" aria-label="Project detail sections">
-              {DETAIL_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === tab.id}
-                  className={`stage-tab${detailTab === tab.id ? ' active' : ''}`}
-                  onClick={() => setDetailTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {detailProject ? (
-            <div className="project-detail-grid">
-                {detailTab === 'details' ? (
+                </div>
+              </div>
+              <div className="pipeline-detail-body">
+                {detailLoading ? <p className="muted">Loading project details...</p> : null}
+                {detailError ? <div className="alert">{detailError}</div> : null}
+                {detailStatus ? <p className="muted">{detailStatus}</p> : null}
+                {detailProject ? (
+                  <div className="stage-tabs detail-tabs" role="tablist" aria-label="Project detail sections">
+                    {DETAIL_TABS.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={detailTab === tab.id}
+                        className={`stage-tab${detailTab === tab.id ? ' active' : ''}`}
+                        onClick={() => setDetailTab(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {detailProject ? (
+                  <div className="project-detail-grid">
+                {detailTab === 'project' ? (
                 <div className="detail-card">
                   {!canEditProjectDetails ? (
                     <p className="muted">
@@ -1233,6 +1357,20 @@ export default function Pipeline({
                       />
                     </label>
                     <label className="span-2">
+                      Current area
+                      {canEditProjectDetails ? (
+                        <select value={areaSelection} onChange={(event) => setAreaSelection(event.target.value)}>
+                          {stageOptions.map((stage) => (
+                            <option key={stage.id} value={stage.id}>
+                              {stage.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input value={detailCurrentStage?.name || '-'} readOnly />
+                      )}
+                    </label>
+                    <label className="span-2">
                       Summary
                       <textarea
                         value={detailForm.summary}
@@ -1252,8 +1390,11 @@ export default function Pipeline({
                       />
                     </label>
                   </div>
-                  {canEditProjects ? (
-                    <div className="actions-grid detail-note-actions">
+                  <div className="actions">
+                    <button className="ghost" type="button" onClick={closeDetails} disabled={saving}>
+                      {canEditProjectDetails ? 'Cancel' : 'Close'}
+                    </button>
+                    {canEditProjects ? (
                       <button
                         type="button"
                         className="ghost"
@@ -1262,34 +1403,31 @@ export default function Pipeline({
                       >
                         {detailStageNoteSaving ? 'Saving...' : 'Add note'}
                       </button>
-                    </div>
-                  ) : null}
+                    ) : null}
+                    {canEditProjectDetails ? (
+                      <button className="primary" type="button" onClick={handleSave} disabled={saving}>
+                        {saving ? 'Saving...' : 'Save changes'}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 ) : null}
 
-                {detailTab === 'stages' ? (
+                {detailTab === 'project' ? (
+                <div className="detail-card">
+                  <div className="detail-card-header">
+                    <h3>Progress</h3>
+                    <span className="progress-pill">{`${detailProgress}%`}</span>
+                  </div>
+                  <div className="progress-track">
+                    <div className="progress-fill" style={{ width: `${detailProgress}%` }} />
+                  </div>
+                </div>
+                ) : null}
+
+                {detailTab === 'project' ? (
                 <div className="detail-card">
                   <h3>Stages</h3>
-                  {canEditProjectDetails ? (
-                    <div className="area-editor">
-                      <div className="muted">Current area</div>
-                      <div className="area-editor-row">
-                        <select
-                          value={areaSelection}
-                          onChange={(event) => setAreaSelection(event.target.value)}
-                        >
-                          {stageOptions.map((stage) => (
-                            <option key={stage.id} value={stage.id}>
-                              {stage.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <p className="muted area-editor-hint">
-                        Area selection is saved with the main "Save changes" button.
-                      </p>
-                    </div>
-                  ) : null}
                   <div className="table-scroll project-stage-table">
                     {(detailProject.stages || []).length ? (
                       <table className="project-table stage-matrix-table">
@@ -1656,20 +1794,12 @@ export default function Pipeline({
                   </div>
                 </div>
                 ) : null}
-
-                <div className="actions">
-                  <button className="ghost" type="button" onClick={closeDetails} disabled={saving}>
-                    {canEditProjectDetails ? 'Cancel' : 'Close'}
-                  </button>
-                  {canEditProjectDetails ? (
-                    <button className="primary" type="button" onClick={handleSave} disabled={saving}>
-                      {saving ? 'Saving...' : 'Save changes'}
-                    </button>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
-          ) : null}
-        </section>
+          </div>
+        </ModalPortal>
       ) : null}
 
       {preview.open ? (
