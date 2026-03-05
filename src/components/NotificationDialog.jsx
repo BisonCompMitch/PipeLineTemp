@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { listUsers, sendNotification } from '../api.js';
 
 const AREA_OPTIONS = [
+  'Plans Recieved',
   'CFS Budget',
   'Money - D&E',
   'Design',

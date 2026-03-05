@@ -17,6 +17,7 @@ import {
 } from '../api.js';
 
 const AREA_OPTIONS = [
+  'Plans Recieved',
   'CFS Budget',
   'Money - D&E',
   'Design',

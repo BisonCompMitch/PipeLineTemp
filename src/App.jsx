@@ -39,6 +39,8 @@ const TEST_ROLE_PRESETS = {
   bison_contractor: { bison: true, contractor: true, customer: false }
 };
 
+const DEFAULT_TESTING_OVERRIDE = { rolePreset: 'auto', areas: '' };
+
 function titleForPath(pathname) {
   if (!pathname) return 'BisonWorks';
   const match = Object.keys(ROUTE_TITLES).find((route) => pathname.startsWith(route));
@@ -286,21 +288,24 @@ export default function App() {
   }, [authed]);
 
   const roles = normalizeListValues(profile?.roles);
-  const areas = normalizeListValues(profile?.areas);
+  const profileAreas = normalizeListValues(profile?.areas);
+  const normalizedProfileAreas = profileAreas.map((area) => normalizeAreaKey(area)).filter(Boolean);
+  const canUseTestingOverride = normalizedProfileAreas.includes('admin');
+  const activeTestingOverride = canUseTestingOverride ? testingOverride : DEFAULT_TESTING_OVERRIDE;
   const normalizedRoles = roles.map((role) => String(role || '').trim().toLowerCase());
   const baseHasCustomer = normalizedRoles.some((role) => role.includes('customer'));
   const baseHasContractor = normalizedRoles.some((role) => role.includes('contractor'));
   const baseHasBison =
     normalizedRoles.some((role) => role && !role.includes('customer') && !role.includes('contractor')) ||
-    areas.length > 0 ||
+    profileAreas.length > 0 ||
     normalizedRoles.length === 0;
-  const preset = TEST_ROLE_PRESETS[testingOverride.rolePreset] || TEST_ROLE_PRESETS.auto;
+  const preset = TEST_ROLE_PRESETS[activeTestingOverride.rolePreset] || TEST_ROLE_PRESETS.auto;
   const hasCustomer = preset.customer === null ? baseHasCustomer : preset.customer;
   const hasContractor = preset.contractor === null ? baseHasContractor : preset.contractor;
   const hasBison = preset.bison === null ? baseHasBison : preset.bison;
-  const effectiveAreas = testingOverride.areas
-    ? normalizeListValues(testingOverride.areas)
-    : areas;
+  const effectiveAreas = activeTestingOverride.areas
+    ? normalizeListValues(activeTestingOverride.areas)
+    : profileAreas;
   const normalizedAreas = effectiveAreas.map((area) => normalizeAreaKey(area)).filter(Boolean);
   const hasAdminArea = normalizedAreas.includes('admin');
   const hasManagementArea = normalizedAreas.includes('management');
@@ -320,8 +325,15 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!canUseTestingOverride) {
+      localStorage.removeItem('bw_testing_override');
+      if (testingOverride.rolePreset !== DEFAULT_TESTING_OVERRIDE.rolePreset || testingOverride.areas !== DEFAULT_TESTING_OVERRIDE.areas) {
+        setTestingOverride(DEFAULT_TESTING_OVERRIDE);
+      }
+      return;
+    }
     localStorage.setItem('bw_testing_override', JSON.stringify(testingOverride));
-  }, [testingOverride]);
+  }, [testingOverride, canUseTestingOverride]);
 
   useEffect(() => {
     localStorage.setItem('bw_theme', theme);
@@ -368,10 +380,7 @@ export default function App() {
       items.push({ label: 'Dashboard', path: '/pipeline' });
     }
     if (hasBison) {
-      items.push(
-        { label: 'Project Intake', path: '/intake' },
-        { label: 'Areas', path: '/areas' }
-      );
+      items.push({ label: 'Areas', path: '/areas' });
     }
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Manage Users', path: '/users' });
@@ -457,18 +466,18 @@ export default function App() {
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
-                  testingOverride={testingOverride}
-                  onTestingOverrideChange={setTestingOverride}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
                   <Pipeline
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
-                    applyAreaFilter={hasBison}
+                    applyAreaFilter={false}
                     allowedAreas={effectiveAreas}
-                    canViewAllAreas={canViewAllAreas}
-                    showHoverNotes={hasBison}
+                    canViewAllAreas={true}
+                    showHoverNotes={true}
                   />
                 </PageShell>
               </Protected>
@@ -483,8 +492,8 @@ export default function App() {
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
-                  testingOverride={testingOverride}
-                  onTestingOverrideChange={setTestingOverride}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
@@ -505,8 +514,8 @@ export default function App() {
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
-                  testingOverride={testingOverride}
-                  onTestingOverrideChange={setTestingOverride}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
@@ -530,8 +539,8 @@ export default function App() {
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
-                  testingOverride={testingOverride}
-                  onTestingOverrideChange={setTestingOverride}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
@@ -549,8 +558,8 @@ export default function App() {
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
-                  testingOverride={testingOverride}
-                  onTestingOverrideChange={setTestingOverride}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
@@ -568,8 +577,8 @@ export default function App() {
                     onSignOut={handleLogout}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
-                    testingOverride={testingOverride}
-                    onTestingOverrideChange={setTestingOverride}
+                    testingOverride={canUseTestingOverride ? testingOverride : null}
+                    onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                     showNavToggle={showNavToggle}
                     onToggleNav={() => setNavOpen((open) => !open)}
                   >
@@ -587,8 +596,8 @@ export default function App() {
                     onSignOut={handleLogout}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
-                    testingOverride={testingOverride}
-                    onTestingOverrideChange={setTestingOverride}
+                    testingOverride={canUseTestingOverride ? testingOverride : null}
+                    onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                     showNavToggle={showNavToggle}
                     onToggleNav={() => setNavOpen((open) => !open)}
                   >
@@ -606,8 +615,8 @@ export default function App() {
                     onSignOut={handleLogout}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
-                    testingOverride={testingOverride}
-                    onTestingOverrideChange={setTestingOverride}
+                    testingOverride={canUseTestingOverride ? testingOverride : null}
+                    onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                     showNavToggle={showNavToggle}
                     onToggleNav={() => setNavOpen((open) => !open)}
                   >
@@ -626,8 +635,8 @@ export default function App() {
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
-                  testingOverride={testingOverride}
-                  onTestingOverrideChange={setTestingOverride}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >

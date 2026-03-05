@@ -13,6 +13,7 @@ import {
 import ModalPortal from '../components/ModalPortal.jsx';
 
 const ALL_AREA_STAGE_IDS = [
+  'plans_received',
   'budget',
   'money_design',
   'design',
@@ -27,6 +28,9 @@ const ALL_AREA_STAGE_IDS = [
 ];
 
 const AREA_STAGE_MAP = {
+  'plans recieved': ['plans_received'],
+  'plans received': ['plans_received'],
+  plans_received: ['plans_received'],
   budget: ['budget'],
   'cfs budget': ['budget'],
   'money - d&e': ['money_design'],
@@ -56,6 +60,7 @@ const AREA_STAGE_MAP = {
 };
 
 const AREA_FLOW_ORDER = [
+  'Plans Recieved',
   'CFS Budget',
   'Money - D&E',
   'Design',
@@ -71,6 +76,7 @@ const AREA_FLOW_ORDER = [
 
 const ADMIN_AREA_OPTIONS = [
   'Admin',
+  'Plans Recieved',
   'CFS Budget',
   'Money - D&E',
   'Design',
