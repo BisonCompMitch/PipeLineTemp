@@ -290,9 +290,10 @@ export default function App() {
   const roles = normalizeListValues(profile?.roles);
   const profileAreas = normalizeListValues(profile?.areas);
   const normalizedProfileAreas = profileAreas.map((area) => normalizeAreaKey(area)).filter(Boolean);
-  const canUseTestingOverride = normalizedProfileAreas.includes('admin');
-  const activeTestingOverride = canUseTestingOverride ? testingOverride : DEFAULT_TESTING_OVERRIDE;
   const normalizedRoles = roles.map((role) => String(role || '').trim().toLowerCase());
+  const hasAdminRole = normalizedRoles.some((role) => role === 'admin' || role.includes('admin'));
+  const canUseTestingOverride = hasAdminRole || normalizedProfileAreas.includes('admin');
+  const activeTestingOverride = canUseTestingOverride ? testingOverride : DEFAULT_TESTING_OVERRIDE;
   const baseHasCustomer = normalizedRoles.some((role) => role.includes('customer'));
   const baseHasContractor = normalizedRoles.some((role) => role.includes('contractor'));
   const baseHasBison =
@@ -381,6 +382,9 @@ export default function App() {
     }
     if (hasBison) {
       items.push({ label: 'Areas', path: '/areas' });
+    }
+    if (hasBison && hasAdminArea) {
+      items.push({ label: 'Project Intake', path: '/intake' });
     }
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Manage Users', path: '/users' });
