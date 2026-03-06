@@ -28,6 +28,17 @@ function formatBytes(value) {
   return `${mb.toFixed(1)} MB`;
 }
 
+function triggerBrowserDownload(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'download';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+}
+
 export default function CustomerPictures() {
   const [project, setProject] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -37,6 +48,16 @@ export default function CustomerPictures() {
   const [status, setStatus] = useState('');
   const [previewId, setPreviewId] = useState(null);
   const photoUrlRef = useRef({});
+  const blobCacheRef = useRef(new Map());
+
+  const getCachedBlob = useCallback(async (projectId, fileId) => {
+    const key = `${projectId}:${fileId}`;
+    const cached = blobCacheRef.current.get(key);
+    if (cached) return cached;
+    const blob = await downloadProjectFile(projectId, fileId);
+    blobCacheRef.current.set(key, blob);
+    return blob;
+  }, []);
 
   const replacePhotoUrls = useCallback((nextMap) => {
     const previousMap = photoUrlRef.current || {};
@@ -79,6 +100,19 @@ export default function CustomerPictures() {
   }, [loadPhotos]);
 
   useEffect(() => {
+    if (!project?.id) {
+      blobCacheRef.current.clear();
+      return;
+    }
+    const prefix = `${project.id}:`;
+    Array.from(blobCacheRef.current.keys()).forEach((key) => {
+      if (!key.startsWith(prefix)) {
+        blobCacheRef.current.delete(key);
+      }
+    });
+  }, [project?.id]);
+
+  useEffect(() => {
     let cancelled = false;
     const loadThumbnails = async () => {
       if (!project?.id || !photos.length) {
@@ -90,7 +124,7 @@ export default function CustomerPictures() {
         photos.map(async (fileRecord) => {
           if (!fileRecord?.id) return [null, ''];
           try {
-            const blob = await downloadProjectFile(project.id, fileRecord.id);
+            const blob = await getCachedBlob(project.id, fileRecord.id);
             return [fileRecord.id, window.URL.createObjectURL(blob)];
           } catch (_error) {
             return [fileRecord.id, ''];
@@ -115,7 +149,7 @@ export default function CustomerPictures() {
     return () => {
       cancelled = true;
     };
-  }, [photos, project?.id, replacePhotoUrls]);
+  }, [photos, project?.id, replacePhotoUrls, getCachedBlob]);
 
   useEffect(() => {
     if (!previewId) return;
@@ -132,11 +166,23 @@ export default function CustomerPictures() {
         if (url) window.URL.revokeObjectURL(url);
       });
       photoUrlRef.current = {};
+      blobCacheRef.current.clear();
     };
   }, []);
 
   const previewPhoto = photos.find((item) => item.id === previewId) || null;
   const previewUrl = previewPhoto ? photoUrls[previewPhoto.id] : '';
+
+  const handleDownloadPreview = async () => {
+    if (!project?.id || !previewPhoto?.id) return;
+    setStatus('');
+    try {
+      const blob = await getCachedBlob(project.id, previewPhoto.id);
+      triggerBrowserDownload(blob, previewPhoto.filename);
+    } catch (_error) {
+      setStatus('Unable to download file.');
+    }
+  };
 
   return (
     <section className="panel">
@@ -200,9 +246,14 @@ export default function CustomerPictures() {
             <div className="modal file-preview-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
                 <div className="modal-title">{previewPhoto.filename || 'Photo preview'}</div>
-                <button className="ghost" type="button" onClick={() => setPreviewId(null)}>
-                  Close
-                </button>
+                <div className="file-preview-header-actions">
+                  <button className="ghost" type="button" onClick={handleDownloadPreview}>
+                    Download
+                  </button>
+                  <button className="ghost" type="button" onClick={() => setPreviewId(null)}>
+                    Close
+                  </button>
+                </div>
               </div>
               <div className="file-preview-body">
                 {previewUrl ? (

@@ -15,21 +15,9 @@ import {
   updateCustomer,
   updateUser
 } from '../api.js';
+import { formatStageName, STAGE_FLOW } from '../utils/stageDisplay.js';
 
-const AREA_OPTIONS = [
-  'Plans Recieved',
-  'CFS Budget',
-  'Money - D&E',
-  'Design',
-  'Engineering',
-  'Estimating',
-  'Money - Production',
-  'Manufacturing',
-  'Money - Shipping',
-  'Shipping',
-  'Management',
-  'Admin'
-];
+const AREA_OPTIONS = [...STAGE_FLOW.map((stage) => formatStageName(stage.name, stage.id)), 'Management', 'Admin'];
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();

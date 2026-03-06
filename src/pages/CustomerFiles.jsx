@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, listProjectFiles, listProjects, uploadProjectFile } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
 
@@ -73,6 +73,14 @@ function summarizeSelection(fileList, emptyLabel, noun) {
   return `${fileList.length} ${noun} selected`;
 }
 
+function getFileTypeLabel(filename) {
+  const name = String(filename || '').trim();
+  if (!name.includes('.')) return 'FILE';
+  const ext = name.split('.').pop();
+  if (!ext) return 'FILE';
+  return ext.slice(0, 5).toUpperCase();
+}
+
 export default function CustomerFiles() {
   const [project, setProject] = useState(null);
   const [files, setFiles] = useState([]);
@@ -84,7 +92,31 @@ export default function CustomerFiles() {
   const [uploadError, setUploadError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [preview, setPreview] = useState({ open: false, url: '', name: '', kind: '', text: '' });
+  const [preview, setPreview] = useState({ open: false, url: '', name: '', kind: '', text: '', record: null });
+  const [filePreviewUrls, setFilePreviewUrls] = useState({});
+  const filePreviewUrlRef = useRef({});
+  const blobCacheRef = useRef(new Map());
+
+  const getCachedBlob = useCallback(async (projectId, fileId) => {
+    const key = `${projectId}:${fileId}`;
+    const cached = blobCacheRef.current.get(key);
+    if (cached) return cached;
+    const blob = await downloadProjectFile(projectId, fileId);
+    blobCacheRef.current.set(key, blob);
+    return blob;
+  }, []);
+
+  const replaceFilePreviewUrls = useCallback((nextMap) => {
+    const previousMap = filePreviewUrlRef.current || {};
+    const nextValues = new Set(Object.values(nextMap));
+    Object.values(previousMap).forEach((url) => {
+      if (url && !nextValues.has(url)) {
+        window.URL.revokeObjectURL(url);
+      }
+    });
+    filePreviewUrlRef.current = nextMap;
+    setFilePreviewUrls(nextMap);
+  }, []);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
@@ -97,43 +129,99 @@ export default function CustomerFiles() {
       setProject(selected);
       if (!selected?.id) {
         setFiles([]);
+        replaceFilePreviewUrls({});
         return;
       }
       const fileList = await listProjectFiles(selected.id);
-      const nonImageFiles = (Array.isArray(fileList) ? fileList : []).filter((fileRecord) => !isImageFile(fileRecord));
-      setFiles(nonImageFiles);
+      setFiles(Array.isArray(fileList) ? fileList : []);
     } catch (_err) {
       setFiles([]);
+      replaceFilePreviewUrls({});
       setStatus('Unable to load project files.');
       setStatusTone('error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [replaceFilePreviewUrls]);
 
   useEffect(() => {
     loadFiles();
   }, [loadFiles]);
+
+  useEffect(() => {
+    if (!project?.id) {
+      blobCacheRef.current.clear();
+      return;
+    }
+    const prefix = `${project.id}:`;
+    Array.from(blobCacheRef.current.keys()).forEach((key) => {
+      if (!key.startsWith(prefix)) {
+        blobCacheRef.current.delete(key);
+      }
+    });
+  }, [project?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPreviews = async () => {
+      if (!project?.id || !files.length) {
+        replaceFilePreviewUrls({});
+        return;
+      }
+      const imageFiles = files.filter((item) => isImageFile(item));
+      if (!imageFiles.length) {
+        replaceFilePreviewUrls({});
+        return;
+      }
+      const entries = await Promise.all(
+        imageFiles.map(async (fileRecord) => {
+          if (!fileRecord?.id) return [null, ''];
+          try {
+            const blob = await getCachedBlob(project.id, fileRecord.id);
+            return [fileRecord.id, window.URL.createObjectURL(blob)];
+          } catch (_error) {
+            return [fileRecord.id, ''];
+          }
+        })
+      );
+      if (cancelled) {
+        entries.forEach(([, url]) => {
+          if (url) window.URL.revokeObjectURL(url);
+        });
+        return;
+      }
+      const nextMap = {};
+      entries.forEach(([id, url]) => {
+        if (id && url) nextMap[id] = url;
+      });
+      replaceFilePreviewUrls(nextMap);
+    };
+
+    loadPreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [files, project?.id, replaceFilePreviewUrls, getCachedBlob]);
 
   const handleView = async (fileRecord) => {
     if (!project?.id || !fileRecord?.id) return;
     setStatus('');
     setStatusTone('success');
     const name = fileRecord.filename || 'File preview';
-    setPreview({ open: true, url: '', name, kind: 'loading', text: '' });
+    setPreview({ open: true, url: '', name, kind: 'loading', text: '', record: fileRecord });
     setPreviewLoading(true);
     try {
-      const blob = await downloadProjectFile(project.id, fileRecord.id);
+      const blob = await getCachedBlob(project.id, fileRecord.id);
       if (isImageFile(fileRecord)) {
         const url = window.URL.createObjectURL(blob);
-        setPreview({ open: true, url, name, kind: 'image', text: '' });
+        setPreview({ open: true, url, name, kind: 'image', text: '', record: fileRecord });
         return;
       }
       if (isTextFile(fileRecord)) {
         const isTruncated = blob.size > TEXT_PREVIEW_LIMIT_BYTES;
         const textBlob = isTruncated ? blob.slice(0, TEXT_PREVIEW_LIMIT_BYTES) : blob;
         const text = await textBlob.text();
-        setPreview({ open: true, url: '', name, kind: 'text', text });
+        setPreview({ open: true, url: '', name, kind: 'text', text, record: fileRecord });
         if (isTruncated) {
           setStatus('Showing partial text preview (first 1 MB). Download for full file.');
           setStatusTone('success');
@@ -142,14 +230,14 @@ export default function CustomerFiles() {
       }
       if (isPdfFile(fileRecord)) {
         const url = window.URL.createObjectURL(blob);
-        setPreview({ open: true, url, name, kind: 'pdf', text: '' });
+        setPreview({ open: true, url, name, kind: 'pdf', text: '', record: fileRecord });
         return;
       }
-      setPreview({ open: false, url: '', name: '', kind: '', text: '' });
+      setPreview({ open: false, url: '', name: '', kind: '', text: '', record: null });
       setStatus('Preview unavailable for this file type. Use Download.');
       setStatusTone('error');
     } catch (_err) {
-      setPreview({ open: false, url: '', name: '', kind: '', text: '' });
+      setPreview({ open: false, url: '', name: '', kind: '', text: '', record: null });
       setStatus('Unable to open file.');
       setStatusTone('error');
     } finally {
@@ -162,7 +250,7 @@ export default function CustomerFiles() {
     setStatus('');
     setStatusTone('success');
     try {
-      const blob = await downloadProjectFile(project.id, fileRecord.id);
+      const blob = await getCachedBlob(project.id, fileRecord.id);
       triggerBrowserDownload(blob, fileRecord.filename);
     } catch (_err) {
       setStatus('Unable to download file.');
@@ -175,7 +263,7 @@ export default function CustomerFiles() {
       window.URL.revokeObjectURL(preview.url);
     }
     setPreviewLoading(false);
-    setPreview({ open: false, url: '', name: '', kind: '', text: '' });
+    setPreview({ open: false, url: '', name: '', kind: '', text: '', record: null });
   };
 
   useEffect(() => {
@@ -185,6 +273,17 @@ export default function CustomerFiles() {
       }
     };
   }, [preview.url]);
+
+  useEffect(() => {
+    return () => {
+      const map = filePreviewUrlRef.current || {};
+      Object.values(map).forEach((url) => {
+        if (url) window.URL.revokeObjectURL(url);
+      });
+      filePreviewUrlRef.current = {};
+      blobCacheRef.current.clear();
+    };
+  }, []);
 
   const handleUpload = async (event) => {
     event.preventDefault();
@@ -296,42 +395,46 @@ export default function CustomerFiles() {
               {uploadError ? <div className="alert">{uploadError}</div> : null}
             </div>
           </form>
-          <div className="table-scroll">
-            <table className="project-table">
-              <thead>
-                <tr>
-                  <th>File</th>
-                  <th>Size</th>
-                  <th>Uploaded</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.length ? (
-                  files.map((fileRecord) => (
-                    <tr key={fileRecord.id}>
-                      <td>{fileRecord.filename}</td>
-                      <td>{formatBytes(fileRecord.size_bytes)}</td>
-                      <td>{formatDateTime(fileRecord.created_at)}</td>
-                      <td>
-                        <div className="file-row-actions">
-                          <button className="ghost" type="button" onClick={() => handleView(fileRecord)}>
-                            View
-                          </button>
-                          <button className="ghost" type="button" onClick={() => handleDownload(fileRecord)}>
-                            Download
-                          </button>
+          <div className="photo-gallery-panel">
+            {files.length ? (
+              <div className="photo-gallery">
+                {files.map((fileRecord) => (
+                  <button
+                    key={fileRecord.id}
+                    type="button"
+                    className="photo-card file-card"
+                    onClick={() => handleView(fileRecord)}
+                  >
+                    <div className="photo-thumb-wrap file-thumb-wrap">
+                      {isImageFile(fileRecord) ? (
+                        filePreviewUrls[fileRecord.id] ? (
+                          <img className="photo-thumb" src={filePreviewUrls[fileRecord.id]} alt={fileRecord.filename} />
+                        ) : (
+                          <div className="photo-thumb-placeholder">Loading...</div>
+                        )
+                      ) : (
+                        <div className="file-thumb-placeholder">
+                          <span className="file-thumb-type">{getFileTypeLabel(fileRecord.filename)}</span>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr className="empty-row">
-                    <td colSpan={4}>No files uploaded yet.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      )}
+                    </div>
+                    <div className="photo-meta">
+                      <div className="photo-name" title={fileRecord.filename}>
+                        {fileRecord.filename}
+                      </div>
+                      <div className="photo-sub muted">
+                        <span>{formatDateTime(fileRecord.created_at)}</span>
+                        <span>{formatBytes(fileRecord.size_bytes)}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p className="muted">No files uploaded yet.</p>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -342,9 +445,19 @@ export default function CustomerFiles() {
             <div className="modal file-preview-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
                 <div className="modal-title">{preview.name}</div>
-                <button className="ghost" type="button" onClick={closePreview}>
-                  Close
-                </button>
+                <div className="file-preview-header-actions">
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => preview.record && handleDownload(preview.record)}
+                    disabled={!preview.record}
+                  >
+                    Download
+                  </button>
+                  <button className="ghost" type="button" onClick={closePreview}>
+                    Close
+                  </button>
+                </div>
               </div>
               <div className="file-preview-body">
                 {previewLoading || preview.kind === 'loading' ? (

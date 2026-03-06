@@ -11,21 +11,9 @@ import {
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
 
-const ALL_AREA_STAGE_IDS = [
-  'plans_received',
-  'budget',
-  'money_design',
-  'design',
-  'engineering',
-  'estimating',
-  'money_production',
-  'manufacturing',
-  'money_shipping',
-  'shipping',
-  'final_payment',
-  'completed'
-];
+const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
 
 const AREA_STAGE_MAP = {
   'plans recieved': ['plans_received'],
@@ -59,36 +47,9 @@ const AREA_STAGE_MAP = {
   administrator: ALL_AREA_STAGE_IDS
 };
 
-const AREA_FLOW_ORDER = [
-  'Plans Recieved',
-  'CFS Budget',
-  'Money - D&E',
-  'Design',
-  'Engineering',
-  'Estimating',
-  'Money - Production',
-  'Manufacturing',
-  'Money - Shipping',
-  'Shipping',
-  'Management',
-  'Admin'
-];
+const AREA_FLOW_ORDER = [...STAGE_FLOW.map((stage) => formatStageName(stage.name, stage.id)), 'Management', 'Admin'];
 
-const ADMIN_AREA_OPTIONS = [
-  'Admin',
-  'Plans Recieved',
-  'CFS Budget',
-  'Money - D&E',
-  'Design',
-  'Engineering',
-  'Estimating',
-  'Money - Production',
-  'Manufacturing',
-  'Money - Shipping',
-  'Shipping',
-  'Final Payment',
-  'Completed'
-];
+const ADMIN_AREA_OPTIONS = ['Admin', ...STAGE_FLOW.map((stage) => formatStageName(stage.name, stage.id))];
 
 const DETAIL_TABS = [
   { id: 'details', label: 'Details' },
@@ -360,13 +321,13 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
             : new Set(['awaiting_approval', 'in_progress']);
       const filtered = selectedKey === 'admin'
         ? (Array.isArray(projects) ? projects : []).flatMap((project) => {
-            const stage = currentProjectStage(project.stages || []);
+            const stage = currentProjectStage(normalizeProjectStages(project.stages || []));
             if (!stage || !visibleStatuses.has(stage.status)) return [];
             return [{ project, stage }];
           })
         : (Array.isArray(projects) ? projects : [])
             .flatMap((project) =>
-              (Array.isArray(project.stages) ? project.stages : [])
+              normalizeProjectStages(project.stages || [])
                 .filter((stage) => stageIds.includes(stage.id) && visibleStatuses.has(stage.status))
                 .map((stage) => ({ project, stage }))
             );
@@ -511,7 +472,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
       const updatedStage = await updateStage(selectedRow.project.id, selectedRow.stage.id, {
         area_note: noteText,
         event_title: 'Area note updated',
-        event_meta: { stage: selectedRow.stage.name }
+        event_meta: { stage: formatStageName(selectedRow.stage.name, selectedRow.stage.id) }
       });
       setRows((prev) =>
         prev.map((entry) => {
@@ -811,7 +772,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                 return (
                   <tr
                     key={`${project.id}-${stage.id}`}
-                    onClick={() => {
+                    onDoubleClick={() => {
                       setSelectedRow({ project, stage });
                       setDetailTab('details');
                     }}
@@ -965,7 +926,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>{selectedRow.stage.name}</td>
+                      <td>{formatStageName(selectedRow.stage.name, selectedRow.stage.id)}</td>
                       <td>{selectedRow.stage.owner}</td>
                       <td>
                         <span className={`status-pill ${stageStatusClass(selectedRow.stage.status)}`}>

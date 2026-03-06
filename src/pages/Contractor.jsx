@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { listProjects } from '../api.js';
+import { formatStageName, normalizeProjectStages } from '../utils/stageDisplay.js';
 
 const NOTICE_LEVELS = ['green', 'yellow', 'red'];
 const TONE_COLORS = {
@@ -65,13 +66,14 @@ export default function Contractor() {
       .then((projects) => {
         if (!active) return;
         const mapped = (projects || []).map((project) => {
-          const stage = currentStage(project.stages);
+          const stages = normalizeProjectStages(project.stages || []);
+          const stage = currentStage(stages);
           return {
             id: project.id,
             projectNumber: project.project_number || '',
             name: project.name || 'Unnamed project',
-            area: stage?.name || 'Pending',
-            progress: completionPercent(project.stages),
+            area: formatStageName(stage?.name, stage?.id) || 'Pending',
+            progress: completionPercent(stages),
             statusTone: stageNoticeTone(stage)
           };
         });

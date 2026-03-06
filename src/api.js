@@ -1,4 +1,4 @@
-const LOCAL_API_FALLBACK = 'http://localhost:8000';
+const LOCAL_API_FALLBACK = '/api';
 const PRODUCTION_API_FALLBACK = 'https://api.scottsdaleutah.com';
 const ALLOW_API_OVERRIDE =
   String(import.meta.env.VITE_ALLOW_API_OVERRIDE || '')
@@ -19,6 +19,7 @@ function isLoopbackHost(hostname) {
 }
 
 function assertSecureApiBase(baseUrl) {
+  if (String(baseUrl || '').startsWith('/')) return;
   if (!ENFORCE_SECURE_API) return;
   let parsed;
   try {
@@ -48,6 +49,9 @@ function normalizeApiBase(value) {
 export function getApiBase() {
   const envBase = normalizeApiBase(import.meta.env.VITE_API_URL || import.meta.env.VITE_PIPELINE_API_URL);
   if (envBase) return envBase;
+  if (import.meta.env.DEV) {
+    return LOCAL_API_FALLBACK;
+  }
   if (ALLOW_API_OVERRIDE) {
     const stored = normalizeApiBase(localStorage.getItem('bw_api_url'));
     if (stored) return stored;

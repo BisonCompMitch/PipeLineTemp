@@ -17,6 +17,7 @@ import {
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
 
 const NOTICE_LEVELS = ['green', 'yellow', 'red'];
 const TONE_COLORS = {
@@ -53,20 +54,7 @@ const DETAIL_TABS = [
 
 const DASHBOARD_FILTER_ALL = '__all__';
 
-const ALL_AREA_STAGE_IDS = [
-  'plans_received',
-  'budget',
-  'money_design',
-  'design',
-  'engineering',
-  'estimating',
-  'money_production',
-  'manufacturing',
-  'money_shipping',
-  'shipping',
-  'final_payment',
-  'completed'
-];
+const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
 
 const AREA_FILTER_TO_STAGE_IDS = {
   'plans recieved': ['plans_received'],
@@ -173,17 +161,18 @@ function isCompletedDashboardRow(row) {
 }
 
 function toRow(project) {
-  const stage = currentStage(project.stages);
+  const normalizedStages = normalizeProjectStages(project.stages || []);
+  const stage = currentStage(normalizedStages);
   return {
     id: project.id,
     projectNumber: project.project_number || '',
     name: project.name || 'Unnamed project',
-    area: stage?.name || 'Pending',
+    area: formatStageName(stage?.name, stage?.id) || 'Pending',
     areaId: stage?.id || '',
     areaNote: String(stage?.area_note || '').trim(),
     areaNoteUpdatedBy: String(stage?.area_note_updated_by || '').trim(),
     areaNoteUpdatedAt: stage?.area_note_updated_at || null,
-    progress: completionPercent(project.stages),
+    progress: completionPercent(normalizedStages),
     statusTone: stageNoticeTone(stage),
     isDeleted: Boolean(project.is_deleted),
     project
@@ -311,7 +300,7 @@ function dashboardAreaNotesKey(projectId, stageId) {
 }
 
 function formatDashboardAreaNotesTooltip(entries = [], areaName = '') {
-  const safeAreaName = String(areaName || '').trim() || 'Area';
+  const safeAreaName = formatStageName(areaName) || 'Area';
   if (!entries.length) {
     return `All notes (${safeAreaName})\n\nNo notes yet.`;
   }
@@ -326,7 +315,7 @@ function formatDashboardAreaNotesTooltip(entries = [], areaName = '') {
 }
 
 function formatStageNotesTooltip(entries = [], stageName = '') {
-  const safeStageName = String(stageName || '').trim() || 'Stage';
+  const safeStageName = formatStageName(stageName) || 'Stage';
   if (!entries.length) {
     return `All notes (${safeStageName})\n\nNo notes yet.`;
   }
@@ -483,18 +472,22 @@ export default function Pipeline({
 
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
+  const detailStages = useMemo(
+    () => normalizeProjectStages(detailProject?.stages || []),
+    [detailProject?.stages]
+  );
   const projectIsComplete = useMemo(() => {
-    const stages = detailProject?.stages || [];
+    const stages = detailStages;
     if (!stages.length) return false;
     return stages.every((stage) => String(stage.status || '').toLowerCase() === 'complete');
-  }, [detailProject]);
+  }, [detailStages]);
   const detailCurrentStage = useMemo(
-    () => currentStage(detailProject?.stages || []),
-    [detailProject]
+    () => currentStage(detailStages),
+    [detailStages]
   );
   const detailProgress = useMemo(
-    () => completionPercent(detailProject?.stages || []),
-    [detailProject]
+    () => completionPercent(detailStages),
+    [detailStages]
   );
   const stageNoteTooltipByStageId = useMemo(() => {
     const grouped = new Map();
@@ -505,14 +498,14 @@ export default function Pipeline({
       grouped.get(key).push(entry);
     });
     const tooltips = new Map();
-    (detailProject?.stages || []).forEach((stage) => {
+    detailStages.forEach((stage) => {
       const entries = [...(grouped.get(stage.id) || [])].sort(
         (a, b) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime()
       );
-      tooltips.set(stage.id, formatStageNotesTooltip(entries, stage.name));
+      tooltips.set(stage.id, formatStageNotesTooltip(entries, formatStageName(stage.name, stage.id)));
     });
     return tooltips;
-  }, [stageNotesHistory, detailProject]);
+  }, [stageNotesHistory, detailStages]);
   const stageNoteCountByStageId = useMemo(() => {
     const counts = new Map();
     stageNotesHistory.forEach((entry) => {
@@ -665,22 +658,19 @@ export default function Pipeline({
   }, []);
 
   useEffect(() => {
-    if (!detailProject?.stages?.length) {
+    if (!detailStages.length) {
       setAreaSelection('');
       return;
     }
-    const current = currentStage(detailProject.stages);
+    const current = currentStage(detailStages);
     setAreaSelection(current?.id || '');
-  }, [detailProject]);
+  }, [detailStages]);
 
   useEffect(() => {
     setDetailStageNoteDraft('');
   }, [detailCurrentStage?.id]);
 
-  const stageOptions = useMemo(
-    () => (detailProject?.stages ? [...detailProject.stages] : []),
-    [detailProject]
-  );
+  const stageOptions = useMemo(() => [...detailStages], [detailStages]);
 
   const openDetails = async (row) => {
     if (!row?.id) return;
@@ -1100,7 +1090,7 @@ export default function Pipeline({
       <tr
         key={row.id || `${row.name}-${keyPrefix}-${idx}`}
         className={row.isDeleted ? 'row-archived' : ''}
-        onClick={() => openDetails(row)}
+        onDoubleClick={() => openDetails(row)}
       >
         <td className={showHoverNotes ? 'dashboard-name-with-notes' : ''} title={projectNotesTitle}>
           {row.projectNumber ? `${row.projectNumber} - ${row.name}` : row.name}
@@ -1128,7 +1118,7 @@ export default function Pipeline({
         <div className="panel-header">
           <div>
             <h2>Dashboard</h2>
-            <p className="muted">Click a project row to view details.</p>
+            <p className="muted">Double-click a project row to view details.</p>
           </div>
           <div className="detail-header-actions">
             <label className="pipeline-area-select">
@@ -1362,12 +1352,12 @@ export default function Pipeline({
                         <select value={areaSelection} onChange={(event) => setAreaSelection(event.target.value)}>
                           {stageOptions.map((stage) => (
                             <option key={stage.id} value={stage.id}>
-                              {stage.name}
+                              {formatStageName(stage.name, stage.id)}
                             </option>
                           ))}
                         </select>
                       ) : (
-                        <input value={detailCurrentStage?.name || '-'} readOnly />
+                        <input value={formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'} readOnly />
                       )}
                     </label>
                     <label className="span-2">
@@ -1429,12 +1419,12 @@ export default function Pipeline({
                 <div className="detail-card">
                   <h3>Stages</h3>
                   <div className="table-scroll project-stage-table">
-                    {(detailProject.stages || []).length ? (
+                    {detailStages.length ? (
                       <table className="project-table stage-matrix-table">
                         <thead>
                           <tr>
                             <th className="stage-matrix-label">Field</th>
-                            {(detailProject.stages || []).map((stage) => {
+                            {detailStages.map((stage) => {
                               const count = stageNoteCountByStageId.get(stage.id) || 0;
                               const notesTitle = stageNoteTooltipByStageId.get(stage.id) || '';
                               return (
@@ -1443,7 +1433,7 @@ export default function Pipeline({
                                   className={`stage-matrix-stage${count ? ' has-notes' : ''}`}
                                   title={notesTitle}
                                 >
-                                  {stage.name}
+                                  {formatStageName(stage.name, stage.id)}
                                 </th>
                               );
                             })}
@@ -1452,7 +1442,7 @@ export default function Pipeline({
                         <tbody>
                           <tr>
                             <th className="stage-matrix-label">Owner</th>
-                            {(detailProject.stages || []).map((stage) => (
+                            {detailStages.map((stage) => (
                               <td key={`${stage.id}-owner`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
                                 {stage.owner}
                               </td>
@@ -1460,7 +1450,7 @@ export default function Pipeline({
                           </tr>
                           <tr>
                             <th className="stage-matrix-label">Status</th>
-                            {(detailProject.stages || []).map((stage) => (
+                            {detailStages.map((stage) => (
                               <td key={`${stage.id}-status`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
                                 <span className={`status-pill ${stageStatusClass(stage.status)}`}>
                                   {String(stage.status || 'pending').replace('_', ' ')}
@@ -1470,7 +1460,7 @@ export default function Pipeline({
                           </tr>
                           <tr>
                             <th className="stage-matrix-label">Expected (hrs)</th>
-                            {(detailProject.stages || []).map((stage) => (
+                            {detailStages.map((stage) => (
                               <td key={`${stage.id}-expected`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
                                 {Number(stage.expected_hours ?? stage.default_duration_hours ?? 0)}
                               </td>
@@ -1478,7 +1468,7 @@ export default function Pipeline({
                           </tr>
                           <tr>
                             <th className="stage-matrix-label">Started</th>
-                            {(detailProject.stages || []).map((stage) => (
+                            {detailStages.map((stage) => (
                               <td key={`${stage.id}-started`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
                                 {formatDateTime(stage.started_at)}
                               </td>
@@ -1486,7 +1476,7 @@ export default function Pipeline({
                           </tr>
                           <tr>
                             <th className="stage-matrix-label">Completed</th>
-                            {(detailProject.stages || []).map((stage) => (
+                            {detailStages.map((stage) => (
                               <td key={`${stage.id}-completed`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
                                 {formatDateTime(stage.completed_at)}
                               </td>
