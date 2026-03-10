@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadProjectFile, listProjectFiles, listProjects, uploadProjectFile } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
 
@@ -93,9 +93,8 @@ export default function CustomerFiles() {
   const [dragActive, setDragActive] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState({ open: false, url: '', name: '', kind: '', text: '', record: null });
-  const [filePreviewUrls, setFilePreviewUrls] = useState({});
-  const filePreviewUrlRef = useRef({});
   const blobCacheRef = useRef(new Map());
+  const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -104,18 +103,6 @@ export default function CustomerFiles() {
     const blob = await downloadProjectFile(projectId, fileId);
     blobCacheRef.current.set(key, blob);
     return blob;
-  }, []);
-
-  const replaceFilePreviewUrls = useCallback((nextMap) => {
-    const previousMap = filePreviewUrlRef.current || {};
-    const nextValues = new Set(Object.values(nextMap));
-    Object.values(previousMap).forEach((url) => {
-      if (url && !nextValues.has(url)) {
-        window.URL.revokeObjectURL(url);
-      }
-    });
-    filePreviewUrlRef.current = nextMap;
-    setFilePreviewUrls(nextMap);
   }, []);
 
   const loadFiles = useCallback(async () => {
@@ -129,20 +116,18 @@ export default function CustomerFiles() {
       setProject(selected);
       if (!selected?.id) {
         setFiles([]);
-        replaceFilePreviewUrls({});
         return;
       }
       const fileList = await listProjectFiles(selected.id);
       setFiles(Array.isArray(fileList) ? fileList : []);
     } catch (_err) {
       setFiles([]);
-      replaceFilePreviewUrls({});
       setStatus('Unable to load project files.');
       setStatusTone('error');
     } finally {
       setLoading(false);
     }
-  }, [replaceFilePreviewUrls]);
+  }, []);
 
   useEffect(() => {
     loadFiles();
@@ -160,48 +145,6 @@ export default function CustomerFiles() {
       }
     });
   }, [project?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadPreviews = async () => {
-      if (!project?.id || !files.length) {
-        replaceFilePreviewUrls({});
-        return;
-      }
-      const imageFiles = files.filter((item) => isImageFile(item));
-      if (!imageFiles.length) {
-        replaceFilePreviewUrls({});
-        return;
-      }
-      const entries = await Promise.all(
-        imageFiles.map(async (fileRecord) => {
-          if (!fileRecord?.id) return [null, ''];
-          try {
-            const blob = await getCachedBlob(project.id, fileRecord.id);
-            return [fileRecord.id, window.URL.createObjectURL(blob)];
-          } catch (_error) {
-            return [fileRecord.id, ''];
-          }
-        })
-      );
-      if (cancelled) {
-        entries.forEach(([, url]) => {
-          if (url) window.URL.revokeObjectURL(url);
-        });
-        return;
-      }
-      const nextMap = {};
-      entries.forEach(([id, url]) => {
-        if (id && url) nextMap[id] = url;
-      });
-      replaceFilePreviewUrls(nextMap);
-    };
-
-    loadPreviews();
-    return () => {
-      cancelled = true;
-    };
-  }, [files, project?.id, replaceFilePreviewUrls, getCachedBlob]);
 
   const handleView = async (fileRecord) => {
     if (!project?.id || !fileRecord?.id) return;
@@ -276,11 +219,6 @@ export default function CustomerFiles() {
 
   useEffect(() => {
     return () => {
-      const map = filePreviewUrlRef.current || {};
-      Object.values(map).forEach((url) => {
-        if (url) window.URL.revokeObjectURL(url);
-      });
-      filePreviewUrlRef.current = {};
       blobCacheRef.current.clear();
     };
   }, []);
@@ -396,9 +334,9 @@ export default function CustomerFiles() {
             </div>
           </form>
           <div className="photo-gallery-panel">
-            {files.length ? (
+            {documentFiles.length ? (
               <div className="photo-gallery">
-                {files.map((fileRecord) => (
+                {documentFiles.map((fileRecord) => (
                   <button
                     key={fileRecord.id}
                     type="button"
@@ -406,17 +344,9 @@ export default function CustomerFiles() {
                     onClick={() => handleView(fileRecord)}
                   >
                     <div className="photo-thumb-wrap file-thumb-wrap">
-                      {isImageFile(fileRecord) ? (
-                        filePreviewUrls[fileRecord.id] ? (
-                          <img className="photo-thumb" src={filePreviewUrls[fileRecord.id]} alt={fileRecord.filename} />
-                        ) : (
-                          <div className="photo-thumb-placeholder">Loading...</div>
-                        )
-                      ) : (
-                        <div className="file-thumb-placeholder">
-                          <span className="file-thumb-type">{getFileTypeLabel(fileRecord.filename)}</span>
-                        </div>
-                      )}
+                      <div className="file-thumb-placeholder">
+                        <span className="file-thumb-type">{getFileTypeLabel(fileRecord.filename)}</span>
+                      </div>
                     </div>
                     <div className="photo-meta">
                       <div className="photo-name" title={fileRecord.filename}>

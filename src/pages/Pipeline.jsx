@@ -281,6 +281,14 @@ function summarizeSelection(fileList, emptyLabel, noun) {
   return `${fileList.length} ${noun} selected`;
 }
 
+function getFileTypeLabel(filename) {
+  const name = String(filename || '').trim();
+  if (!name.includes('.')) return 'FILE';
+  const ext = name.split('.').pop();
+  if (!ext) return 'FILE';
+  return ext.slice(0, 5).toUpperCase();
+}
+
 function triggerBrowserDownload(blob, filename) {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -368,6 +376,7 @@ export default function Pipeline({
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewRecord, setPreviewRecord] = useState(null);
   const [preview, setPreview] = useState({
     open: false,
     url: '',
@@ -388,6 +397,7 @@ export default function Pipeline({
       window.URL.revokeObjectURL(preview.url);
     }
     setPreviewLoading(false);
+    setPreviewRecord(null);
     setPreview({ open: false, url: '', name: '', kind: '', text: '' });
   }, [preview.url]);
 
@@ -925,6 +935,7 @@ export default function Pipeline({
     if (!detailProject?.id || !fileRecord?.id) return;
     setFilesError('');
     const name = fileRecord.filename || 'File preview';
+    setPreviewRecord(fileRecord);
     setPreview({ open: true, url: '', name, kind: 'loading', text: '' });
     setPreviewLoading(true);
     try {
@@ -950,9 +961,11 @@ export default function Pipeline({
         return;
       }
       setPreview({ open: false, url: '', name: '', kind: '', text: '' });
+      setPreviewRecord(null);
       setFilesError('Preview unavailable for this file type. Use Download.');
     } catch (_err) {
       setPreview({ open: false, url: '', name: '', kind: '', text: '' });
+      setPreviewRecord(null);
       setFilesError('Unable to open file.');
     } finally {
       setPreviewLoading(false);
@@ -972,12 +985,22 @@ export default function Pipeline({
 
   const handleDeleteFile = async (fileRecord) => {
     if (!detailProject?.id || !fileRecord?.id) return;
-    if (!window.confirm(`Delete ${fileRecord.filename}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete ${fileRecord.filename}? This cannot be undone.`)) return false;
     try {
       await deleteProjectFile(detailProject.id, fileRecord.id);
       setFiles((prev) => prev.filter((item) => item.id !== fileRecord.id));
+      return true;
     } catch (_err) {
       setFilesError('Unable to delete file.');
+      return false;
+    }
+  };
+
+  const handleDeletePreviewFile = async () => {
+    if (!previewRecord) return;
+    const deleted = await handleDeleteFile(previewRecord);
+    if (deleted) {
+      closePreview();
     }
   };
 
@@ -1576,75 +1599,52 @@ export default function Pipeline({
                   </form>
                   {filesError ? <div className="alert">{filesError}</div> : null}
                   {filesLoading ? <p className="muted">Loading files...</p> : null}
-                  <div className="table-scroll">
-                    <table className="project-table">
-                      <thead>
-                        <tr>
-                          <th>File</th>
-                          <th>Size</th>
-                          <th>Uploaded</th>
-                          <th>Customer</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {documentFiles.length ? (
-                          documentFiles.map((fileRecord) => (
-                            <tr key={fileRecord.id}>
-                              <td>{fileRecord.filename}</td>
-                              <td>{formatBytes(fileRecord.size_bytes)}</td>
-                              <td>{formatDateTime(fileRecord.created_at)}</td>
-                              <td>
-                                <label className="switch-field">
-                                  <input
-                                    type="checkbox"
-                                    checked={coerceBool(fileRecord.customer_visible)}
-                                    onChange={(event) =>
-                                      handleToggleFileVisibility(fileRecord, event.target.checked)
-                                    }
-                                  />
-                                  <span className="switch-track" aria-hidden="true">
-                                    <span className="switch-thumb" />
-                                  </span>
-                                  <span className="switch-text">Visible</span>
-                                </label>
-                              </td>
-                              <td>
-                                <div className="file-row-actions">
-                                  <button
-                                    className="ghost"
-                                    type="button"
-                                    onClick={() => handleViewFile(fileRecord)}
-                                  >
-                                    View
-                                  </button>
-                                  <button
-                                    className="ghost"
-                                    type="button"
-                                    onClick={() => handleDownloadFile(fileRecord)}
-                                  >
-                                    Download
-                                  </button>
-                                  {canEditProjects ? (
-                                    <button
-                                      className="ghost danger"
-                                      type="button"
-                                      onClick={() => handleDeleteFile(fileRecord)}
-                                    >
-                                      Delete
-                                    </button>
-                                  ) : null}
+                  <div className="photo-gallery-panel">
+                    {documentFiles.length ? (
+                      <div className="photo-gallery upload-card-gallery">
+                        {documentFiles.map((fileRecord) => (
+                          <div key={fileRecord.id} className="photo-card file-card compact-upload-card">
+                            <button
+                              className="file-card-open"
+                              type="button"
+                              onClick={() => handleViewFile(fileRecord)}
+                            >
+                              <div className="photo-thumb-wrap file-thumb-wrap">
+                                <div className="file-thumb-placeholder">
+                                  <span className="file-thumb-type">{getFileTypeLabel(fileRecord.filename)}</span>
                                 </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr className="empty-row">
-                            <td colSpan={5}>No files uploaded yet.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                              </div>
+                              <div className="photo-meta">
+                                <div className="photo-name" title={fileRecord.filename}>
+                                  {fileRecord.filename}
+                                </div>
+                                <div className="photo-sub muted">
+                                  <span>{formatDateTime(fileRecord.created_at)}</span>
+                                  <span>{formatBytes(fileRecord.size_bytes)}</span>
+                                </div>
+                              </div>
+                            </button>
+                            <label className="switch-field compact-card-switch">
+                              <input
+                                type="checkbox"
+                                checked={coerceBool(fileRecord.customer_visible)}
+                                onChange={(event) =>
+                                  handleToggleFileVisibility(fileRecord, event.target.checked)
+                                }
+                              />
+                              <span className="switch-track" aria-hidden="true">
+                                <span className="switch-thumb" />
+                              </span>
+                              <span className="switch-text">Customer view</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <p className="muted">No files uploaded yet.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 ) : null}
@@ -1712,75 +1712,50 @@ export default function Pipeline({
                     </div>
                   </form>
                   {photoError ? <div className="alert">{photoError}</div> : null}
-                  <div className="table-scroll">
-                    <table className="project-table">
-                      <thead>
-                        <tr>
-                          <th>Photo</th>
-                          <th>Size</th>
-                          <th>Uploaded</th>
-                          <th>Customer</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {photoFiles.length ? (
-                          photoFiles.map((fileRecord) => (
-                            <tr key={fileRecord.id}>
-                              <td>{fileRecord.filename}</td>
-                              <td>{formatBytes(fileRecord.size_bytes)}</td>
-                              <td>{formatDateTime(fileRecord.created_at)}</td>
-                              <td>
-                                <label className="switch-field">
-                                  <input
-                                    type="checkbox"
-                                    checked={coerceBool(fileRecord.customer_visible)}
-                                    onChange={(event) =>
-                                      handleToggleFileVisibility(fileRecord, event.target.checked)
-                                    }
-                                  />
-                                  <span className="switch-track" aria-hidden="true">
-                                    <span className="switch-thumb" />
-                                  </span>
-                                  <span className="switch-text">Visible</span>
-                                </label>
-                              </td>
-                              <td>
-                                <div className="file-row-actions">
-                                  <button
-                                    className="ghost"
-                                    type="button"
-                                    onClick={() => handleViewFile(fileRecord)}
-                                  >
-                                    View
-                                  </button>
-                                  <button
-                                    className="ghost"
-                                    type="button"
-                                    onClick={() => handleDownloadFile(fileRecord)}
-                                  >
-                                    Download
-                                  </button>
-                                  {canEditProjects ? (
-                                    <button
-                                      className="ghost danger"
-                                      type="button"
-                                      onClick={() => handleDeleteFile(fileRecord)}
-                                    >
-                                      Delete
-                                    </button>
-                                  ) : null}
+                  <div className="photo-gallery-panel">
+                    {photoFiles.length ? (
+                      <div className="photo-gallery upload-card-gallery">
+                        {photoFiles.map((fileRecord) => (
+                          <div key={fileRecord.id} className="photo-card compact-upload-card">
+                            <button
+                              className="file-card-open"
+                              type="button"
+                              onClick={() => handleViewFile(fileRecord)}
+                            >
+                              <div className="photo-thumb-wrap">
+                                <div className="photo-thumb-placeholder">Photo</div>
+                              </div>
+                              <div className="photo-meta">
+                                <div className="photo-name" title={fileRecord.filename}>
+                                  {fileRecord.filename}
                                 </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr className="empty-row">
-                            <td colSpan={5}>No photos uploaded yet.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                                <div className="photo-sub muted">
+                                  <span>{formatDateTime(fileRecord.created_at)}</span>
+                                  <span>{formatBytes(fileRecord.size_bytes)}</span>
+                                </div>
+                              </div>
+                            </button>
+                            <label className="switch-field compact-card-switch">
+                              <input
+                                type="checkbox"
+                                checked={coerceBool(fileRecord.customer_visible)}
+                                onChange={(event) =>
+                                  handleToggleFileVisibility(fileRecord, event.target.checked)
+                                }
+                              />
+                              <span className="switch-track" aria-hidden="true">
+                                <span className="switch-thumb" />
+                              </span>
+                              <span className="switch-text">Customer view</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <p className="muted">No photos uploaded yet.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 ) : null}
@@ -1798,9 +1773,29 @@ export default function Pipeline({
             <div className="modal file-preview-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
                 <div className="modal-title">{preview.name}</div>
-                <button className="ghost" type="button" onClick={closePreview}>
-                  Close
-                </button>
+                <div className="file-preview-header-actions">
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => previewRecord && handleDownloadFile(previewRecord)}
+                    disabled={!previewRecord}
+                  >
+                    Download
+                  </button>
+                  {canEditProjects ? (
+                    <button
+                      className="ghost danger"
+                      type="button"
+                      onClick={handleDeletePreviewFile}
+                      disabled={!previewRecord}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                  <button className="ghost" type="button" onClick={closePreview}>
+                    Close
+                  </button>
+                </div>
               </div>
               <div className="file-preview-body">
                 {previewLoading || preview.kind === 'loading' ? (
