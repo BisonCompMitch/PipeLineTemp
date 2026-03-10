@@ -1325,11 +1325,40 @@ body::before {
 
 .compact-card-switch {
   width: 100%;
-  justify-content: space-between;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  font-weight: 500;
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: rgba(15, 23, 42, 0.22);
+}
+
+.compact-card-switch .switch-track {
+  width: 36px;
+  height: 20px;
+  padding: 1px;
+  flex: 0 0 auto;
+}
+
+.compact-card-switch .switch-thumb {
+  width: 16px;
+  height: 16px;
+}
+
+.compact-card-switch input:checked + .switch-track .switch-thumb {
+  transform: translateX(16px);
+}
+
+.compact-card-switch .switch-text {
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .file-thumb-wrap {

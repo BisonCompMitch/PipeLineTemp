@@ -378,6 +378,7 @@ export default function Pipeline({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
   const [cardPreviewUrls, setCardPreviewUrls] = useState({});
+  const [cardPreviewStatus, setCardPreviewStatus] = useState({});
   const [preview, setPreview] = useState({
     open: false,
     url: '',
@@ -428,6 +429,7 @@ export default function Pipeline({
     if (!detailProject?.id) {
       previewBlobCacheRef.current.clear();
       replaceCardPreviewUrls({});
+      setCardPreviewStatus({});
       return;
     }
     const prefix = `${detailProject.id}:`;
@@ -443,13 +445,21 @@ export default function Pipeline({
     const loadCardPreviews = async () => {
       if (!detailProject?.id || !files.length) {
         replaceCardPreviewUrls({});
+        setCardPreviewStatus({});
         return;
       }
       const imageFiles = files.filter((fileRecord) => isImageFile(fileRecord));
       if (!imageFiles.length) {
         replaceCardPreviewUrls({});
+        setCardPreviewStatus({});
         return;
       }
+      setCardPreviewStatus(
+        imageFiles.reduce((acc, fileRecord) => {
+          if (fileRecord?.id) acc[fileRecord.id] = 'loading';
+          return acc;
+        }, {})
+      );
       const entries = await Promise.all(
         imageFiles.map(async (fileRecord) => {
           if (!fileRecord?.id) return [null, ''];
@@ -473,10 +483,18 @@ export default function Pipeline({
         return;
       }
       const nextMap = {};
+      const nextStatus = {};
       entries.forEach(([id, url]) => {
-        if (id && url) nextMap[id] = url;
+        if (!id) return;
+        if (url) {
+          nextMap[id] = url;
+          nextStatus[id] = 'ready';
+        } else {
+          nextStatus[id] = 'error';
+        }
       });
       replaceCardPreviewUrls(nextMap);
+      setCardPreviewStatus(nextStatus);
     };
 
     loadCardPreviews();
@@ -1810,7 +1828,13 @@ export default function Pipeline({
                               onClick={() => handleViewFile(fileRecord)}
                             >
                               <div className="photo-thumb-wrap">
-                                <div className="photo-thumb-placeholder">Photo</div>
+                                {cardPreviewUrls[fileRecord.id] ? (
+                                  <img className="photo-thumb" src={cardPreviewUrls[fileRecord.id]} alt={fileRecord.filename} />
+                                ) : (
+                                  <div className="photo-thumb-placeholder">
+                                    {cardPreviewStatus[fileRecord.id] === 'loading' ? 'Loading...' : 'No preview'}
+                                  </div>
+                                )}
                               </div>
                               <div className="photo-meta">
                                 <div className="photo-name" title={fileRecord.filename}>

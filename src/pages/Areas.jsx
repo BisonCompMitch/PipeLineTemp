@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   deleteProjectFile,
   downloadProjectFile,
@@ -278,6 +278,8 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
+  const [cardPreviewUrls, setCardPreviewUrls] = useState({});
+  const [cardPreviewStatus, setCardPreviewStatus] = useState({});
   const [preview, setPreview] = useState({
     open: false,
     url: '',
@@ -285,6 +287,8 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     kind: '',
     text: ''
   });
+  const cardPreviewUrlRef = useRef({});
+  const previewBlobCacheRef = useRef(new Map());
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
   const selectedAreaStageIds = useMemo(() => {
@@ -301,6 +305,18 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     setPreview({ open: false, url: '', name: '', kind: '', text: '' });
   };
 
+  const replaceCardPreviewUrls = useCallback((nextMap) => {
+    const previousMap = cardPreviewUrlRef.current || {};
+    const nextValues = new Set(Object.values(nextMap));
+    Object.values(previousMap).forEach((url) => {
+      if (url && !nextValues.has(url)) {
+        window.URL.revokeObjectURL(url);
+      }
+    });
+    cardPreviewUrlRef.current = nextMap;
+    setCardPreviewUrls(nextMap);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (preview.url) {
@@ -308,6 +324,97 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
       }
     };
   }, [preview.url]);
+
+  useEffect(() => {
+    const projectId = selectedRow?.project?.id;
+    if (!projectId) {
+      previewBlobCacheRef.current.clear();
+      replaceCardPreviewUrls({});
+      setCardPreviewStatus({});
+      return;
+    }
+    const prefix = `${projectId}:`;
+    Array.from(previewBlobCacheRef.current.keys()).forEach((key) => {
+      if (!key.startsWith(prefix)) {
+        previewBlobCacheRef.current.delete(key);
+      }
+    });
+  }, [selectedRow?.project?.id, replaceCardPreviewUrls]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const projectId = selectedRow?.project?.id;
+    const loadCardPreviews = async () => {
+      if (!projectId || !files.length) {
+        replaceCardPreviewUrls({});
+        setCardPreviewStatus({});
+        return;
+      }
+      const imageFiles = files.filter((fileRecord) => isImageFile(fileRecord));
+      if (!imageFiles.length) {
+        replaceCardPreviewUrls({});
+        setCardPreviewStatus({});
+        return;
+      }
+      setCardPreviewStatus(
+        imageFiles.reduce((acc, fileRecord) => {
+          if (fileRecord?.id) acc[fileRecord.id] = 'loading';
+          return acc;
+        }, {})
+      );
+      const entries = await Promise.all(
+        imageFiles.map(async (fileRecord) => {
+          if (!fileRecord?.id) return [null, ''];
+          const key = `${projectId}:${fileRecord.id}`;
+          try {
+            let blob = previewBlobCacheRef.current.get(key);
+            if (!blob) {
+              blob = await downloadProjectFile(projectId, fileRecord.id);
+              previewBlobCacheRef.current.set(key, blob);
+            }
+            return [fileRecord.id, window.URL.createObjectURL(blob)];
+          } catch (_error) {
+            return [fileRecord.id, ''];
+          }
+        })
+      );
+      if (cancelled) {
+        entries.forEach(([, url]) => {
+          if (url) window.URL.revokeObjectURL(url);
+        });
+        return;
+      }
+      const nextMap = {};
+      const nextStatus = {};
+      entries.forEach(([id, url]) => {
+        if (!id) return;
+        if (url) {
+          nextMap[id] = url;
+          nextStatus[id] = 'ready';
+        } else {
+          nextStatus[id] = 'error';
+        }
+      });
+      replaceCardPreviewUrls(nextMap);
+      setCardPreviewStatus(nextStatus);
+    };
+
+    loadCardPreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [files, selectedRow?.project?.id, replaceCardPreviewUrls]);
+
+  useEffect(() => {
+    return () => {
+      const map = cardPreviewUrlRef.current || {};
+      Object.values(map).forEach((url) => {
+        if (url) window.URL.revokeObjectURL(url);
+      });
+      cardPreviewUrlRef.current = {};
+      previewBlobCacheRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!areaOptions.includes(selectedArea)) {
@@ -1191,7 +1298,13 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                           onClick={() => handleViewFile(fileRecord)}
                         >
                           <div className="photo-thumb-wrap">
-                            <div className="photo-thumb-placeholder">Photo</div>
+                            {cardPreviewUrls[fileRecord.id] ? (
+                              <img className="photo-thumb" src={cardPreviewUrls[fileRecord.id]} alt={fileRecord.filename} />
+                            ) : (
+                              <div className="photo-thumb-placeholder">
+                                {cardPreviewStatus[fileRecord.id] === 'loading' ? 'Loading...' : 'No preview'}
+                              </div>
+                            )}
                           </div>
                           <div className="photo-meta">
                             <div className="photo-name" title={fileRecord.filename}>
