@@ -1291,11 +1291,14 @@ body::before {
 }
 
 .upload-card-gallery {
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
 }
 
 .compact-upload-card {
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: start;
   gap: 8px;
   padding: 8px;
 }
@@ -1325,7 +1328,7 @@ body::before {
 
 .compact-card-switch {
   width: 100%;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
   gap: 8px;
   min-height: 0;
@@ -1401,6 +1404,23 @@ body::before {
   font-size: 13.667px;
 }
 
+.compact-upload-card .photo-sub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.compact-upload-card .photo-sub span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.compact-upload-card .photo-sub span:last-child {
+  white-space: nowrap;
+  text-align: right;
+}
+
 .file-preview-text {
   width: 100%;
   max-height: 70vh;
@@ -1422,6 +1442,8 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .file-inline-preview {
@@ -5116,6 +5138,69 @@ body[data-theme='light'] .progress-meta .muted {
     max-width: 100%;
   }
 
+  .topbar-left {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .topbar-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .testing-control {
+    flex: 0 0 auto;
+  }
+
+  .theme-toggle-button {
+    flex: 0 0 auto;
+  }
+
+  .user-menu {
+    flex: 1 1 180px;
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  .topbar-user {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .topbar-user > span:not(.avatar) {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .file-preview-modal {
+    width: min(1180px, calc(100vw - 20px));
+    max-height: calc(100vh - 20px);
+  }
+
+  .file-preview-modal .modal-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  .file-preview-modal .modal-title {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-preview-header-actions {
+    justify-content: flex-start;
+  }
+
   .panel-header {
     display: grid;
     grid-template-columns: 1fr;
@@ -5232,6 +5317,28 @@ body[data-theme='light'] .progress-meta .muted {
 }
 
 @media (max-width: 520px) {
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .testing-control {
+    order: 1;
+  }
+
+  .theme-toggle-button {
+    order: 2;
+  }
+
+  .user-menu {
+    order: 3;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .topbar-user {
+    justify-content: space-between;
+  }
+
   .pipeline-detail-backdrop {
     padding: 6px;
   }
@@ -5274,16 +5381,16 @@ body[data-theme='light'] .progress-meta .muted {
 
   .compact-upload-card .photo-sub {
     display: grid;
-    grid-template-columns: 1fr;
-    justify-items: start;
-    gap: 2px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: stretch;
+    gap: 6px;
   }
 
   .compact-card-switch .switch-text {
     font-size: 13px;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     line-height: 1.15;
   }
 
