@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   archiveProject,
   compressProjectFiles,
@@ -377,6 +377,7 @@ export default function Pipeline({
   const [compressing, setCompressing] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
+  const [cardPreviewUrls, setCardPreviewUrls] = useState({});
   const [preview, setPreview] = useState({
     open: false,
     url: '',
@@ -384,6 +385,8 @@ export default function Pipeline({
     kind: '',
     text: ''
   });
+  const cardPreviewUrlRef = useRef({});
+  const previewBlobCacheRef = useRef(new Map());
   const [contractorCompanies, setContractorCompanies] = useState([]);
   const [dashboardRequesterFilter, setDashboardRequesterFilter] = useState(DASHBOARD_FILTER_ALL);
   const [splitDashboardLayout, setSplitDashboardLayout] = useState(() =>
@@ -401,6 +404,18 @@ export default function Pipeline({
     setPreview({ open: false, url: '', name: '', kind: '', text: '' });
   }, [preview.url]);
 
+  const replaceCardPreviewUrls = useCallback((nextMap) => {
+    const previousMap = cardPreviewUrlRef.current || {};
+    const nextValues = new Set(Object.values(nextMap));
+    Object.values(previousMap).forEach((url) => {
+      if (url && !nextValues.has(url)) {
+        window.URL.revokeObjectURL(url);
+      }
+    });
+    cardPreviewUrlRef.current = nextMap;
+    setCardPreviewUrls(nextMap);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (preview.url) {
@@ -408,6 +423,78 @@ export default function Pipeline({
       }
     };
   }, [preview.url]);
+
+  useEffect(() => {
+    if (!detailProject?.id) {
+      previewBlobCacheRef.current.clear();
+      replaceCardPreviewUrls({});
+      return;
+    }
+    const prefix = `${detailProject.id}:`;
+    Array.from(previewBlobCacheRef.current.keys()).forEach((key) => {
+      if (!key.startsWith(prefix)) {
+        previewBlobCacheRef.current.delete(key);
+      }
+    });
+  }, [detailProject?.id, replaceCardPreviewUrls]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCardPreviews = async () => {
+      if (!detailProject?.id || !files.length) {
+        replaceCardPreviewUrls({});
+        return;
+      }
+      const imageFiles = files.filter((fileRecord) => isImageFile(fileRecord));
+      if (!imageFiles.length) {
+        replaceCardPreviewUrls({});
+        return;
+      }
+      const entries = await Promise.all(
+        imageFiles.map(async (fileRecord) => {
+          if (!fileRecord?.id) return [null, ''];
+          const key = `${detailProject.id}:${fileRecord.id}`;
+          try {
+            let blob = previewBlobCacheRef.current.get(key);
+            if (!blob) {
+              blob = await downloadProjectFile(detailProject.id, fileRecord.id);
+              previewBlobCacheRef.current.set(key, blob);
+            }
+            return [fileRecord.id, window.URL.createObjectURL(blob)];
+          } catch (_error) {
+            return [fileRecord.id, ''];
+          }
+        })
+      );
+      if (cancelled) {
+        entries.forEach(([, url]) => {
+          if (url) window.URL.revokeObjectURL(url);
+        });
+        return;
+      }
+      const nextMap = {};
+      entries.forEach(([id, url]) => {
+        if (id && url) nextMap[id] = url;
+      });
+      replaceCardPreviewUrls(nextMap);
+    };
+
+    loadCardPreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [files, detailProject?.id, replaceCardPreviewUrls]);
+
+  useEffect(() => {
+    return () => {
+      const map = cardPreviewUrlRef.current || {};
+      Object.values(map).forEach((url) => {
+        if (url) window.URL.revokeObjectURL(url);
+      });
+      cardPreviewUrlRef.current = {};
+      previewBlobCacheRef.current.clear();
+    };
+  }, []);
 
   const allowedStageIds = useMemo(() => {
     if (!applyAreaFilter || canViewAllAreas) return null;
