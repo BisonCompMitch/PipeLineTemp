@@ -1,3 +1,10 @@
+import {
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken
+} from './utils/authStorage.js';
+
 const LOCAL_API_FALLBACK = '/api';
 const PRODUCTION_API_FALLBACK = 'https://api.scottsdaleutah.com';
 const ALLOW_API_OVERRIDE =
@@ -78,12 +85,12 @@ export function setApiBase(url) {
 }
 
 export function getAuthHeader() {
-  const token = localStorage.getItem('bw_token');
+  const token = getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function refreshAccessToken() {
-  const refreshToken = localStorage.getItem('bw_refresh_token');
+  const refreshToken = getRefreshToken();
   if (!refreshToken) {
     return null;
   }
@@ -97,10 +104,10 @@ async function refreshAccessToken() {
   }
   const payload = await response.json();
   if (payload?.access_token) {
-    localStorage.setItem('bw_token', payload.access_token);
+    setAccessToken(payload.access_token);
   }
   if (payload?.refresh_token) {
-    localStorage.setItem('bw_refresh_token', payload.refresh_token);
+    setRefreshToken(payload.refresh_token);
   }
   return payload?.access_token || null;
 }

@@ -21,6 +21,7 @@ function normalizeTestingOverride(value) {
 
 export default function TopBar({
   title,
+  displayName = 'User',
   onSignOut,
   theme,
   onToggleTheme,
@@ -29,11 +30,7 @@ export default function TopBar({
   showNavToggle = false,
   onToggleNav
 }) {
-  const displayName =
-    localStorage.getItem('bw_display_name') ||
-    localStorage.getItem('bw_first_login_current_username') ||
-    localStorage.getItem('bw_user') ||
-    'User';
+  const normalizedDisplayName = String(displayName || '').trim() || 'User';
   const [menuOpen, setMenuOpen] = useState(false);
   const [testingOpen, setTestingOpen] = useState(false);
   const [draft, setDraft] = useState(() => normalizeTestingOverride(testingOverride || DEFAULT_TESTING_OVERRIDE));
@@ -208,8 +205,8 @@ export default function TopBar({
                 setMenuOpen((open) => !open);
               }}
             >
-              <span className="avatar">{initialsFor(displayName)}</span>
-              <span>{displayName}</span>
+              <span className="avatar">{initialsFor(normalizedDisplayName)}</span>
+              <span>{normalizedDisplayName}</span>
               <svg className="caret" viewBox="0 0 20 20">
                 <path d="M5 7l5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               </svg>

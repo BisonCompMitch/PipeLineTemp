@@ -5230,3 +5230,67 @@ body[data-theme='light'] .progress-meta .muted {
     display: inline;
   }
 }
+
+@media (max-width: 520px) {
+  .pipeline-detail-backdrop {
+    padding: 6px;
+  }
+
+  .pipeline-detail-modal {
+    border-radius: 14px;
+  }
+
+  .pipeline-detail-header {
+    padding: 12px;
+  }
+
+  .pipeline-detail-title {
+    font-size: 19px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.25;
+  }
+
+  .pipeline-detail-header .detail-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .pipeline-detail-header .detail-tabs .stage-tab {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pipeline-detail-body {
+    padding: 10px 12px 12px;
+  }
+
+  .upload-card-gallery {
+    grid-template-columns: 1fr !important;
+  }
+
+  .compact-upload-card .photo-sub {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 2px;
+  }
+
+  .compact-card-switch .switch-text {
+    font-size: 13px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.15;
+  }
+
+  .file-upload-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

@@ -6,6 +6,19 @@ import {
   sendPresenceHeartbeat,
   updateMyThemePreference
 } from './api.js';
+import {
+  clearAuthState,
+  getAccessToken,
+  getAuthedFlag,
+  getDisplayName,
+  getRefreshToken,
+  getStoredUsername,
+  setAccessToken,
+  setAuthedFlag,
+  setDisplayName,
+  setRefreshToken,
+  setStoredUsername
+} from './utils/authStorage.js';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
@@ -111,6 +124,7 @@ function Protected({ authed, allowed, fallback, loading = false, children }) {
 
 function PageShell({
   title,
+  displayName,
   onSignOut,
   theme,
   onToggleTheme,
@@ -124,6 +138,7 @@ function PageShell({
     <div className="page">
       <TopBar
         title={title}
+        displayName={displayName}
         onSignOut={onSignOut}
         theme={theme}
         onToggleTheme={onToggleTheme}
@@ -140,7 +155,7 @@ function PageShell({
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const initialAuthed = localStorage.getItem('bw_authed') === 'true';
+  const initialAuthed = getAuthedFlag();
   const [authed, setAuthed] = useState(initialAuthed);
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(initialAuthed);
@@ -179,16 +194,16 @@ export default function App() {
     const canonicalUsername = String(
       tokenPayload?.username || tokenPayload?.login_username || username || ''
     ).trim();
-    localStorage.setItem('bw_authed', 'true');
+    setAuthedFlag(true);
     if (canonicalUsername) {
-      localStorage.setItem('bw_user', canonicalUsername);
-      localStorage.setItem('bw_display_name', canonicalUsername);
+      setStoredUsername(canonicalUsername);
+      setDisplayName(canonicalUsername);
     }
     if (tokenPayload?.access_token) {
-      localStorage.setItem('bw_token', tokenPayload.access_token);
+      setAccessToken(tokenPayload.access_token);
     }
     if (tokenPayload?.refresh_token) {
-      localStorage.setItem('bw_refresh_token', tokenPayload.refresh_token);
+      setRefreshToken(tokenPayload.refresh_token);
     }
     setProfileLoading(true);
     setAuthed(true);
@@ -196,15 +211,11 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    const refreshToken = localStorage.getItem('bw_refresh_token');
+    const refreshToken = getRefreshToken();
     if (refreshToken) {
       logoutRequest(refreshToken).catch(() => null);
     }
-    localStorage.removeItem('bw_authed');
-    localStorage.removeItem('bw_user');
-    localStorage.removeItem('bw_token');
-    localStorage.removeItem('bw_refresh_token');
-    localStorage.removeItem('bw_display_name');
+    clearAuthState();
     setAuthed(false);
     setProfileLoading(false);
     navigate('/login');
@@ -216,8 +227,8 @@ export default function App() {
       setProfileLoading(false);
       return;
     }
-    const storedUsername = String(localStorage.getItem('bw_user') || '').trim();
-    const tokenUsername = usernameFromAccessToken(localStorage.getItem('bw_token'));
+    const storedUsername = getStoredUsername();
+    const tokenUsername = usernameFromAccessToken(getAccessToken());
     const candidates = Array.from(new Set([storedUsername, tokenUsername].filter(Boolean)));
     if (!candidates.length) {
       setProfile(null);
@@ -233,10 +244,10 @@ export default function App() {
           if (!active) return;
           setProfile(user);
           if (user?.username) {
-            localStorage.setItem('bw_user', String(user.username).trim());
+            setStoredUsername(user.username);
           }
           if (user?.full_name) {
-            localStorage.setItem('bw_display_name', String(user.full_name).trim());
+            setDisplayName(user.full_name);
           }
           setProfileLoading(false);
           return;
@@ -258,8 +269,8 @@ export default function App() {
     if (!authed) return undefined;
     let active = true;
     const refreshProfile = async () => {
-      const storedUsername = String(localStorage.getItem('bw_user') || '').trim();
-      const tokenUsername = usernameFromAccessToken(localStorage.getItem('bw_token'));
+      const storedUsername = getStoredUsername();
+      const tokenUsername = usernameFromAccessToken(getAccessToken());
       const candidates = Array.from(new Set([storedUsername, tokenUsername].filter(Boolean)));
       for (const candidate of candidates) {
         try {
@@ -267,10 +278,10 @@ export default function App() {
           if (!active) return;
           setProfile(user);
           if (user?.username) {
-            localStorage.setItem('bw_user', String(user.username).trim());
+            setStoredUsername(user.username);
           }
           if (user?.full_name) {
-            localStorage.setItem('bw_display_name', String(user.full_name).trim());
+            setDisplayName(user.full_name);
           }
           return;
         } catch (_error) {
@@ -404,6 +415,9 @@ export default function App() {
       return true;
     });
   }, [hasBison, hasContractor, hasCustomer, canAccessDashboard, hasAdminArea]);
+  const topBarDisplayName = String(
+    profile?.full_name || getDisplayName() || profile?.username || getStoredUsername() || 'User'
+  ).trim() || 'User';
 
   const showSidebar = location.pathname !== '/login';
   const pageTitle = useMemo(() => titleForPath(location.pathname), [location.pathname]);
@@ -467,6 +481,7 @@ export default function App() {
               <Protected authed={authed} allowed={canAccessDashboard} fallback={defaultRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
+                  displayName={topBarDisplayName}
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
@@ -493,6 +508,7 @@ export default function App() {
               <Protected authed={authed} allowed={hasBison} fallback={defaultRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
+                  displayName={topBarDisplayName}
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
@@ -515,6 +531,7 @@ export default function App() {
               <Protected authed={authed} allowed={hasBison} fallback={defaultRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
+                  displayName={topBarDisplayName}
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
@@ -540,6 +557,7 @@ export default function App() {
               <Protected authed={authed} allowed={hasContractor} fallback={defaultRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
+                  displayName={topBarDisplayName}
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
@@ -559,6 +577,7 @@ export default function App() {
               <Protected authed={authed} allowed={hasBison && hasAdminArea} fallback={defaultRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
+                  displayName={topBarDisplayName}
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
@@ -578,6 +597,7 @@ export default function App() {
                 <Protected authed={authed} allowed={hasCustomer} fallback={defaultRoute} loading={accessLoading}>
                   <PageShell
                     title={pageTitle}
+                    displayName={topBarDisplayName}
                     onSignOut={handleLogout}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
@@ -597,6 +617,7 @@ export default function App() {
                 <Protected authed={authed} allowed={hasCustomer} fallback={defaultRoute} loading={accessLoading}>
                   <PageShell
                     title={pageTitle}
+                    displayName={topBarDisplayName}
                     onSignOut={handleLogout}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
@@ -616,6 +637,7 @@ export default function App() {
                 <Protected authed={authed} allowed={hasCustomer} fallback={defaultRoute} loading={accessLoading}>
                   <PageShell
                     title={pageTitle}
+                    displayName={topBarDisplayName}
                     onSignOut={handleLogout}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
@@ -636,6 +658,7 @@ export default function App() {
               <Protected authed={authed} allowed={!profileLoading} fallback={defaultRoute} loading={accessLoading}>
                 <PageShell
                   title="Not Found"
+                  displayName={topBarDisplayName}
                   onSignOut={handleLogout}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
