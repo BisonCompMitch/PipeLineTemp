@@ -23,6 +23,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
 import Login from './pages/Login.jsx';
+import FirstLoginSetup from './pages/FirstLoginSetup.jsx';
 import Pipeline from './pages/Pipeline.jsx';
 import Areas from './pages/Areas.jsx';
 import Intake from './pages/Intake.jsx';
@@ -41,7 +42,8 @@ const ROUTE_TITLES = {
   '/users': 'Manage Users',
   '/customer/files': 'Files for Review',
   '/customer/pictures': 'Project Pictures',
-  '/customer': 'Progress'
+  '/customer': 'Progress',
+  '/first-login-setup': 'Complete Setup'
 };
 
 const TEST_ROLE_PRESETS = {
@@ -53,6 +55,12 @@ const TEST_ROLE_PRESETS = {
 };
 
 const DEFAULT_TESTING_OVERRIDE = { rolePreset: 'auto', areas: '' };
+const DEFAULT_FIRST_LOGIN_STATE = {
+  required: false,
+  usernameNeedsSetup: false,
+  suggestedUsername: '',
+  email: ''
+};
 
 function titleForPath(pathname) {
   if (!pathname) return 'BisonWorks';
@@ -189,6 +197,7 @@ export default function App() {
       return { rolePreset: 'auto', areas: '' };
     }
   });
+  const [firstLoginState, setFirstLoginState] = useState(DEFAULT_FIRST_LOGIN_STATE);
 
   const handleLogin = (username, tokenPayload) => {
     const canonicalUsername = String(
@@ -205,9 +214,19 @@ export default function App() {
     if (tokenPayload?.refresh_token) {
       setRefreshToken(tokenPayload.refresh_token);
     }
+    const mustResetPassword = Boolean(tokenPayload?.must_reset_password);
+    const suggestedUsername = String(
+      tokenPayload?.login_username || tokenPayload?.username || tokenPayload?.email || canonicalUsername
+    ).trim();
+    setFirstLoginState({
+      required: mustResetPassword,
+      usernameNeedsSetup: Boolean(tokenPayload?.username_needs_setup),
+      suggestedUsername,
+      email: String(tokenPayload?.email || '').trim()
+    });
     setProfileLoading(true);
     setAuthed(true);
-    navigate('/pipeline');
+    navigate(mustResetPassword ? '/first-login-setup' : '/pipeline');
   };
 
   const handleLogout = () => {
@@ -217,6 +236,7 @@ export default function App() {
     }
     clearAuthState();
     setAuthed(false);
+    setFirstLoginState(DEFAULT_FIRST_LOGIN_STATE);
     setProfileLoading(false);
     navigate('/login');
   };
@@ -249,6 +269,12 @@ export default function App() {
           if (user?.full_name) {
             setDisplayName(user.full_name);
           }
+          setFirstLoginState({
+            required: Boolean(user?.must_reset_password),
+            usernameNeedsSetup: !String(user?.login_username || '').trim(),
+            suggestedUsername: String(user?.login_username || user?.email || user?.username || '').trim(),
+            email: String(user?.email || '').trim()
+          });
           setProfileLoading(false);
           return;
         } catch (_error) {
@@ -326,12 +352,14 @@ export default function App() {
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
   const accessLoading = authed && profileLoading;
+  const firstLoginRequired = authed && firstLoginState.required;
 
   const defaultRoute = hasContractor
     ? '/pipeline'
     : hasBison
       ? '/pipeline'
       : '/customer';
+  const fallbackRoute = firstLoginRequired ? '/first-login-setup' : defaultRoute;
   const handleToggleTheme = () => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   };
@@ -352,9 +380,15 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const appliedTheme = location.pathname === '/login' ? 'dark' : theme;
+    const appliedTheme =
+      location.pathname === '/login' || location.pathname === '/first-login-setup' ? 'dark' : theme;
     document.body.setAttribute('data-theme', appliedTheme);
   }, [theme, location.pathname]);
+
+  useEffect(() => {
+    if (!authed || !firstLoginRequired || location.pathname === '/first-login-setup') return;
+    navigate('/first-login-setup', { replace: true });
+  }, [authed, firstLoginRequired, location.pathname, navigate]);
 
   useEffect(() => {
     if (!authed) return;
@@ -419,7 +453,7 @@ export default function App() {
     profile?.full_name || getDisplayName() || profile?.username || getStoredUsername() || 'User'
   ).trim() || 'User';
 
-  const showSidebar = location.pathname !== '/login';
+  const showSidebar = location.pathname !== '/login' && location.pathname !== '/first-login-setup';
   const pageTitle = useMemo(() => titleForPath(location.pathname), [location.pathname]);
   const showNavToggle = showSidebar;
 
@@ -476,9 +510,29 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route
+            path="/first-login-setup"
+            element={
+              <Protected authed={authed} allowed={firstLoginRequired} fallback={defaultRoute} loading={accessLoading}>
+                <FirstLoginSetup
+                  initialUsername={firstLoginState.suggestedUsername}
+                  email={firstLoginState.email}
+                  onComplete={(result) => {
+                    const nextUsername = String(result?.login_username || result?.username || '').trim();
+                    if (nextUsername) {
+                      setStoredUsername(nextUsername);
+                    }
+                    setFirstLoginState(DEFAULT_FIRST_LOGIN_STATE);
+                    navigate(defaultRoute, { replace: true });
+                  }}
+                  onSignOut={handleLogout}
+                />
+              </Protected>
+            }
+          />
+          <Route
             path="/pipeline"
             element={
-              <Protected authed={authed} allowed={canAccessDashboard} fallback={defaultRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!firstLoginRequired && canAccessDashboard} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
@@ -497,6 +551,7 @@ export default function App() {
                     allowedAreas={effectiveAreas}
                     canViewAllAreas={true}
                     showHoverNotes={true}
+                    showRequesterFilter={!hasContractor || hasBison}
                   />
                 </PageShell>
               </Protected>
@@ -505,7 +560,7 @@ export default function App() {
           <Route
             path="/areas"
             element={
-              <Protected authed={authed} allowed={hasBison} fallback={defaultRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!firstLoginRequired && hasBison} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
@@ -528,7 +583,7 @@ export default function App() {
           <Route
             path="/intake"
             element={
-              <Protected authed={authed} allowed={hasBison} fallback={defaultRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!firstLoginRequired && hasBison} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
@@ -554,7 +609,7 @@ export default function App() {
           <Route
             path="/leads"
             element={
-              <Protected authed={authed} allowed={hasContractor} fallback={defaultRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!firstLoginRequired && hasContractor} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
@@ -574,7 +629,7 @@ export default function App() {
           <Route
             path="/users"
             element={
-              <Protected authed={authed} allowed={hasBison && hasAdminArea} fallback={defaultRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!firstLoginRequired && hasBison && hasAdminArea} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
@@ -594,7 +649,7 @@ export default function App() {
             <Route
               path="/customer"
               element={
-                <Protected authed={authed} allowed={hasCustomer} fallback={defaultRoute} loading={accessLoading}>
+                <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
                   <PageShell
                     title={pageTitle}
                     displayName={topBarDisplayName}
@@ -614,7 +669,7 @@ export default function App() {
             <Route
               path="/customer/files"
               element={
-                <Protected authed={authed} allowed={hasCustomer} fallback={defaultRoute} loading={accessLoading}>
+                <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
                   <PageShell
                     title={pageTitle}
                     displayName={topBarDisplayName}
@@ -634,7 +689,7 @@ export default function App() {
             <Route
               path="/customer/pictures"
               element={
-                <Protected authed={authed} allowed={hasCustomer} fallback={defaultRoute} loading={accessLoading}>
+                <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
                   <PageShell
                     title={pageTitle}
                     displayName={topBarDisplayName}
@@ -651,11 +706,11 @@ export default function App() {
                 </Protected>
               }
             />
-          <Route path="/" element={<Navigate to={authed ? (accessLoading ? '/pipeline' : defaultRoute) : '/login'} replace />} />
+          <Route path="/" element={<Navigate to={authed ? (accessLoading ? '/pipeline' : fallbackRoute) : '/login'} replace />} />
           <Route
             path="*"
             element={
-              <Protected authed={authed} allowed={!profileLoading} fallback={defaultRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!profileLoading && !firstLoginRequired} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title="Not Found"
                   displayName={topBarDisplayName}

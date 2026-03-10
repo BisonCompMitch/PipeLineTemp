@@ -5401,3 +5401,35 @@ body[data-theme='light'] .progress-meta .muted {
     gap: 8px;
   }
 }
+
+.first-login-card {
+  width: min(520px, 100%);
+}
+
+.first-login-hint {
+  margin: 4px 2px 0;
+}
+
+.first-login-actions {
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.first-login-actions .login-button {
+  width: auto;
+  min-width: 190px;
+}
+
+@media (max-width: 640px) {
+  .first-login-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .first-login-actions .login-button {
+    width: 100%;
+    min-width: 0;
+  }
+}

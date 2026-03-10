@@ -189,6 +189,26 @@ export async function logoutRequest(refreshToken) {
   });
 }
 
+export async function completeFirstLogin(payload) {
+  const response = await apiRequest('/auth/first-login/complete', {
+    method: 'POST',
+    body: payload
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const data = await response.json();
+      if (typeof data?.detail === 'string' && data.detail.trim()) {
+        message = data.detail.trim();
+      }
+    } catch (_error) {
+      // Ignore non-JSON error payloads
+    }
+    throw new Error(message);
+  }
+  return response.json();
+}
+
 export async function apiJson(path, options = {}) {
   const response = await apiRequest(path, options);
   if (!response.ok) {

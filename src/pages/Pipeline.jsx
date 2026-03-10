@@ -343,7 +343,8 @@ export default function Pipeline({
   applyAreaFilter = false,
   allowedAreas = [],
   canViewAllAreas = false,
-  showHoverNotes = false
+  showHoverNotes = false,
+  showRequesterFilter = true
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -545,6 +546,7 @@ export default function Pipeline({
     return Array.from(unique.values()).sort((a, b) => a.localeCompare(b));
   }, [rows, detailProject, contractorCompanies]);
   const dashboardRequesterOptions = useMemo(() => {
+    if (!showRequesterFilter) return [];
     const unique = new Map();
     rows.forEach((row) => {
       const value = String(row?.project?.requester || '').trim();
@@ -559,13 +561,14 @@ export default function Pipeline({
       if (!unique.has(key)) unique.set(key, value);
     });
     return Array.from(unique.values()).sort((a, b) => a.localeCompare(b));
-  }, [rows, contractorCompanies]);
+  }, [rows, contractorCompanies, showRequesterFilter]);
   const visibleRows = useMemo(() => {
+    if (!showRequesterFilter) return rows;
     if (dashboardRequesterFilter === DASHBOARD_FILTER_ALL) return rows;
     const selected = String(dashboardRequesterFilter || '').trim().toLowerCase();
     if (!selected) return rows;
     return rows.filter((row) => String(row?.project?.requester || '').trim().toLowerCase() === selected);
-  }, [rows, dashboardRequesterFilter]);
+  }, [rows, dashboardRequesterFilter, showRequesterFilter]);
   const dashboardRows = useMemo(() => {
     const ordered = [...visibleRows].sort(sortByProjectNumber);
     const active = [];
@@ -725,6 +728,12 @@ export default function Pipeline({
   }, [loadProjects]);
 
   useEffect(() => {
+    if (!showRequesterFilter) {
+      if (dashboardRequesterFilter !== DASHBOARD_FILTER_ALL) {
+        setDashboardRequesterFilter(DASHBOARD_FILTER_ALL);
+      }
+      return;
+    }
     if (dashboardRequesterFilter === DASHBOARD_FILTER_ALL) return;
     const selected = String(dashboardRequesterFilter || '').trim().toLowerCase();
     const stillPresent = dashboardRequesterOptions.some(
@@ -733,7 +742,7 @@ export default function Pipeline({
     if (!stillPresent) {
       setDashboardRequesterFilter(DASHBOARD_FILTER_ALL);
     }
-  }, [dashboardRequesterFilter, dashboardRequesterOptions]);
+  }, [dashboardRequesterFilter, dashboardRequesterOptions, showRequesterFilter]);
 
   useEffect(() => {
     let active = true;
@@ -1249,20 +1258,22 @@ export default function Pipeline({
             <p className="muted">Double-click a project row to view details.</p>
           </div>
           <div className="detail-header-actions">
-            <label className="pipeline-area-select">
-              <span className="muted">Requester/Contractor</span>
-              <select
-                value={dashboardRequesterFilter}
-                onChange={(event) => setDashboardRequesterFilter(event.target.value)}
-              >
-                <option value={DASHBOARD_FILTER_ALL}>All</option>
-                {dashboardRequesterOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {showRequesterFilter ? (
+              <label className="pipeline-area-select">
+                <span className="muted">Requester/Contractor</span>
+                <select
+                  value={dashboardRequesterFilter}
+                  onChange={(event) => setDashboardRequesterFilter(event.target.value)}
+                >
+                  <option value={DASHBOARD_FILTER_ALL}>All</option>
+                  {dashboardRequesterOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label className="switch-field switch-field--pill">
               <input
                 type="checkbox"
@@ -1324,7 +1335,7 @@ export default function Pipeline({
               <tbody>
                 <tr className="empty-row">
                   <td colSpan={2}>
-                    {dashboardRequesterFilter !== DASHBOARD_FILTER_ALL
+                    {showRequesterFilter && dashboardRequesterFilter !== DASHBOARD_FILTER_ALL
                       ? 'No projects match that requester/contractor.'
                       : applyAreaFilter && !canViewAllAreas
                       ? 'No projects in your assigned areas.'
