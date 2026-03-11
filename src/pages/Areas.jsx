@@ -17,6 +17,7 @@ const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
 
 const AREA_STAGE_MAP = {
   'plans recieved': ['plans_received'],
+  'plans revieved': ['plans_received'],
   'plans received': ['plans_received'],
   plans_received: ['plans_received'],
   budget: ['budget'],

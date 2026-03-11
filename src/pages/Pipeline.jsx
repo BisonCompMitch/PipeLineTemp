@@ -58,6 +58,7 @@ const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
 
 const AREA_FILTER_TO_STAGE_IDS = {
   'plans recieved': ['plans_received'],
+  'plans revieved': ['plans_received'],
   'plans received': ['plans_received'],
   plans_received: ['plans_received'],
   budget: ['budget'],
@@ -344,7 +345,8 @@ export default function Pipeline({
   allowedAreas = [],
   canViewAllAreas = false,
   showHoverNotes = false,
-  showRequesterFilter = true
+  showRequesterFilter = true,
+  showArchivedFilter = true
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -728,6 +730,12 @@ export default function Pipeline({
   }, [loadProjects]);
 
   useEffect(() => {
+    if (!showArchivedFilter && showArchived) {
+      setShowArchived(false);
+    }
+  }, [showArchivedFilter, showArchived]);
+
+  useEffect(() => {
     if (!showRequesterFilter) {
       if (dashboardRequesterFilter !== DASHBOARD_FILTER_ALL) {
         setDashboardRequesterFilter(DASHBOARD_FILTER_ALL);
@@ -854,6 +862,11 @@ export default function Pipeline({
     setDetailError('');
     setDetailStatus('');
     try {
+      const currentStageId = detailCurrentStage?.id || '';
+      const requestedStageId =
+        areaSelection && stageOptions.some((stage) => stage.id === areaSelection)
+          ? areaSelection
+          : '';
       const payload = {
         project_number: trimOrNull(detailForm.project_number),
         name: detailForm.name.trim(),
@@ -861,38 +874,11 @@ export default function Pipeline({
         due_date: trimOrNull(detailForm.due_date),
         urgency: trimOrNull(detailForm.urgency) || 'standard',
         budget: trimOrNull(detailForm.budget),
-        summary: trimOrNull(detailForm.summary)
+        summary: trimOrNull(detailForm.summary),
+        stage_id: requestedStageId && requestedStageId !== currentStageId ? requestedStageId : undefined
       };
-      let updated = await updateProject(detailProject.id, payload);
-      const stages = updated?.stages || [];
-      const targetIndex = stages.findIndex((stage) => stage.id === areaSelection);
-      const currentStageId = currentStage(stages)?.id || '';
-      let areaChanged = false;
-
-      if (targetIndex >= 0 && areaSelection && currentStageId !== areaSelection) {
-        for (let idx = 0; idx < stages.length; idx += 1) {
-          const stage = stages[idx];
-          let nextStatus = stage.status;
-          if (idx < targetIndex) {
-            nextStatus = 'complete';
-          } else if (idx === targetIndex) {
-            nextStatus = stage.id === 'completed' ? 'complete' : 'in_progress';
-          } else {
-            nextStatus = 'pending';
-          }
-          if (stage.status === nextStatus) continue;
-          await updateStage(detailProject.id, stage.id, {
-            status: nextStatus,
-            event_title: 'Stage moved',
-            event_meta: { action: 'admin_set_area', target: areaSelection }
-          });
-          areaChanged = true;
-        }
-      }
-
-      if (areaChanged) {
-        updated = await getProject(detailProject.id);
-      }
+      const updated = await updateProject(detailProject.id, payload);
+      const areaChanged = Boolean(payload.stage_id);
 
       setDetailProject(updated);
       setDetailForm(toEditForm(updated));
@@ -1274,17 +1260,19 @@ export default function Pipeline({
                 </select>
               </label>
             ) : null}
-            <label className="switch-field switch-field--pill">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(event) => setShowArchived(event.target.checked)}
-              />
-              <span className="switch-track" aria-hidden="true">
-                <span className="switch-thumb" />
-              </span>
-              <span className="switch-text">Show archived</span>
-            </label>
+            {showArchivedFilter ? (
+              <label className="switch-field switch-field--pill">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(event) => setShowArchived(event.target.checked)}
+                />
+                <span className="switch-track" aria-hidden="true">
+                  <span className="switch-thumb" />
+                </span>
+                <span className="switch-text">Show archived</span>
+              </label>
+            ) : null}
           </div>
         </div>
         {loading ? <p className="muted">Loading projects...</p> : null}

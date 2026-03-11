@@ -92,7 +92,7 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
               disabled={saving}
             />
           </label>
-          <p className="muted first-login-hint">Password must meet the platform policy.</p>
+          <p className="muted first-login-hint">Password must be at least 8 characters.</p>
           <div className="actions first-login-actions">
             <button className="ghost" type="button" onClick={onSignOut} disabled={saving}>
               Sign out
