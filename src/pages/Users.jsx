@@ -98,7 +98,7 @@ export default function Users() {
   const [editStatus, setEditStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
-  const { confirmDialog, dialogPortal } = useSiteDialog();
+  const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
   const [createBisonForm, setCreateBisonForm] = useState({
     username: '',
     full_name: '',
@@ -205,6 +205,66 @@ export default function Users() {
       window.clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    if (!bisonStatus?.text) return;
+    let active = true;
+    (async () => {
+      await alertDialog(bisonStatus.text, {
+        title: bisonStatus.tone === 'error' ? 'Bison users error' : 'Bison users',
+        confirmText: 'OK'
+      });
+      if (active) setBisonStatus(null);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [bisonStatus, alertDialog]);
+
+  useEffect(() => {
+    if (!contractorStatus?.text) return;
+    let active = true;
+    (async () => {
+      await alertDialog(contractorStatus.text, {
+        title: contractorStatus.tone === 'error' ? 'Contractors error' : 'Contractors',
+        confirmText: 'OK'
+      });
+      if (active) setContractorStatus(null);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [contractorStatus, alertDialog]);
+
+  useEffect(() => {
+    if (!customerStatus?.text) return;
+    let active = true;
+    (async () => {
+      await alertDialog(customerStatus.text, {
+        title: customerStatus.tone === 'error' ? 'Customers error' : 'Customers',
+        confirmText: 'OK'
+      });
+      if (active) setCustomerStatus(null);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [customerStatus, alertDialog]);
+
+  useEffect(() => {
+    if (!editStatus?.text) return;
+    let active = true;
+    (async () => {
+      await alertDialog(editStatus.text, {
+        title: editStatus.tone === 'error' ? 'Update error' : 'Update saved',
+        confirmText: 'OK'
+      });
+      if (active) setEditStatus(null);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [editStatus, alertDialog]);
 
   const projectMap = useMemo(() => {
     const map = new Map();
@@ -546,7 +606,6 @@ export default function Users() {
             <p className="muted">Internal team accounts.</p>
           </div>
         </div>
-        {bisonStatus ? <div className={bisonStatus.tone === 'error' ? 'alert' : 'muted'}>{bisonStatus.text}</div> : null}
         <form className="form-grid user-create-form user-create-form--bison" onSubmit={handleCreateBison}>
           <label>
             Username
@@ -657,9 +716,6 @@ export default function Users() {
             <p className="muted">Contractor logins.</p>
           </div>
         </div>
-        {contractorStatus ? (
-          <div className={contractorStatus.tone === 'error' ? 'alert' : 'muted'}>{contractorStatus.text}</div>
-        ) : null}
         <datalist id="shared-party-options">
           {sharedPartyOptions.map((option) => (
             <option key={option} value={option} />
@@ -750,9 +806,6 @@ export default function Users() {
             <p className="muted">Customer accounts linked to a project.</p>
           </div>
         </div>
-        {customerStatus ? (
-          <div className={customerStatus.tone === 'error' ? 'alert' : 'muted'}>{customerStatus.text}</div>
-        ) : null}
         <form className="form-grid user-create-form user-create-form--simple" onSubmit={handleCreateCustomer}>
           <label>
             Email
@@ -837,9 +890,6 @@ export default function Users() {
                 Close
               </button>
             </div>
-            {editStatus ? (
-              <div className={editStatus.tone === 'error' ? 'alert' : 'muted'}>{editStatus.text}</div>
-            ) : null}
             {editing.type === 'bison' ? (
               <div className="user-edit-card">
                 <div className="user-form-grid">

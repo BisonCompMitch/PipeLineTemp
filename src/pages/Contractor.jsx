@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { listProjects } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, normalizeProjectStages } from '../utils/stageDisplay.js';
 
 const NOTICE_LEVELS = ['green', 'yellow', 'red'];
@@ -58,6 +59,7 @@ export default function Contractor() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { alertDialog, dialogPortal } = useSiteDialog();
 
   useEffect(() => {
     let active = true;
@@ -94,6 +96,18 @@ export default function Contractor() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!error) return;
+    let active = true;
+    (async () => {
+      await alertDialog(error, { title: 'Dashboard error', confirmText: 'OK' });
+      if (active) setError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [error, alertDialog]);
+
   return (
     <section className="panel">
       <div className="panel-header">
@@ -103,7 +117,6 @@ export default function Contractor() {
         </div>
       </div>
       {loading ? <p className="muted">Loading projects...</p> : null}
-      {error ? <div className="alert">{error}</div> : null}
       <div className="table-scroll">
         <table className="project-table">
           <thead>
@@ -143,6 +156,7 @@ export default function Contractor() {
           </tbody>
         </table>
       </div>
+      {dialogPortal}
     </section>
   );
 }

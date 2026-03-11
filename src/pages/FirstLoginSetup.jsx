@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import logo from '../assets/BisonWorksFavicon.png';
 import { completeFirstLogin } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 export default function FirstLoginSetup({ initialUsername = '', email = '', onComplete, onSignOut }) {
   const suggestedUsername = useMemo(() => {
@@ -13,6 +14,7 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const { alertDialog, dialogPortal } = useSiteDialog();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -48,6 +50,18 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
     }
   };
 
+  React.useEffect(() => {
+    if (!error) return;
+    let active = true;
+    (async () => {
+      await alertDialog(error, { title: 'Setup error', confirmText: 'OK' });
+      if (active) setError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [error, alertDialog]);
+
   return (
     <div className="login">
       <div className="login-card first-login-card">
@@ -58,7 +72,6 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
             <p className="muted">Set your username and a new password to continue.</p>
           </div>
         </div>
-        {error ? <div className="alert">{error}</div> : null}
         <form onSubmit={handleSubmit} className="login-form">
           <label>
             Username
@@ -103,6 +116,7 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
           </div>
         </form>
       </div>
+      {dialogPortal}
     </div>
   );
 }

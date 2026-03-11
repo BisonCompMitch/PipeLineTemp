@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadProjectFile, listProjectFiles, listProjects, uploadProjectFile } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 function formatDateTime(value) {
   if (!value) return '-';
@@ -95,6 +96,7 @@ export default function CustomerFiles() {
   const [preview, setPreview] = useState({ open: false, url: '', name: '', kind: '', text: '', record: null });
   const blobCacheRef = useRef(new Map());
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
+  const { alertDialog, dialogPortal } = useSiteDialog();
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -223,6 +225,34 @@ export default function CustomerFiles() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!status) return;
+    let active = true;
+    (async () => {
+      const title = statusTone === 'error' ? 'Files error' : 'Files notice';
+      await alertDialog(status, { title, confirmText: 'OK' });
+      if (active) {
+        setStatus('');
+        setStatusTone('success');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [status, statusTone, alertDialog]);
+
+  useEffect(() => {
+    if (!uploadError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(uploadError, { title: 'Upload error', confirmText: 'OK' });
+      if (active) setUploadError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [uploadError, alertDialog]);
+
   const handleUpload = async (event) => {
     event.preventDefault();
     if (!project?.id) return;
@@ -273,7 +303,6 @@ export default function CustomerFiles() {
           Refresh
         </button>
       </div>
-      {status ? <div className={statusTone === 'error' ? 'alert' : 'status-banner success'}>{status}</div> : null}
       {loading ? <p className="muted">Loading files...</p> : null}
       {!project ? (
         <div className="empty-state">
@@ -330,7 +359,6 @@ export default function CustomerFiles() {
               <span className="muted">Uploaded files are shared with the project team.</span>
             </div>
             <div>
-              {uploadError ? <div className="alert">{uploadError}</div> : null}
             </div>
           </form>
           <div className="photo-gallery-panel">
@@ -413,6 +441,7 @@ export default function CustomerFiles() {
           </div>
         </ModalPortal>
       ) : null}
+      {dialogPortal}
     </section>
   );
 }

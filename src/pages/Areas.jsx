@@ -257,7 +257,6 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     hasAdminArea && areaOptions.includes('Admin') ? 'Admin' : areaOptions[0] || ''
   );
   const [rows, setRows] = useState([]);
-  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [savingExpectedId, setSavingExpectedId] = useState('');
@@ -427,10 +426,45 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     }
   }, [areaOptions, selectedArea]);
 
+  useEffect(() => {
+    if (!areaNoteHistoryError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(areaNoteHistoryError, { title: 'Notes error', confirmText: 'OK' });
+      if (active) setAreaNoteHistoryError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [areaNoteHistoryError, alertDialog]);
+
+  useEffect(() => {
+    if (!filesError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(filesError, { title: 'Files notice', confirmText: 'OK' });
+      if (active) setFilesError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [filesError, alertDialog]);
+
+  useEffect(() => {
+    if (!photoError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(photoError, { title: 'Photos notice', confirmText: 'OK' });
+      if (active) setPhotoError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [photoError, alertDialog]);
+
   const loadProjects = async () => {
     if (!selectedArea) return;
     setLoading(true);
-    setStatus('');
     try {
       const projects = await listProjects();
       const selectedKey = normalize(selectedArea);
@@ -455,7 +489,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
             );
       setRows(filtered.sort(compareRowsByProjectNumber));
     } catch (err) {
-      setStatus('Unable to load projects for this area.');
+      await alertDialog('Unable to load projects for this area.', {
+        title: 'Load failed',
+        confirmText: 'OK'
+      });
       setRows([]);
     } finally {
       setLoading(false);
@@ -555,7 +592,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     if (expected === null) return;
     const hours = Number(expected);
     if (!Number.isFinite(hours) || hours <= 0) {
-      setStatus('Enter a valid expected time in hours.');
+      await alertDialog('Enter a valid expected time in hours.', {
+        title: 'Invalid expected time',
+        confirmText: 'OK'
+      });
       return;
     }
     try {
@@ -566,9 +606,9 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
         event_meta: { action: 'accept' }
       });
       await loadProjects();
-      setStatus('Stage accepted.');
+      await alertDialog('Stage accepted.', { title: 'Stage accepted', confirmText: 'OK' });
     } catch (err) {
-      setStatus('Unable to accept the project.');
+      await alertDialog('Unable to accept the project.', { title: 'Action failed', confirmText: 'OK' });
     }
   };
 
@@ -581,9 +621,8 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
       setSelectedRow(null);
       setDetailTab('details');
       moved = true;
-      setStatus('Project sent successfully.');
     } catch (err) {
-      setStatus('Unable to send to next step.');
+      await alertDialog('Unable to send to next step.', { title: 'Action failed', confirmText: 'OK' });
     } finally {
       setStageMoveLoading(false);
     }
@@ -596,7 +635,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     if (!selectedRow?.project?.id || !selectedRow?.stage?.id) return;
     const noteText = areaNoteDraft.trim();
     if (!noteText) {
-      setStatus('Enter a note to add.');
+      await alertDialog('Enter a note to add.', { title: 'Note required', confirmText: 'OK' });
       return;
     }
     setAreaNoteSaving(true);
@@ -634,10 +673,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
           : prev
       );
       setAreaNoteDraft('');
-      setStatus('Note added.');
       await loadAreaNotes(selectedRow.project.id);
+      await alertDialog('Note added.', { title: 'Note saved', confirmText: 'OK' });
     } catch (_err) {
-      setStatus('Unable to add note.');
+      await alertDialog('Unable to add note.', { title: 'Action failed', confirmText: 'OK' });
     } finally {
       setAreaNoteSaving(false);
     }
@@ -653,7 +692,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     if (expected === null) return;
     const hours = Number(expected);
     if (!Number.isFinite(hours) || hours <= 0) {
-      setStatus('Enter a valid expected time in hours.');
+      await alertDialog('Enter a valid expected time in hours.', {
+        title: 'Invalid expected time',
+        confirmText: 'OK'
+      });
       return;
     }
     setSavingExpectedId(`${projectId}-${stage.id}`);
@@ -664,9 +706,9 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
         event_meta: { action: 'update_expected_hours' }
       });
       await loadProjects();
-      setStatus('Expected time updated.');
+      await alertDialog('Expected time updated.', { title: 'Expected time saved', confirmText: 'OK' });
     } catch (_error) {
-      setStatus('Unable to update expected time.');
+      await alertDialog('Unable to update expected time.', { title: 'Action failed', confirmText: 'OK' });
     } finally {
       setSavingExpectedId('');
     }
@@ -692,9 +734,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
       setUploadFiles([]);
       setUploadAllowCustomer(false);
       await loadFiles(selectedRow.project.id);
-      setStatus(
-        uploadedCount === 1 ? 'File uploaded.' : `${uploadedCount} files uploaded.`
-      );
+      await alertDialog(uploadedCount === 1 ? 'File uploaded.' : `${uploadedCount} files uploaded.`, {
+        title: 'Upload complete',
+        confirmText: 'OK'
+      });
     } catch (err) {
       setFilesError(err?.message || 'Unable to upload file.');
     } finally {
@@ -730,9 +773,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
       const uploadedCount = photoUploads.length;
       setPhotoUploads([]);
       await loadFiles(selectedRow.project.id);
-      setStatus(
-        uploadedCount === 1 ? 'Photo uploaded.' : `${uploadedCount} photos uploaded.`
-      );
+      await alertDialog(uploadedCount === 1 ? 'Photo uploaded.' : `${uploadedCount} photos uploaded.`, {
+        title: 'Upload complete',
+        confirmText: 'OK'
+      });
     } catch (err) {
       setPhotoError(err?.message || 'Unable to upload photo.');
     } finally {
@@ -901,7 +945,6 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
           </select>
         </div>
       </div>
-      {status ? <div className="alert">{status}</div> : null}
       {loading ? <p className="muted">Loading area queue...</p> : null}
       <div className="table-scroll">
         <table className="project-table">
@@ -1028,7 +1071,6 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                 <div className="detail-card-header">
                   <h3>All notes ({selectedArea})</h3>
                 </div>
-                {areaNoteHistoryError ? <div className="alert">{areaNoteHistoryError}</div> : null}
                 {areaNoteHistoryLoading ? <p className="muted">Loading notes...</p> : null}
                 <textarea
                   className="notes-history-window"
@@ -1195,7 +1237,6 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   </span>
                 </div>
               </form>
-              {filesError ? <div className="alert">{filesError}</div> : null}
               {filesLoading ? <p className="muted">Loading files...</p> : null}
               <div className="photo-gallery-panel">
                 {documentFiles.length ? (
@@ -1309,7 +1350,6 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   </span>
                 </div>
               </form>
-              {photoError ? <div className="alert">{photoError}</div> : null}
               <div className="photo-gallery-panel">
                 {photoFiles.length ? (
                   <div className="photo-gallery upload-card-gallery">

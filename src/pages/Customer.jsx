@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { listProjects } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatMoneyStageGlyph, formatStageName, normalizeProjectStages } from '../utils/stageDisplay.js';
 
 function completionPercent(stages = []) {
@@ -25,6 +26,7 @@ export default function Customer() {
   const [project, setProject] = useState(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('');
+  const { alertDialog, dialogPortal } = useSiteDialog();
   const [isTabletView, setIsTabletView] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(max-width: 1100px) and (min-width: 761px)').matches;
@@ -66,6 +68,18 @@ export default function Customer() {
     return () => media.removeListener(onChange);
   }, []);
 
+  useEffect(() => {
+    if (!status) return;
+    let active = true;
+    (async () => {
+      await alertDialog(status, { title: 'Progress error', confirmText: 'OK' });
+      if (active) setStatus('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [status, alertDialog]);
+
   const stages = useMemo(() => normalizeProjectStages(project?.stages || []), [project?.stages]);
   const stage = currentStage(stages);
   const stageRows = useMemo(() => {
@@ -84,7 +98,6 @@ export default function Customer() {
           <p className="muted">Your project progress and current phase.</p>
         </div>
       </div>
-      {status ? <div className="alert">{status}</div> : null}
       <div className="customer-progress-card">
         <div className="customer-progress-top">
           <div className="customer-progress-title">{project?.name || 'No project linked yet'}</div>
@@ -138,6 +151,7 @@ export default function Customer() {
           </div>
         ) : null}
       </div>
+      {dialogPortal}
     </section>
   );
 }

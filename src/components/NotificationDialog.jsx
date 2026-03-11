@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { listUsers, sendNotification } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, STAGE_FLOW } from '../utils/stageDisplay.js';
 
 const AREA_OPTIONS = [...STAGE_FLOW.map((stage) => formatStageName(stage.name, stage.id)), 'Management', 'Admin'];
@@ -49,6 +50,7 @@ export default function NotificationDialog({ open, onClose }) {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const { alertDialog, dialogPortal } = useSiteDialog();
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +77,22 @@ export default function NotificationDialog({ open, onClose }) {
   }, [open]);
 
   const filteredUsers = useMemo(() => usersForArea(users, area), [users, area]);
+
+  useEffect(() => {
+    if (!open || !status) return;
+    let active = true;
+    (async () => {
+      const isError = status.startsWith('Unable') || status.startsWith('Select');
+      await alertDialog(status, {
+        title: isError ? 'Notification error' : 'Notification sent',
+        confirmText: 'OK'
+      });
+      if (active) setStatus('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [open, status, alertDialog]);
 
   useEffect(() => {
     if (!open) return;
@@ -186,7 +204,6 @@ export default function NotificationDialog({ open, onClose }) {
               )}
             </div>
           </div>
-          {status ? <div className={status.startsWith('Unable') ? 'alert' : 'muted'}>{status}</div> : null}
           <div className="actions">
             <button className="ghost" type="button" onClick={onClose}>
               Cancel
@@ -197,6 +214,7 @@ export default function NotificationDialog({ open, onClose }) {
           </div>
         </div>
       </div>
+      {dialogPortal}
     </div>
   );
 }

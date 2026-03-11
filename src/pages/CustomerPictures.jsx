@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, listProjectFiles, listProjects } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'];
 
@@ -49,6 +50,7 @@ export default function CustomerPictures() {
   const [previewId, setPreviewId] = useState(null);
   const photoUrlRef = useRef({});
   const blobCacheRef = useRef(new Map());
+  const { alertDialog, dialogPortal } = useSiteDialog();
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -170,6 +172,18 @@ export default function CustomerPictures() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!status) return;
+    let active = true;
+    (async () => {
+      await alertDialog(status, { title: 'Pictures notice', confirmText: 'OK' });
+      if (active) setStatus('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [status, alertDialog]);
+
   const previewPhoto = photos.find((item) => item.id === previewId) || null;
   const previewUrl = previewPhoto ? photoUrls[previewPhoto.id] : '';
 
@@ -194,7 +208,6 @@ export default function CustomerPictures() {
           Refresh
         </button>
       </div>
-      {status ? <div className="alert">{status}</div> : null}
       {loading ? <p className="muted">Loading project pictures...</p> : null}
       {!project ? (
         <div className="empty-state">
@@ -266,6 +279,7 @@ export default function CustomerPictures() {
           </div>
         </ModalPortal>
       ) : null}
+      {dialogPortal}
     </section>
   );
 }

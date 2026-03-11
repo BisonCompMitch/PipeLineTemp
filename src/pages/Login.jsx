@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import logo from '../assets/BisonWorksFavicon.png';
 import { loginRequest } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { alertDialog, dialogPortal } = useSiteDialog();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -35,6 +37,18 @@ export default function Login({ onLogin }) {
     }
   };
 
+  React.useEffect(() => {
+    if (!error) return;
+    let active = true;
+    (async () => {
+      await alertDialog(error, { title: 'Sign in error', confirmText: 'OK' });
+      if (active) setError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [error, alertDialog]);
+
   return (
     <div className="login">
       <div className="login-card">
@@ -45,7 +59,6 @@ export default function Login({ onLogin }) {
             <p className="muted">Please sign in.</p>
           </div>
         </div>
-        {error ? <div className="alert">{error}</div> : null}
         <form onSubmit={handleSubmit} className="login-form">
           <label>
             Username
@@ -69,6 +82,7 @@ export default function Login({ onLogin }) {
           </button>
         </form>
       </div>
+      {dialogPortal}
     </div>
   );
 }

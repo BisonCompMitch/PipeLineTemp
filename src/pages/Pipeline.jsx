@@ -399,7 +399,7 @@ export default function Pipeline({
       ? window.matchMedia('(min-width: 1101px)').matches
       : true
   );
-  const { confirmDialog, dialogPortal } = useSiteDialog();
+  const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
 
   const closePreview = useCallback(() => {
     if (preview.url) {
@@ -803,6 +803,54 @@ export default function Pipeline({
   useEffect(() => {
     setDetailStageNoteDraft('');
   }, [detailCurrentStage?.id]);
+
+  useEffect(() => {
+    if (!error) return;
+    let active = true;
+    (async () => {
+      await alertDialog(error, { title: 'Dashboard error', confirmText: 'OK' });
+      if (active) setError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [error, alertDialog]);
+
+  useEffect(() => {
+    if (!detailError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(detailError, { title: 'Project details notice', confirmText: 'OK' });
+      if (active) setDetailError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [detailError, alertDialog]);
+
+  useEffect(() => {
+    if (!filesError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(filesError, { title: 'Files notice', confirmText: 'OK' });
+      if (active) setFilesError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [filesError, alertDialog]);
+
+  useEffect(() => {
+    if (!photoError) return;
+    let active = true;
+    (async () => {
+      await alertDialog(photoError, { title: 'Photos notice', confirmText: 'OK' });
+      if (active) setPhotoError('');
+    })();
+    return () => {
+      active = false;
+    };
+  }, [photoError, alertDialog]);
 
   const stageOptions = useMemo(() => [...detailStages], [detailStages]);
 
@@ -1294,7 +1342,6 @@ export default function Pipeline({
           </div>
         </div>
         {loading ? <p className="muted">Loading projects...</p> : null}
-        {error ? <div className="alert">{error}</div> : null}
         {dashboardRows.length ? (
           splitDashboardLayout ? (
           <div className="dashboard-columns">
@@ -1417,7 +1464,6 @@ export default function Pipeline({
               </div>
               <div className="pipeline-detail-body">
                 {detailLoading ? <p className="muted">Loading project details...</p> : null}
-                {detailError ? <div className="alert">{detailError}</div> : null}
                 {detailStatus ? <p className="muted">{detailStatus}</p> : null}
                 {detailProject ? (
                   <div className="project-detail-grid">
@@ -1719,7 +1765,6 @@ export default function Pipeline({
                       </span>
                     </div>
                   </form>
-                  {filesError ? <div className="alert">{filesError}</div> : null}
                   {filesLoading ? <p className="muted">Loading files...</p> : null}
                   <div className="photo-gallery-panel">
                     {documentFiles.length ? (
@@ -1833,7 +1878,6 @@ export default function Pipeline({
                       </span>
                     </div>
                   </form>
-                  {photoError ? <div className="alert">{photoError}</div> : null}
                   <div className="photo-gallery-panel">
                     {photoFiles.length ? (
                       <div className="photo-gallery upload-card-gallery">
