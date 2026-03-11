@@ -573,18 +573,22 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   };
 
   const handleComplete = async (projectId, stageId) => {
+    let moved = false;
     setStageMoveLoading(true);
     try {
       await handoffStage(projectId, stageId);
       await loadProjects();
       setSelectedRow(null);
       setDetailTab('details');
+      moved = true;
       setStatus('Project sent successfully.');
-      await alertDialog('Project sent successfully.', { title: 'Project moved', confirmText: 'OK' });
     } catch (err) {
       setStatus('Unable to send to next step.');
     } finally {
       setStageMoveLoading(false);
+    }
+    if (moved) {
+      await alertDialog('Project sent successfully.', { title: 'Project moved', confirmText: 'OK' });
     }
   };
 
