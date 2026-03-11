@@ -1163,6 +1163,53 @@ body::before {
   font-weight: 600;
 }
 
+.site-dialog-modal {
+  width: min(520px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+}
+
+.site-dialog-body {
+  display: grid;
+  gap: 14px;
+}
+
+.site-dialog-message {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.site-dialog-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.blocking-overlay-backdrop {
+  z-index: 9500;
+}
+
+.blocking-overlay-modal {
+  width: min(440px, calc(100vw - 40px));
+  text-align: center;
+}
+
+.blocking-overlay-title {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.blocking-overlay-message {
+  margin: 0;
+  color: var(--muted);
+}
+
 .file-preview-modal {
   width: min(1180px, calc(100vw - 80px));
   max-height: calc(100vh - 80px);

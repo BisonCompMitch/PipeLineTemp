@@ -7,7 +7,7 @@ function normalizeId(value) {
 }
 
 export const STAGE_FLOW = [
-  { id: 'plans_received', name: 'Plans Recieved', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
   { id: 'budget', name: 'CFS Budget', owner: 'CFS', default_duration_hours: 24 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
@@ -24,6 +24,10 @@ export const STAGE_FLOW = [
 export function formatStageName(name, stageId = '') {
   const rawName = normalizeValue(name);
   const id = normalizeId(stageId);
+  if (id === 'plans_received') return 'Plans Received';
+  if (/^plans\s+recieved$/i.test(rawName)) return 'Plans Received';
+  if (/^plans\s+revieved$/i.test(rawName)) return 'Plans Received';
+  if (/^plans\s+received$/i.test(rawName)) return 'Plans Received';
   if (id === 'money_design') return 'Money - D&E';
   if (/^money\s*(check\s*)?-\s*design$/i.test(rawName)) return 'Money - D&E';
   if (/^money\s*design$/i.test(rawName)) return 'Money - D&E';

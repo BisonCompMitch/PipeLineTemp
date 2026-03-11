@@ -11,6 +11,8 @@ import {
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import BlockingOverlay from '../components/BlockingOverlay.jsx';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
 
 const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
@@ -281,6 +283,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   const [previewRecord, setPreviewRecord] = useState(null);
   const [cardPreviewUrls, setCardPreviewUrls] = useState({});
   const [cardPreviewStatus, setCardPreviewStatus] = useState({});
+  const [stageMoveLoading, setStageMoveLoading] = useState(false);
   const [preview, setPreview] = useState({
     open: false,
     url: '',
@@ -290,6 +293,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   });
   const cardPreviewUrlRef = useRef({});
   const previewBlobCacheRef = useRef(new Map());
+  const { confirmDialog, promptDialog, alertDialog, dialogPortal } = useSiteDialog();
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
   const selectedAreaStageIds = useMemo(() => {
@@ -544,7 +548,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   }, [selectedRow?.stage?.id]);
 
   const handleAccept = async (projectId, stageId) => {
-    const expected = window.prompt('Expected time in hours for this stage?');
+    const expected = await promptDialog('Expected time in hours for this stage?', {
+      title: 'Set expected time',
+      confirmText: 'Save'
+    });
     if (expected === null) return;
     const hours = Number(expected);
     if (!Number.isFinite(hours) || hours <= 0) {
@@ -566,15 +573,18 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   };
 
   const handleComplete = async (projectId, stageId) => {
+    setStageMoveLoading(true);
     try {
       await handoffStage(projectId, stageId);
-      window.alert('Project sent successfully.');
       await loadProjects();
       setSelectedRow(null);
       setDetailTab('details');
       setStatus('Project sent successfully.');
+      await alertDialog('Project sent successfully.', { title: 'Project moved', confirmText: 'OK' });
     } catch (err) {
       setStatus('Unable to send to next step.');
+    } finally {
+      setStageMoveLoading(false);
     }
   };
 
@@ -631,7 +641,11 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
 
   const handleEditExpected = async (projectId, stage) => {
     const current = Number(stage?.expected_hours ?? stage?.default_duration_hours ?? 0);
-    const expected = window.prompt('Expected time in hours for this stage?', current > 0 ? String(current) : '');
+    const expected = await promptDialog('Expected time in hours for this stage?', {
+      title: 'Edit expected time',
+      confirmText: 'Save',
+      defaultValue: current > 0 ? String(current) : ''
+    });
     if (expected === null) return;
     const hours = Number(expected);
     if (!Number.isFinite(hours) || hours <= 0) {
@@ -811,7 +825,11 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
 
   const handleDeleteFile = async (fileRecord) => {
     if (!selectedRow?.project?.id || !fileRecord?.id) return;
-    if (!window.confirm(`Delete ${fileRecord.filename}? This cannot be undone.`)) return false;
+    const shouldDelete = await confirmDialog(`Delete ${fileRecord.filename}? This cannot be undone.`, {
+      title: 'Delete file',
+      confirmText: 'Delete'
+    });
+    if (!shouldDelete) return false;
     try {
       await deleteProjectFile(selectedRow.project.id, fileRecord.id);
       setFiles((prev) => prev.filter((item) => item.id !== fileRecord.id));
@@ -1397,6 +1415,14 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
           </div>
         </ModalPortal>
       ) : null}
+
+      <BlockingOverlay
+        open={stageMoveLoading}
+        title="Moving project to next stage..."
+        message="Please wait while the handoff completes."
+      />
+
+      {dialogPortal}
 
     </>
   );

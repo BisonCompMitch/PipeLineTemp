@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createLead, deleteLead, listLeads, updateLead } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost'];
 const CREATOR_COMPANY_ALL = '__all__';
@@ -22,6 +23,7 @@ export default function Leads({ isAdminView = false }) {
   });
   const [editing, setEditing] = useState(null);
   const [creatorCompanyFilter, setCreatorCompanyFilter] = useState(CREATOR_COMPANY_ALL);
+  const { confirmDialog, dialogPortal } = useSiteDialog();
 
   const refresh = async () => {
     setLoading(true);
@@ -77,7 +79,11 @@ export default function Leads({ isAdminView = false }) {
 
   const handleDelete = async (leadId) => {
     if (!leadId) return;
-    if (!window.confirm('Delete this lead?')) return;
+    const shouldDelete = await confirmDialog('Delete this lead?', {
+      title: 'Delete lead',
+      confirmText: 'Delete'
+    });
+    if (!shouldDelete) return;
     try {
       await deleteLead(leadId);
       setMessage('Lead deleted.');
@@ -121,7 +127,8 @@ export default function Leads({ isAdminView = false }) {
   }, [leads, isAdminView, creatorCompanyFilter]);
 
   return (
-    <section className="panel">
+    <>
+      <section className="panel">
       <div className="panel-header">
         <div>
           <h2>Leads</h2>
@@ -271,6 +278,8 @@ export default function Leads({ isAdminView = false }) {
           </div>
         </div>
       ) : null}
-    </section>
+      </section>
+      {dialogPortal}
+    </>
   );
 }

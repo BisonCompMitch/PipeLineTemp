@@ -15,6 +15,7 @@ import {
   updateCustomer,
   updateUser
 } from '../api.js';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, STAGE_FLOW } from '../utils/stageDisplay.js';
 
 const AREA_OPTIONS = [...STAGE_FLOW.map((stage) => formatStageName(stage.name, stage.id)), 'Management', 'Admin'];
@@ -97,6 +98,7 @@ export default function Users() {
   const [editStatus, setEditStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const { confirmDialog, dialogPortal } = useSiteDialog();
   const [createBisonForm, setCreateBisonForm] = useState({
     username: '',
     full_name: '',
@@ -470,7 +472,11 @@ export default function Users() {
 
   const handleDeleteBison = async (user) => {
     if (!user?.username) return;
-    if (!window.confirm(`Delete ${user.username}? This cannot be undone.`)) return;
+    const shouldDelete = await confirmDialog(`Delete ${user.username}? This cannot be undone.`, {
+      title: 'Delete user',
+      confirmText: 'Delete'
+    });
+    if (!shouldDelete) return;
     try {
       await deleteUser(user.username);
       if (editing?.type === 'bison' && editing?.form?.username === user.username) {
@@ -484,7 +490,11 @@ export default function Users() {
 
   const handleDeleteContractor = async (contractor) => {
     if (!contractor?.email) return;
-    if (!window.confirm(`Delete contractor ${contractor.email}? This cannot be undone.`)) return;
+    const shouldDelete = await confirmDialog(
+      `Delete contractor ${contractor.email}? This cannot be undone.`,
+      { title: 'Delete contractor', confirmText: 'Delete' }
+    );
+    if (!shouldDelete) return;
     try {
       await deleteContractor(contractor.email);
       if (editing?.type === 'contractor' && editing?.form?.email === contractor.email) {
@@ -498,7 +508,11 @@ export default function Users() {
 
   const handleDeleteCustomer = async (customer) => {
     if (!customer?.email) return;
-    if (!window.confirm(`Delete customer ${customer.email}? This cannot be undone.`)) return;
+    const shouldDelete = await confirmDialog(
+      `Delete customer ${customer.email}? This cannot be undone.`,
+      { title: 'Delete customer', confirmText: 'Delete' }
+    );
+    if (!shouldDelete) return;
     try {
       await deleteCustomer(customer.email);
       if (editing?.type === 'customer' && editing?.form?.email === customer.email) {
@@ -1009,6 +1023,7 @@ export default function Users() {
           </div>
         </div>
       ) : null}
+      {dialogPortal}
     </div>
   );
 }

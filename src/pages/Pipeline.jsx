@@ -17,6 +17,7 @@ import {
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
 
 const NOTICE_LEVELS = ['green', 'yellow', 'red'];
@@ -398,6 +399,7 @@ export default function Pipeline({
       ? window.matchMedia('(min-width: 1101px)').matches
       : true
   );
+  const { confirmDialog, dialogPortal } = useSiteDialog();
 
   const closePreview = useCallback(() => {
     if (preview.url) {
@@ -1085,7 +1087,11 @@ export default function Pipeline({
 
   const handleDeleteFile = async (fileRecord) => {
     if (!detailProject?.id || !fileRecord?.id) return;
-    if (!window.confirm(`Delete ${fileRecord.filename}? This cannot be undone.`)) return false;
+    const shouldDelete = await confirmDialog(`Delete ${fileRecord.filename}? This cannot be undone.`, {
+      title: 'Delete file',
+      confirmText: 'Delete'
+    });
+    if (!shouldDelete) return false;
     try {
       await deleteProjectFile(detailProject.id, fileRecord.id);
       setFiles((prev) => prev.filter((item) => item.id !== fileRecord.id));
@@ -1110,7 +1116,11 @@ export default function Pipeline({
       setDetailStatus('Project must be completed before compression.');
       return;
     }
-    if (!window.confirm('Compress all project files into a single archive? This removes individual files.')) {
+    const shouldCompress = await confirmDialog(
+      'Compress all project files into a single archive? This removes individual files.',
+      { title: 'Compress files', confirmText: 'Compress' }
+    );
+    if (!shouldCompress) {
       return;
     }
     setCompressing(true);
@@ -1129,7 +1139,11 @@ export default function Pipeline({
 
   const handleArchiveProject = async () => {
     if (!detailProject?.id || !canEditProjects || detailProject.is_deleted) return;
-    if (!window.confirm('Archive this project? You can restore it later.')) return;
+    const shouldArchive = await confirmDialog('Archive this project? You can restore it later.', {
+      title: 'Archive project',
+      confirmText: 'Archive'
+    });
+    if (!shouldArchive) return;
     setProjectActionBusy('archive');
     setDetailError('');
     setDetailStatus('');
@@ -1180,7 +1194,11 @@ export default function Pipeline({
 
   const handleDeleteProject = async () => {
     if (!detailProject?.id || !canEditProjects) return;
-    if (!window.confirm('Delete this project permanently? This cannot be undone.')) return;
+    const shouldDelete = await confirmDialog('Delete this project permanently? This cannot be undone.', {
+      title: 'Delete project',
+      confirmText: 'Delete'
+    });
+    if (!shouldDelete) return;
     setProjectActionBusy('delete');
     setDetailError('');
     setDetailStatus('');
@@ -1929,6 +1947,8 @@ export default function Pipeline({
           </div>
         </ModalPortal>
       ) : null}
+
+      {dialogPortal}
     </>
   );
 }
