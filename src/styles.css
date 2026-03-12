@@ -3524,6 +3524,8 @@ body::before {
 }
 
 .intake-docs-title {
+  display: block;
+  margin: 0 0 2px;
   padding: 0 4px;
   font-family: var(--font-display);
   font-size: 16px;

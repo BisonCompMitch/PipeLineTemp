@@ -177,8 +177,10 @@ export default function Intake() {
             Budget
             <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
           </label>
-          <fieldset className="intake-docs span-2">
-            <legend className="intake-docs-title">Required docs</legend>
+          <div className="intake-docs span-2" role="group" aria-labelledby="required-docs-title">
+            <div id="required-docs-title" className="intake-docs-title">
+              Required docs
+            </div>
             <div className="intake-docs-grid">
               {REQUIRED_DOC_OPTIONS.map((option) => (
                 <label key={option.id} className="intake-doc-option">
@@ -191,7 +193,7 @@ export default function Intake() {
                 </label>
               ))}
             </div>
-          </fieldset>
+          </div>
           <label className="span-2">
             Notes
             <textarea value={form.summary} onChange={updateField('summary')} placeholder="Notes" rows={3} />
