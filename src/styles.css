@@ -1485,6 +1485,29 @@ body::before {
   border-radius: 12px;
 }
 
+.file-preview-table-wrap {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.file-preview-table-wrap .table-scroll {
+  max-height: calc(100vh - 320px);
+}
+
+.file-preview-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.file-preview-table th,
+.file-preview-table td {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-preview-header-actions {
   display: inline-flex;
   align-items: center;
@@ -3521,6 +3544,25 @@ body::before {
   background: var(--panel-2);
   display: grid;
   gap: 10px;
+}
+
+.intake-upload-section {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  display: grid;
+  gap: 10px;
+}
+
+.intake-upload-section .intake-docs-title {
+  margin: 0;
+  padding: 0 4px;
+}
+
+.intake-upload-section .file-upload-form {
+  margin-bottom: 0;
 }
 
 .intake-docs-title {

@@ -228,7 +228,10 @@ function formatBytes(value) {
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'];
 const TEXT_EXTENSIONS = ['.txt', '.md', '.csv', '.tsv', '.log', '.json', '.yaml', '.yml', '.xml'];
 const PDF_EXTENSIONS = ['.pdf'];
+const SPREADSHEET_EXTENSIONS = ['.csv', '.tsv', '.xlsx', '.xls'];
 const TEXT_PREVIEW_LIMIT_BYTES = 1024 * 1024;
+const SPREADSHEET_PREVIEW_MAX_ROWS = 200;
+const SPREADSHEET_PREVIEW_MAX_COLUMNS = 30;
 
 function isImageFile(fileRecord) {
   const type = String(fileRecord?.content_type || '').toLowerCase();
@@ -260,6 +263,92 @@ function isPdfFile(fileRecord) {
   if (type === 'application/pdf' || type.includes('/pdf')) return true;
   const name = String(fileRecord?.filename || '').toLowerCase();
   return PDF_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function isSpreadsheetFile(fileRecord) {
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  if (
+    [
+      'text/csv',
+      'text/tab-separated-values',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ].includes(type)
+  ) {
+    return true;
+  }
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  return SPREADSHEET_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+async function buildSpreadsheetPreview(fileRecord, blob) {
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  const isDelimited =
+    name.endsWith('.csv') ||
+    name.endsWith('.tsv') ||
+    type === 'text/csv' ||
+    type === 'text/tab-separated-values' ||
+    type === 'application/csv';
+  if (isDelimited) {
+    const Papa = (await import('papaparse')).default;
+    const raw = await blob.text();
+    const delimiter = name.endsWith('.tsv') || type === 'text/tab-separated-values' ? '\t' : undefined;
+    const parsed = Papa.parse(raw, {
+      header: false,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      delimiter
+    });
+    if (parsed?.errors?.length) {
+      throw new Error('Unable to parse CSV/TSV preview.');
+    }
+    const data = Array.isArray(parsed.data) ? parsed.data : [];
+    const rowCount = data.length;
+    const safeRows = data.slice(0, SPREADSHEET_PREVIEW_MAX_ROWS).map((row) => {
+      const values = Array.isArray(row) ? row : [row];
+      return values.slice(0, SPREADSHEET_PREVIEW_MAX_COLUMNS).map((value) => String(value ?? ''));
+    });
+    const maxColumns = safeRows.reduce((max, row) => Math.max(max, row.length), 0);
+    const headers = Array.from({ length: maxColumns }, (_, index) => `Col ${index + 1}`);
+    return {
+      rows: safeRows,
+      headers,
+      note:
+        rowCount > SPREADSHEET_PREVIEW_MAX_ROWS
+          ? `Showing first ${SPREADSHEET_PREVIEW_MAX_ROWS} rows. Download for full file.`
+          : ''
+    };
+  }
+
+  const XLSX = await import('xlsx');
+  const buffer = await blob.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array', dense: true });
+  const sheetName = workbook?.SheetNames?.[0];
+  if (!sheetName) throw new Error('Spreadsheet has no sheets to preview.');
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    blankrows: false,
+    raw: false
+  });
+  const tableRows = Array.isArray(rawRows) ? rawRows : [];
+  const rowCount = tableRows.length;
+  const safeRows = tableRows.slice(0, SPREADSHEET_PREVIEW_MAX_ROWS).map((row) => {
+    const values = Array.isArray(row) ? row : [row];
+    return values.slice(0, SPREADSHEET_PREVIEW_MAX_COLUMNS).map((value) => String(value ?? ''));
+  });
+  const maxColumns = safeRows.reduce((max, row) => Math.max(max, row.length), 0);
+  const headers = Array.from({ length: maxColumns }, (_, index) => `Col ${index + 1}`);
+  return {
+    rows: safeRows,
+    headers,
+    note:
+      rowCount > SPREADSHEET_PREVIEW_MAX_ROWS
+        ? `Showing first ${SPREADSHEET_PREVIEW_MAX_ROWS} rows from sheet "${sheetName}". Download for full file.`
+        : `Sheet: ${sheetName}`
+  };
 }
 
 function coerceBool(value) {
@@ -399,7 +488,8 @@ export default function Pipeline({
     url: '',
     name: '',
     kind: '',
-    text: ''
+    text: '',
+    table: null
   });
   const cardPreviewUrlRef = useRef({});
   const previewBlobCacheRef = useRef(new Map());
@@ -418,7 +508,7 @@ export default function Pipeline({
     }
     setPreviewLoading(false);
     setPreviewRecord(null);
-    setPreview({ open: false, url: '', name: '', kind: '', text: '' });
+    setPreview({ open: false, url: '', name: '', kind: '', text: '', table: null });
   }, [preview.url]);
 
   const replaceCardPreviewUrls = useCallback((nextMap) => {
@@ -1107,20 +1197,32 @@ export default function Pipeline({
     setFilesError('');
     const name = fileRecord.filename || 'File preview';
     setPreviewRecord(fileRecord);
-    setPreview({ open: true, url: '', name, kind: 'loading', text: '' });
+    setPreview({ open: true, url: '', name, kind: 'loading', text: '', table: null });
     setPreviewLoading(true);
     try {
       const blob = await downloadProjectFile(detailProject.id, fileRecord.id);
       if (isImageFile(fileRecord)) {
         const url = window.URL.createObjectURL(blob);
-        setPreview({ open: true, url, name, kind: 'image', text: '' });
+        setPreview({ open: true, url, name, kind: 'image', text: '', table: null });
+        return;
+      }
+      if (isSpreadsheetFile(fileRecord)) {
+        const table = await buildSpreadsheetPreview(fileRecord, blob);
+        setPreview({
+          open: true,
+          url: '',
+          name,
+          kind: 'table',
+          text: table.note || '',
+          table
+        });
         return;
       }
       if (isTextFile(fileRecord)) {
         const isTruncated = blob.size > TEXT_PREVIEW_LIMIT_BYTES;
         const textBlob = isTruncated ? blob.slice(0, TEXT_PREVIEW_LIMIT_BYTES) : blob;
         const text = await textBlob.text();
-        setPreview({ open: true, url: '', name, kind: 'text', text });
+        setPreview({ open: true, url: '', name, kind: 'text', text, table: null });
         if (isTruncated) {
           setFilesError('Showing partial text preview (first 1 MB). Download for full file.');
         }
@@ -1128,16 +1230,26 @@ export default function Pipeline({
       }
       if (isPdfFile(fileRecord)) {
         const url = window.URL.createObjectURL(blob);
-        setPreview({ open: true, url, name, kind: 'pdf', text: '' });
+        setPreview({ open: true, url, name, kind: 'pdf', text: '', table: null });
         return;
       }
-      setPreview({ open: false, url: '', name: '', kind: '', text: '' });
-      setPreviewRecord(null);
-      setFilesError('Preview unavailable for this file type. Use Download.');
+      setPreview({
+        open: true,
+        url: '',
+        name,
+        kind: 'unsupported',
+        text: 'Preview unavailable for this file type. Use Download.',
+        table: null
+      });
     } catch (_err) {
-      setPreview({ open: false, url: '', name: '', kind: '', text: '' });
-      setPreviewRecord(null);
-      setFilesError('Unable to open file.');
+      setPreview({
+        open: true,
+        url: '',
+        name,
+        kind: 'unsupported',
+        text: 'Unable to load preview. You can still use Download or Delete.',
+        table: null
+      });
     } finally {
       setPreviewLoading(false);
     }
@@ -2105,12 +2217,42 @@ export default function Pipeline({
                   <img src={preview.url} alt={preview.name} />
                 ) : preview.kind === 'text' ? (
                   <pre className="file-preview-text">{preview.text || 'No preview available.'}</pre>
+                ) : preview.kind === 'table' ? (
+                  <div className="file-preview-table-wrap">
+                    {preview.text ? <p className="muted">{preview.text}</p> : null}
+                    {Array.isArray(preview.table?.rows) && preview.table.rows.length ? (
+                      <div className="table-scroll">
+                        <table className="project-table file-preview-table">
+                          <thead>
+                            <tr>
+                              {(preview.table.headers || []).map((header, index) => (
+                                <th key={`${header}-${index}`}>{header}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {preview.table.rows.map((row, rowIndex) => (
+                              <tr key={`row-${rowIndex}`}>
+                                {(preview.table.headers || []).map((_, colIndex) => (
+                                  <td key={`cell-${rowIndex}-${colIndex}`}>{row[colIndex] || ''}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="file-preview-fallback">No tabular data found to preview.</div>
+                    )}
+                  </div>
                 ) : preview.kind === 'pdf' ? (
                   <object className="file-preview-frame" data={preview.url} type="application/pdf">
                     <div className="file-preview-fallback">PDF preview unavailable. Download to open.</div>
                   </object>
                 ) : (
-                  <div className="file-preview-fallback">Preview unavailable for this file type.</div>
+                  <div className="file-preview-fallback">
+                    {preview.text || 'Preview unavailable for this file type.'}
+                  </div>
                 )}
               </div>
             </div>

@@ -1,11 +1,52 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { createProject, listContractors, listProjects } from '../api.js';
+import { createProject, listContractors, listProjects, uploadProjectFile } from '../api.js';
 import { REQUIRED_DOC_OPTIONS, buildEmptyRequiredDocs, buildProjectSummary } from '../utils/requiredDocs.js';
 
 function todayLocalIso() {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 10);
+}
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'];
+
+function isImageUploadFile(file) {
+  if (!file) return false;
+  const type = String(file.type || '').toLowerCase();
+  if (type.startsWith('image/')) return true;
+  const name = String(file.name || '').toLowerCase();
+  return IMAGE_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function summarizeSelection(items, emptyLabel, noun) {
+  if (!items.length) return emptyLabel;
+  if (items.length === 1) return items[0].file.name;
+  return `${items.length} ${noun} selected`;
+}
+
+function formatBytes(value) {
+  const size = Number(value || 0);
+  if (!size) return '-';
+  if (size < 1024) return `${size} B`;
+  const kb = size / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
+}
+
+function getFileTypeLabel(filename) {
+  const name = String(filename || '').trim();
+  if (!name.includes('.')) return 'FILE';
+  const ext = name.split('.').pop();
+  if (!ext) return 'FILE';
+  return ext.slice(0, 5).toUpperCase();
+}
+
+function toUploadItems(fileList) {
+  return fileList.map((file, index) => ({
+    id: `${file.name}-${file.size}-${file.lastModified}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    file
+  }));
 }
 
 export default function Intake() {
@@ -21,6 +62,14 @@ export default function Intake() {
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [partyOptions, setPartyOptions] = useState([]);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const [photoUploads, setPhotoUploads] = useState([]);
+  const [uploadAllowCustomer, setUploadAllowCustomer] = useState(false);
+  const [uploadAllowContractor, setUploadAllowContractor] = useState(false);
+  const [uploadPhotoAllowContractor, setUploadPhotoAllowContractor] = useState(false);
+  const [fileDragActive, setFileDragActive] = useState(false);
+  const [photoDragActive, setPhotoDragActive] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   const updateField = (key) => (event) => {
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
@@ -68,6 +117,74 @@ export default function Intake() {
   }, []);
 
   const requesterListId = useMemo(() => 'shared-party-options', []);
+  const photoPreviews = useMemo(
+    () =>
+      photoUploads.map((item) => ({
+        id: item.id,
+        file: item.file,
+        previewUrl: window.URL.createObjectURL(item.file)
+      })),
+    [photoUploads]
+  );
+
+  useEffect(
+    () => () => {
+      photoPreviews.forEach((item) => {
+        window.URL.revokeObjectURL(item.previewUrl);
+      });
+    },
+    [photoPreviews]
+  );
+
+  const handleSelectFiles = (event) => {
+    const incoming = Array.from(event.target.files || []);
+    if (incoming.length) {
+      setUploadFiles((prev) => [...prev, ...toUploadItems(incoming)]);
+    }
+    event.target.value = '';
+  };
+
+  const handleSelectPhotos = (event) => {
+    const picked = Array.from(event.target.files || []);
+    const imageFiles = picked.filter(isImageUploadFile);
+    if (imageFiles.length) {
+      setPhotoUploads((prev) => [...prev, ...toUploadItems(imageFiles)]);
+      setPhotoError('');
+    } else if (picked.length) {
+      setPhotoError('Please select image files only.');
+    }
+    event.target.value = '';
+  };
+
+  const removeQueuedFile = (id) => {
+    setUploadFiles((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const removeQueuedPhoto = (id) => {
+    setPhotoUploads((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleFileDrop = (event) => {
+    event.preventDefault();
+    const dropped = Array.from(event.dataTransfer.files || []);
+    if (dropped.length) {
+      setUploadFiles((prev) => [...prev, ...toUploadItems(dropped)]);
+    }
+    setFileDragActive(false);
+  };
+
+  const handlePhotoDrop = (event) => {
+    event.preventDefault();
+    const dropped = Array.from(event.dataTransfer.files || []);
+    const imageFiles = dropped.filter(isImageUploadFile);
+    if (imageFiles.length) {
+      setPhotoUploads((prev) => [...prev, ...toUploadItems(imageFiles)]);
+      setPhotoError('');
+    } else if (dropped.length) {
+      setPhotoError('Please drop image files only.');
+    }
+    setPhotoDragActive(false);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -79,7 +196,7 @@ export default function Intake() {
     setSaving(true);
     setStatus('');
     try {
-      await createProject({
+      const createdProject = await createProject({
         name: form.name.trim(),
         requester,
         due_date: todayLocalIso(),
@@ -87,12 +204,46 @@ export default function Intake() {
         budget: form.budget.trim(),
         summary: buildProjectSummary(form.required_docs, form.summary)
       });
+      const projectId = String(createdProject?.id || '').trim();
+      const pendingFiles = [...uploadFiles];
+      const pendingPhotos = [...photoUploads];
+      if (projectId && (pendingFiles.length || pendingPhotos.length)) {
+        const uploadTasks = [
+          ...pendingFiles.map((item) =>
+            uploadProjectFile(projectId, item.file, {
+              filename: item.file.name,
+              content_type: item.file.type || undefined,
+              customer_visible: uploadAllowCustomer,
+              contractor_visible: uploadAllowContractor
+            })
+          ),
+          ...pendingPhotos.map((item) =>
+            uploadProjectFile(projectId, item.file, {
+              filename: item.file.name,
+              content_type: item.file.type || undefined,
+              customer_visible: true,
+              contractor_visible: uploadPhotoAllowContractor
+            })
+          )
+        ];
+        const results = await Promise.allSettled(uploadTasks);
+        const failedCount = results.filter((result) => result.status === 'rejected').length;
+        const uploadedCount = uploadTasks.length - failedCount;
+        if (failedCount > 0) {
+          setStatus(
+            `Project request submitted. ${uploadedCount} upload(s) completed and ${failedCount} failed. You can retry from project details.`
+          );
+        } else {
+          setStatus(`Project request submitted. Uploaded ${uploadedCount} file(s).`);
+        }
+      } else {
+        setStatus('Project request submitted.');
+      }
       setPartyOptions((prev) => {
         const exists = prev.some((item) => item.toLowerCase() === requester.toLowerCase());
         if (exists) return prev;
         return [...prev, requester].sort((a, b) => a.localeCompare(b));
       });
-      setStatus('Project request submitted.');
       setForm({
         name: '',
         requester: '',
@@ -101,6 +252,12 @@ export default function Intake() {
         summary: '',
         required_docs: emptyRequiredDocs
       });
+      setUploadFiles([]);
+      setPhotoUploads([]);
+      setUploadAllowCustomer(false);
+      setUploadAllowContractor(false);
+      setUploadPhotoAllowContractor(false);
+      setPhotoError('');
     } catch (err) {
       setStatus('Unable to submit the project intake.');
     } finally {
@@ -163,6 +320,190 @@ export default function Intake() {
                   <span>{option.label}</span>
                 </label>
               ))}
+            </div>
+          </div>
+          <div className="intake-upload-section span-2">
+            <div className="intake-docs-title">Files</div>
+            <div className="file-upload-form">
+              <div
+                className={`file-upload-row${fileDragActive ? ' drag-active' : ''}`}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'copy';
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setFileDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setFileDragActive(false);
+                }}
+                onDrop={handleFileDrop}
+              >
+                <div className="file-drop-hint">
+                  <span className="file-drop-icon" aria-hidden="true">
+                    +
+                  </span>
+                  <span>{fileDragActive ? 'Drop files to upload' : 'Drag and drop files here'}</span>
+                </div>
+                <span className="file-upload-name">{summarizeSelection(uploadFiles, 'No files selected', 'files')}</span>
+              </div>
+              <div className="file-upload-actions">
+                <div className="file-upload-controls">
+                  <input
+                    id="intake-file-upload"
+                    className="file-upload-input"
+                    type="file"
+                    multiple
+                    onChange={handleSelectFiles}
+                  />
+                  <label htmlFor="intake-file-upload" className="ghost file-upload-button">
+                    Choose files
+                  </label>
+                </div>
+                <label className="switch-field">
+                  <input
+                    type="checkbox"
+                    checked={uploadAllowCustomer}
+                    onChange={(event) => setUploadAllowCustomer(event.target.checked)}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span className="switch-thumb" />
+                  </span>
+                  <span className="switch-text">Allow customer view</span>
+                </label>
+                <label className="switch-field">
+                  <input
+                    type="checkbox"
+                    checked={uploadAllowContractor}
+                    onChange={(event) => setUploadAllowContractor(event.target.checked)}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span className="switch-thumb" />
+                  </span>
+                  <span className="switch-text">Allow contractor view</span>
+                </label>
+                <span className="file-upload-selected">
+                  {summarizeSelection(uploadFiles, 'No files selected', 'files')}
+                </span>
+              </div>
+            </div>
+            <div className="photo-gallery-panel">
+              {uploadFiles.length ? (
+                <div className="photo-gallery upload-card-gallery">
+                  {uploadFiles.map((item) => (
+                    <div key={item.id} className="photo-card file-card compact-upload-card">
+                      <div className="photo-thumb-wrap file-thumb-wrap">
+                        <div className="file-thumb-placeholder">
+                          <span className="file-thumb-type">{getFileTypeLabel(item.file.name)}</span>
+                        </div>
+                      </div>
+                      <div className="photo-meta">
+                        <div className="photo-name" title={item.file.name}>
+                          {item.file.name}
+                        </div>
+                        <div className="photo-sub muted">
+                          <span>{new Date(item.file.lastModified).toLocaleString()}</span>
+                          <span>{formatBytes(item.file.size)}</span>
+                        </div>
+                      </div>
+                      <button className="ghost tiny-button" type="button" onClick={() => removeQueuedFile(item.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No files selected yet.</p>
+              )}
+            </div>
+          </div>
+          <div className="intake-upload-section span-2">
+            <div className="intake-docs-title">Photos</div>
+            <div className="file-upload-form">
+              <div
+                className={`file-upload-row${photoDragActive ? ' drag-active' : ''}`}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'copy';
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setPhotoDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setPhotoDragActive(false);
+                }}
+                onDrop={handlePhotoDrop}
+              >
+                <div className="file-drop-hint">
+                  <span className="file-drop-icon" aria-hidden="true">
+                    +
+                  </span>
+                  <span>{photoDragActive ? 'Drop photos to upload' : 'Drag and drop photos here'}</span>
+                </div>
+                <span className="file-upload-name">{summarizeSelection(photoUploads, 'No photos selected', 'photos')}</span>
+              </div>
+              <div className="file-upload-actions">
+                <div className="file-upload-controls">
+                  <input
+                    id="intake-photo-upload"
+                    className="file-upload-input"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleSelectPhotos}
+                  />
+                  <label htmlFor="intake-photo-upload" className="ghost file-upload-button">
+                    Choose photos
+                  </label>
+                </div>
+                <label className="switch-field">
+                  <input
+                    type="checkbox"
+                    checked={uploadPhotoAllowContractor}
+                    onChange={(event) => setUploadPhotoAllowContractor(event.target.checked)}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span className="switch-thumb" />
+                  </span>
+                  <span className="switch-text">Allow contractor view</span>
+                </label>
+                <span className="muted">Photos are visible to the linked customer.</span>
+                <span className="file-upload-selected">
+                  {summarizeSelection(photoUploads, 'No photos selected', 'photos')}
+                </span>
+              </div>
+            </div>
+            {photoError ? <p className="muted">{photoError}</p> : null}
+            <div className="photo-gallery-panel">
+              {photoPreviews.length ? (
+                <div className="photo-gallery upload-card-gallery">
+                  {photoPreviews.map((item) => (
+                    <div key={item.id} className="photo-card compact-upload-card">
+                      <div className="photo-thumb-wrap">
+                        <img className="photo-thumb" src={item.previewUrl} alt={item.file.name} />
+                      </div>
+                      <div className="photo-meta">
+                        <div className="photo-name" title={item.file.name}>
+                          {item.file.name}
+                        </div>
+                        <div className="photo-sub muted">
+                          <span>{new Date(item.file.lastModified).toLocaleString()}</span>
+                          <span>{formatBytes(item.file.size)}</span>
+                        </div>
+                      </div>
+                      <button className="ghost tiny-button" type="button" onClick={() => removeQueuedPhoto(item.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No photos selected yet.</p>
+              )}
             </div>
           </div>
           <label className="span-2">
