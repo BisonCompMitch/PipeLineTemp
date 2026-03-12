@@ -14,6 +14,7 @@ import ModalPortal from '../components/ModalPortal.jsx';
 import BlockingOverlay from '../components/BlockingOverlay.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
+import { REQUIRED_DOC_OPTIONS, parseProjectSummary } from '../utils/requiredDocs.js';
 
 const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
 
@@ -934,6 +935,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
         })
         .join('\n\n')
     : '';
+  const detailSummary = useMemo(
+    () => parseProjectSummary(selectedRow?.project?.summary || ''),
+    [selectedRow?.project?.summary]
+  );
   const sortedRows = useMemo(() => [...rows].sort(compareRowsByProjectNumber), [rows]);
   return (
     <>
@@ -1069,9 +1074,22 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   Budget
                   <input value={selectedRow.project.budget || ''} readOnly />
                 </label>
+                <div className="intake-docs span-2" role="group" aria-labelledby="area-required-docs-title">
+                  <div id="area-required-docs-title" className="intake-docs-title">
+                    Required docs
+                  </div>
+                  <div className="intake-docs-grid">
+                    {REQUIRED_DOC_OPTIONS.map((option) => (
+                      <label key={option.id} className="intake-doc-option">
+                        <input type="checkbox" checked={Boolean(detailSummary.requiredDocs?.[option.id])} readOnly disabled />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <label className="span-2">
-                  Summary
-                  <textarea value={selectedRow.project.summary || ''} rows={3} readOnly />
+                  Notes
+                  <textarea value={detailSummary.notes || ''} rows={3} readOnly placeholder="No notes." />
                 </label>
               </div>
               <div className="area-notes-history">

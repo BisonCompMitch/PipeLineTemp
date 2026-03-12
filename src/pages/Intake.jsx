@@ -1,16 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createProject, listContractors, listProjects } from '../api.js';
-
-const REQUIRED_DOC_OPTIONS = [
-  { id: 'foundation_plans', label: 'Foundation Plans and details' },
-  { id: 'framing_plans', label: 'Framing Plans' },
-  { id: 'dimensioned_floor_plans', label: 'Dimensioned floor plans' },
-  { id: 'roof_plans', label: 'Roof plans' },
-  { id: 'building_sections', label: 'Building sections' },
-  { id: 'building_elevations', label: 'At least four building elevations' },
-  { id: 'hvac_layouts', label: 'Intended HVAC layouts or designs' },
-  { id: 'soils_report', label: 'Soils report' }
-];
+import { REQUIRED_DOC_OPTIONS, buildEmptyRequiredDocs, buildProjectSummary } from '../utils/requiredDocs.js';
 
 function todayLocalIso() {
   const now = new Date();
@@ -19,14 +9,7 @@ function todayLocalIso() {
 }
 
 export default function Intake() {
-  const emptyRequiredDocs = useMemo(
-    () =>
-      REQUIRED_DOC_OPTIONS.reduce((acc, option) => {
-        acc[option.id] = false;
-        return acc;
-      }, {}),
-    []
-  );
+  const emptyRequiredDocs = useMemo(() => buildEmptyRequiredDocs(), []);
   const [form, setForm] = useState({
     name: '',
     requester: '',
@@ -96,25 +79,13 @@ export default function Intake() {
     setSaving(true);
     setStatus('');
     try {
-      const selectedDocs = REQUIRED_DOC_OPTIONS.filter((option) => form.required_docs?.[option.id]).map(
-        (option) => option.label
-      );
-      const summaryParts = [];
-      if (selectedDocs.length) {
-        summaryParts.push(`Required docs:\n- ${selectedDocs.join('\n- ')}`);
-      } else {
-        summaryParts.push('Required docs:\n- None selected');
-      }
-      if (form.summary.trim()) {
-        summaryParts.push(`Notes:\n${form.summary.trim()}`);
-      }
       await createProject({
         name: form.name.trim(),
         requester,
         due_date: todayLocalIso(),
         urgency: form.urgency,
         budget: form.budget.trim(),
-        summary: summaryParts.join('\n\n')
+        summary: buildProjectSummary(form.required_docs, form.summary)
       });
       setPartyOptions((prev) => {
         const exists = prev.some((item) => item.toLowerCase() === requester.toLowerCase());

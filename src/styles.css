@@ -3539,7 +3539,7 @@ body::before {
   gap: 8px;
 }
 
-.intake-fields .intake-doc-option {
+.intake-docs-grid .intake-doc-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3552,7 +3552,7 @@ body::before {
   cursor: pointer;
 }
 
-.intake-fields .intake-doc-option input[type='checkbox'] {
+.intake-docs-grid .intake-doc-option input[type='checkbox'] {
   width: 18px;
   height: 18px;
   min-height: 18px;
@@ -3566,7 +3566,7 @@ body::before {
   accent-color: var(--primary);
 }
 
-.intake-fields .intake-doc-option span {
+.intake-docs-grid .intake-doc-option span {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text);

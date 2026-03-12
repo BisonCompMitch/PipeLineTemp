@@ -19,6 +19,12 @@ import {
 import ModalPortal from '../components/ModalPortal.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
+import {
+  REQUIRED_DOC_OPTIONS,
+  buildEmptyRequiredDocs,
+  buildProjectSummary,
+  parseProjectSummary
+} from '../utils/requiredDocs.js';
 
 const NOTICE_LEVELS = ['green', 'yellow', 'red'];
 const TONE_COLORS = {
@@ -182,6 +188,7 @@ function toRow(project) {
 }
 
 function toEditForm(project) {
+  const parsedSummary = parseProjectSummary(project?.summary || '');
   return {
     project_number: project?.project_number || '',
     name: project?.name || '',
@@ -189,7 +196,8 @@ function toEditForm(project) {
     due_date: project?.due_date || '',
     urgency: project?.urgency || 'standard',
     budget: project?.budget || '',
-    summary: project?.summary || ''
+    summary: parsedSummary.notes,
+    required_docs: parsedSummary.requiredDocs || buildEmptyRequiredDocs()
   };
 }
 
@@ -926,7 +934,7 @@ export default function Pipeline({
         due_date: trimOrNull(detailForm.due_date),
         urgency: trimOrNull(detailForm.urgency) || 'standard',
         budget: trimOrNull(detailForm.budget),
-        summary: trimOrNull(detailForm.summary),
+        summary: trimOrNull(buildProjectSummary(detailForm.required_docs, detailForm.summary)),
         stage_id: requestedStageId && requestedStageId !== currentStageId ? requestedStageId : undefined
       };
       const updated = await updateProject(detailProject.id, payload);
@@ -1127,6 +1135,17 @@ export default function Pipeline({
     } finally {
       setPreviewLoading(false);
     }
+  };
+
+  const toggleDetailRequiredDoc = (docId) => (event) => {
+    const checked = Boolean(event.target.checked);
+    setDetailForm((prev) => ({
+      ...prev,
+      required_docs: {
+        ...(prev.required_docs || buildEmptyRequiredDocs()),
+        [docId]: checked
+      }
+    }));
   };
 
   const handleDownloadFile = async (fileRecord) => {
@@ -1558,8 +1577,26 @@ export default function Pipeline({
                         <input value={formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'} readOnly />
                       )}
                     </label>
+                    <div className="intake-docs span-2" role="group" aria-labelledby="detail-required-docs-title">
+                      <div id="detail-required-docs-title" className="intake-docs-title">
+                        Required docs
+                      </div>
+                      <div className="intake-docs-grid">
+                        {REQUIRED_DOC_OPTIONS.map((option) => (
+                          <label key={option.id} className="intake-doc-option">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(detailForm.required_docs?.[option.id])}
+                              onChange={toggleDetailRequiredDoc(option.id)}
+                              disabled={!canEditProjectDetails}
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                     <label className="span-2">
-                      Summary
+                      Notes
                       <textarea
                         value={detailForm.summary}
                         onChange={(event) => setDetailForm({ ...detailForm, summary: event.target.value })}
