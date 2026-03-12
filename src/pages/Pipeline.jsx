@@ -372,6 +372,7 @@ export default function Pipeline({
   const [filesError, setFilesError] = useState('');
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploadAllowCustomer, setUploadAllowCustomer] = useState(false);
+  const [uploadAllowContractor, setUploadAllowContractor] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photoUploads, setPhotoUploads] = useState([]);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -895,6 +896,7 @@ export default function Pipeline({
     setFilesError('');
     setUploadFiles([]);
     setUploadAllowCustomer(false);
+    setUploadAllowContractor(false);
     setPhotoUploads([]);
     setPhotoError('');
     setFileDragActive(false);
@@ -991,12 +993,14 @@ export default function Pipeline({
       for (const file of uploadFiles) {
         await uploadProjectFile(detailProject.id, file, {
           filename: file.name,
-          customer_visible: uploadAllowCustomer
+          customer_visible: uploadAllowCustomer,
+          contractor_visible: uploadAllowContractor
         });
       }
       const uploadedCount = uploadFiles.length;
       setUploadFiles([]);
       setUploadAllowCustomer(false);
+      setUploadAllowContractor(false);
       await loadFiles(detailProject.id);
       setDetailStatus(
         uploadedCount === 1 ? 'File uploaded.' : `${uploadedCount} files uploaded.`
@@ -1065,14 +1069,17 @@ export default function Pipeline({
     setPhotoUploads(images);
   };
 
-  const handleToggleFileVisibility = async (fileRecord, nextValue) => {
+  const handleToggleFileVisibility = async (fileRecord, field, nextValue) => {
     if (!detailProject?.id || !fileRecord?.id) return;
+    if (!['customer_visible', 'contractor_visible'].includes(field)) return;
     try {
-      const updated = await setProjectFileVisibility(detailProject.id, fileRecord.id, nextValue);
+      const updated = await setProjectFileVisibility(detailProject.id, fileRecord.id, {
+        [field]: nextValue
+      });
       setFiles((prev) =>
         prev.map((item) =>
           item.id === fileRecord.id
-            ? { ...item, ...(updated || {}), customer_visible: nextValue }
+            ? { ...item, ...(updated || {}), [field]: nextValue }
             : item
         )
       );
@@ -1760,6 +1767,17 @@ export default function Pipeline({
                         </span>
                         <span className="switch-text">Allow customer view</span>
                       </label>
+                      <label className="switch-field">
+                        <input
+                          type="checkbox"
+                          checked={uploadAllowContractor}
+                          onChange={(event) => setUploadAllowContractor(event.target.checked)}
+                        />
+                        <span className="switch-track" aria-hidden="true">
+                          <span className="switch-thumb" />
+                        </span>
+                        <span className="switch-text">Allow contractor view</span>
+                      </label>
                       <span className="file-upload-selected">
                         {summarizeSelection(uploadFiles, 'No files selected', 'files')}
                       </span>
@@ -1796,13 +1814,26 @@ export default function Pipeline({
                                 type="checkbox"
                                 checked={coerceBool(fileRecord.customer_visible)}
                                 onChange={(event) =>
-                                  handleToggleFileVisibility(fileRecord, event.target.checked)
+                                  handleToggleFileVisibility(fileRecord, 'customer_visible', event.target.checked)
                                 }
                               />
                               <span className="switch-track" aria-hidden="true">
                                 <span className="switch-thumb" />
                               </span>
                               <span className="switch-text">Customer view</span>
+                            </label>
+                            <label className="switch-field compact-card-switch">
+                              <input
+                                type="checkbox"
+                                checked={coerceBool(fileRecord.contractor_visible)}
+                                onChange={(event) =>
+                                  handleToggleFileVisibility(fileRecord, 'contractor_visible', event.target.checked)
+                                }
+                              />
+                              <span className="switch-track" aria-hidden="true">
+                                <span className="switch-thumb" />
+                              </span>
+                              <span className="switch-text">Contractor view</span>
                             </label>
                           </div>
                         ))}
@@ -1912,13 +1943,26 @@ export default function Pipeline({
                                 type="checkbox"
                                 checked={coerceBool(fileRecord.customer_visible)}
                                 onChange={(event) =>
-                                  handleToggleFileVisibility(fileRecord, event.target.checked)
+                                  handleToggleFileVisibility(fileRecord, 'customer_visible', event.target.checked)
                                 }
                               />
                               <span className="switch-track" aria-hidden="true">
                                 <span className="switch-thumb" />
                               </span>
                               <span className="switch-text">Customer view</span>
+                            </label>
+                            <label className="switch-field compact-card-switch">
+                              <input
+                                type="checkbox"
+                                checked={coerceBool(fileRecord.contractor_visible)}
+                                onChange={(event) =>
+                                  handleToggleFileVisibility(fileRecord, 'contractor_visible', event.target.checked)
+                                }
+                              />
+                              <span className="switch-track" aria-hidden="true">
+                                <span className="switch-thumb" />
+                              </span>
+                              <span className="switch-text">Contractor view</span>
                             </label>
                           </div>
                         ))}

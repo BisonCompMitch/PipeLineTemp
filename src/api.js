@@ -323,6 +323,9 @@ export async function uploadProjectFile(projectId, file, options = {}) {
   if (typeof options.customer_visible === 'boolean') {
     params.set('customer_visible', options.customer_visible ? 'true' : 'false');
   }
+  if (typeof options.contractor_visible === 'boolean') {
+    params.set('contractor_visible', options.contractor_visible ? 'true' : 'false');
+  }
   const response = await apiRequest(`/projects/${encodeURIComponent(projectId)}/files/upload?${params.toString()}`, {
     method: 'POST',
     body: file
@@ -349,14 +352,40 @@ export async function updateProjectFile(projectId, fileId, payload) {
   });
 }
 
-export async function setProjectFileVisibility(projectId, fileId, customerVisible) {
+export async function setProjectFileVisibility(projectId, fileId, visibilityOrCustomerVisible, maybeContractorVisible) {
+  const visibility =
+    typeof visibilityOrCustomerVisible === 'object' && visibilityOrCustomerVisible !== null
+      ? {
+          customer_visible:
+            typeof visibilityOrCustomerVisible.customer_visible === 'boolean'
+              ? visibilityOrCustomerVisible.customer_visible
+              : undefined,
+          contractor_visible:
+            typeof visibilityOrCustomerVisible.contractor_visible === 'boolean'
+              ? visibilityOrCustomerVisible.contractor_visible
+              : undefined
+        }
+      : {
+          customer_visible:
+            typeof visibilityOrCustomerVisible === 'boolean'
+              ? Boolean(visibilityOrCustomerVisible)
+              : undefined,
+          contractor_visible:
+            typeof maybeContractorVisible === 'boolean' ? Boolean(maybeContractorVisible) : undefined
+        };
+  const payload = {};
+  if (typeof visibility.customer_visible === 'boolean') payload.customer_visible = visibility.customer_visible;
+  if (typeof visibility.contractor_visible === 'boolean') payload.contractor_visible = visibility.contractor_visible;
+  if (!Object.keys(payload).length) {
+    throw new Error('No visibility update provided.');
+  }
   const path = `/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/visibility`;
   const response = await apiRequest(path, {
     method: 'POST',
-    body: { customer_visible: Boolean(customerVisible) }
+    body: payload
   });
   if (response.status === 404 || response.status === 405) {
-    return updateProjectFile(projectId, fileId, { customer_visible: Boolean(customerVisible) });
+    return updateProjectFile(projectId, fileId, payload);
   }
   if (!response.ok) {
     let message = `Request failed (${response.status})`;

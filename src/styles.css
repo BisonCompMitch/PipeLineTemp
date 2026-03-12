@@ -3513,6 +3513,53 @@ body::before {
   grid-column: span 2;
 }
 
+.intake-docs {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  display: grid;
+  gap: 10px;
+}
+
+.intake-docs-title {
+  padding: 0 4px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.intake-docs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.intake-doc-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 9px 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.intake-doc-option input {
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+
+.intake-doc-option span {
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
 .intake-actions {
   display: flex;
   align-items: center;
@@ -3533,6 +3580,10 @@ body::before {
 
   .intake-fields .span-2 {
     grid-column: span 1;
+  }
+
+  .intake-docs-grid {
+    grid-template-columns: 1fr;
   }
 
   .intake-actions {

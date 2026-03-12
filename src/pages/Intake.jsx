@@ -1,14 +1,39 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createProject, listContractors, listProjects } from '../api.js';
 
+const REQUIRED_DOC_OPTIONS = [
+  { id: 'foundation_plans', label: 'Foundation Plans and details' },
+  { id: 'framing_plans', label: 'Framing Plans' },
+  { id: 'dimensioned_floor_plans', label: 'Dimensioned floor plans' },
+  { id: 'roof_plans', label: 'Roof plans' },
+  { id: 'building_sections', label: 'Building sections' },
+  { id: 'building_elevations', label: 'At least four building elevations' },
+  { id: 'hvac_layouts', label: 'Intended HVAC layouts or designs' },
+  { id: 'soils_report', label: 'Soils report' }
+];
+
+function todayLocalIso() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
 export default function Intake() {
+  const emptyRequiredDocs = useMemo(
+    () =>
+      REQUIRED_DOC_OPTIONS.reduce((acc, option) => {
+        acc[option.id] = false;
+        return acc;
+      }, {}),
+    []
+  );
   const [form, setForm] = useState({
     name: '',
     requester: '',
-    due_date: '',
     urgency: 'standard',
     budget: '',
-    summary: ''
+    summary: '',
+    required_docs: emptyRequiredDocs
   });
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
@@ -16,6 +41,14 @@ export default function Intake() {
 
   const updateField = (key) => (event) => {
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  };
+
+  const toggleRequiredDoc = (id) => (event) => {
+    const checked = Boolean(event.target.checked);
+    setForm((prev) => ({
+      ...prev,
+      required_docs: { ...(prev.required_docs || {}), [id]: checked }
+    }));
   };
 
   useEffect(() => {
@@ -63,13 +96,25 @@ export default function Intake() {
     setSaving(true);
     setStatus('');
     try {
+      const selectedDocs = REQUIRED_DOC_OPTIONS.filter((option) => form.required_docs?.[option.id]).map(
+        (option) => option.label
+      );
+      const summaryParts = [];
+      if (selectedDocs.length) {
+        summaryParts.push(`Required docs:\n- ${selectedDocs.join('\n- ')}`);
+      } else {
+        summaryParts.push('Required docs:\n- None selected');
+      }
+      if (form.summary.trim()) {
+        summaryParts.push(`Notes:\n${form.summary.trim()}`);
+      }
       await createProject({
         name: form.name.trim(),
         requester,
-        due_date: form.due_date.trim() || null,
+        due_date: todayLocalIso(),
         urgency: form.urgency,
         budget: form.budget.trim(),
-        summary: form.summary.trim()
+        summary: summaryParts.join('\n\n')
       });
       setPartyOptions((prev) => {
         const exists = prev.some((item) => item.toLowerCase() === requester.toLowerCase());
@@ -80,10 +125,10 @@ export default function Intake() {
       setForm({
         name: '',
         requester: '',
-        due_date: '',
         urgency: 'standard',
         budget: '',
-        summary: ''
+        summary: '',
+        required_docs: emptyRequiredDocs
       });
     } catch (err) {
       setStatus('Unable to submit the project intake.');
@@ -121,10 +166,6 @@ export default function Intake() {
             </datalist>
           </label>
           <label>
-            Date requested
-            <input value={form.due_date} onChange={updateField('due_date')} placeholder="MM-DD-YYYY" />
-          </label>
-          <label>
             Urgency
             <select value={form.urgency} onChange={updateField('urgency')}>
               <option value="standard">Standard</option>
@@ -136,6 +177,21 @@ export default function Intake() {
             Budget
             <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
           </label>
+          <fieldset className="intake-docs span-2">
+            <legend className="intake-docs-title">Required docs</legend>
+            <div className="intake-docs-grid">
+              {REQUIRED_DOC_OPTIONS.map((option) => (
+                <label key={option.id} className="intake-doc-option">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.required_docs?.[option.id])}
+                    onChange={toggleRequiredDoc(option.id)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="span-2">
             Notes
             <textarea value={form.summary} onChange={updateField('summary')} placeholder="Notes" rows={3} />
