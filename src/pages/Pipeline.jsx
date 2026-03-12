@@ -350,6 +350,7 @@ function formatStageNotesTooltip(entries = [], stageName = '') {
 export default function Pipeline({
   canEditProjects = false,
   canEditProjectDetails = false,
+  canUploadProjectFiles = false,
   applyAreaFilter = false,
   allowedAreas = [],
   canViewAllAreas = false,
@@ -608,6 +609,7 @@ export default function Pipeline({
     () => normalizeProjectStages(detailProject?.stages || []),
     [detailProject?.stages]
   );
+  const canUploadInFilesTab = canEditProjects || canUploadProjectFiles;
   const projectIsComplete = useMemo(() => {
     const stages = detailStages;
     if (!stages.length) return false;
@@ -1003,8 +1005,8 @@ export default function Pipeline({
       for (const file of uploadFiles) {
         await uploadProjectFile(detailProject.id, file, {
           filename: file.name,
-          customer_visible: uploadAllowCustomer,
-          contractor_visible: uploadAllowContractor
+          customer_visible: canEditProjects ? uploadAllowCustomer : false,
+          contractor_visible: canEditProjects ? uploadAllowContractor : true
         });
       }
       const uploadedCount = uploadFiles.length;
@@ -1043,8 +1045,8 @@ export default function Pipeline({
       for (const file of photoUploads) {
         await uploadProjectFile(detailProject.id, file, {
           filename: file.name,
-          customer_visible: true,
-          contractor_visible: uploadPhotoAllowContractor,
+          customer_visible: canEditProjects,
+          contractor_visible: canEditProjects ? uploadPhotoAllowContractor : true,
           content_type: file.type || undefined
         });
       }
@@ -1756,7 +1758,7 @@ export default function Pipeline({
                       </button>
                     ) : null}
                   </div>
-                  {canEditProjects ? (
+                  {canUploadInFilesTab ? (
                   <form className="file-upload-form" onSubmit={handleUploadFile}>
                 <div
                   className={`file-upload-row${fileDragActive ? ' drag-active' : ''}`}
@@ -1798,28 +1800,34 @@ export default function Pipeline({
                           {uploading ? 'Uploading...' : 'Upload files'}
                         </button>
                       </div>
-                      <label className="switch-field">
-                        <input
-                          type="checkbox"
-                          checked={uploadAllowCustomer}
-                          onChange={(event) => setUploadAllowCustomer(event.target.checked)}
-                        />
-                        <span className="switch-track" aria-hidden="true">
-                          <span className="switch-thumb" />
-                        </span>
-                        <span className="switch-text">Allow customer view</span>
-                      </label>
-                      <label className="switch-field">
-                        <input
-                          type="checkbox"
-                          checked={uploadAllowContractor}
-                          onChange={(event) => setUploadAllowContractor(event.target.checked)}
-                        />
-                        <span className="switch-track" aria-hidden="true">
-                          <span className="switch-thumb" />
-                        </span>
-                        <span className="switch-text">Allow contractor view</span>
-                      </label>
+                      {canEditProjects ? (
+                        <>
+                          <label className="switch-field">
+                            <input
+                              type="checkbox"
+                              checked={uploadAllowCustomer}
+                              onChange={(event) => setUploadAllowCustomer(event.target.checked)}
+                            />
+                            <span className="switch-track" aria-hidden="true">
+                              <span className="switch-thumb" />
+                            </span>
+                            <span className="switch-text">Allow customer view</span>
+                          </label>
+                          <label className="switch-field">
+                            <input
+                              type="checkbox"
+                              checked={uploadAllowContractor}
+                              onChange={(event) => setUploadAllowContractor(event.target.checked)}
+                            />
+                            <span className="switch-track" aria-hidden="true">
+                              <span className="switch-thumb" />
+                            </span>
+                            <span className="switch-text">Allow contractor view</span>
+                          </label>
+                        </>
+                      ) : (
+                        <span className="muted">Contractor uploads are visible to the project team.</span>
+                      )}
                       <span className="file-upload-selected">
                         {summarizeSelection(uploadFiles, 'No files selected', 'files')}
                       </span>
@@ -1902,7 +1910,7 @@ export default function Pipeline({
                     <h3>Photos</h3>
                     <span className="muted">Shared with the customer.</span>
                   </div>
-                  {canEditProjects ? (
+                  {canUploadInFilesTab ? (
                   <form className="file-upload-form" onSubmit={handleUploadPhoto}>
                     <div
                       className={`file-upload-row${photoDragActive ? ' drag-active' : ''}`}
@@ -1953,18 +1961,24 @@ export default function Pipeline({
                           {photoUploading ? 'Uploading...' : 'Upload photos'}
                         </button>
                       </div>
-                      <label className="switch-field">
-                        <input
-                          type="checkbox"
-                          checked={uploadPhotoAllowContractor}
-                          onChange={(event) => setUploadPhotoAllowContractor(event.target.checked)}
-                        />
-                        <span className="switch-track" aria-hidden="true">
-                          <span className="switch-thumb" />
-                        </span>
-                        <span className="switch-text">Allow contractor view</span>
-                      </label>
-                      <span className="muted">Photos are visible to the linked customer.</span>
+                      {canEditProjects ? (
+                        <>
+                          <label className="switch-field">
+                            <input
+                              type="checkbox"
+                              checked={uploadPhotoAllowContractor}
+                              onChange={(event) => setUploadPhotoAllowContractor(event.target.checked)}
+                            />
+                            <span className="switch-track" aria-hidden="true">
+                              <span className="switch-thumb" />
+                            </span>
+                            <span className="switch-text">Allow contractor view</span>
+                          </label>
+                          <span className="muted">Photos are visible to the linked customer.</span>
+                        </>
+                      ) : (
+                        <span className="muted">Contractor uploads are visible to the project team.</span>
+                      )}
                       <span className="file-upload-selected">
                         {summarizeSelection(photoUploads, 'No photos selected', 'photos')}
                       </span>

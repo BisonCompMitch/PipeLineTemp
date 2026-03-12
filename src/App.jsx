@@ -547,6 +547,7 @@ export default function App() {
                   <Pipeline
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
+                    canUploadProjectFiles={hasContractor && !hasBison}
                     applyAreaFilter={false}
                     allowedAreas={effectiveAreas}
                     canViewAllAreas={true}
