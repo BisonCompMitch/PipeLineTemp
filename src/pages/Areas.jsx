@@ -1032,28 +1032,45 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
       </section>
 
       {selectedRow ? (
-        <section className="panel">
-          <div className="detail-card-header">
-            <div>
-              <h3>{selectedRow.project.name}</h3>
-              <p className="muted">{selectedRow.project.project_number || '-'}</p>
-            </div>
-          </div>
-          <div className="stage-tabs detail-tabs" role="tablist" aria-label="Area detail sections">
-            {DETAIL_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={detailTab === tab.id}
-                className={`stage-tab${detailTab === tab.id ? ' active' : ''}`}
-                onClick={() => setDetailTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="detail-grid">
+        <ModalPortal>
+          <div
+            className="modal-backdrop preview-backdrop pipeline-detail-backdrop"
+            onClick={() => {
+              if (!stageMoveLoading) setSelectedRow(null);
+            }}
+          >
+            <div className="modal pipeline-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="detail-card-header pipeline-detail-header">
+                <div className="pipeline-detail-title">
+                  {`${selectedRow.project.name || 'Project'}${selectedRow.project.project_number ? ` - ${selectedRow.project.project_number}` : ''}`}
+                </div>
+                <div className="detail-header-actions">
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => setSelectedRow(null)}
+                    disabled={stageMoveLoading}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="stage-tabs detail-tabs pipeline-detail-tabs-wrap" role="tablist" aria-label="Area detail sections">
+                  {DETAIL_TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={detailTab === tab.id}
+                      className={`stage-tab${detailTab === tab.id ? ' active' : ''}`}
+                      onClick={() => setDetailTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="pipeline-detail-body">
+                <div className="detail-grid">
             {detailTab === 'details' ? (
             <div className="detail-card">
               <h3>Current stage</h3>
@@ -1459,8 +1476,11 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
               </div>
             </div>
             ) : null}
+                </div>
+              </div>
+            </div>
           </div>
-        </section>
+        </ModalPortal>
       ) : null}
 
       {preview.open ? (
