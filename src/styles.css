@@ -5587,3 +5587,34 @@ body[data-theme='light'] .progress-meta .muted {
     min-width: 0;
   }
 }
+
+@media (max-width: 700px) {
+  body {
+    -webkit-text-size-adjust: 94%;
+    text-size-adjust: 94%;
+  }
+
+  .app-shell :is(
+      .panel h2,
+      .panel h3,
+      .panel h4,
+      .panel p,
+      .muted,
+      .photo-name,
+      .photo-sub,
+      .switch-text,
+      .modal-title,
+      .nav-link,
+      .topbar-project,
+      .topbar-search input,
+      .project-table th,
+      .project-table td,
+      label,
+      input:not([type='checkbox']):not([type='radio']),
+      select,
+      textarea,
+      button
+    ) {
+    font-size: 0.94em !important;
+  }
+}
