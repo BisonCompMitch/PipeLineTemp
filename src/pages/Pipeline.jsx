@@ -1637,7 +1637,7 @@ export default function Pipeline({
                         : 'View only. Add the Admin area to edit project fields.'}
                     </p>
                   ) : null}
-                  <div className="form-grid project-detail-form">
+                  <div className={`form-grid project-detail-form${canEditProjectDetails ? '' : ' detail-static-grid'}`}>
                     <label>
                       Project #
                       {canEditProjectDetails ? (

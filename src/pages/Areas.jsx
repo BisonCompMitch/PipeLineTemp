@@ -1139,7 +1139,19 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   <span className="muted">No actions available for your role.</span>
                 )}
               </div>
-              <div className="form-grid project-detail-form">
+              <div className="form-grid project-detail-form detail-static-grid">
+                <label>
+                  Project #
+                  <div className={`field-static${selectedRow.project.project_number ? '' : ' empty'}`}>
+                    {selectedRow.project.project_number || '-'}
+                  </div>
+                </label>
+                <label>
+                  Project name
+                  <div className={`field-static${selectedRow.project.name ? '' : ' empty'}`}>
+                    {selectedRow.project.name || '-'}
+                  </div>
+                </label>
                 <label>
                   Requester
                   <div className={`field-static${selectedRow.project.requester ? '' : ' empty'}`}>
@@ -1162,6 +1174,12 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   Budget
                   <div className={`field-static${selectedRow.project.budget ? '' : ' empty'}`}>
                     {selectedRow.project.budget || '-'}
+                  </div>
+                </label>
+                <label className="span-2">
+                  Current area
+                  <div className="field-static">
+                    {formatStageName(selectedRow.stage?.name, selectedRow.stage?.id) || '-'}
                   </div>
                 </label>
                 <div className="intake-docs span-2" role="group" aria-labelledby="area-required-docs-title">
