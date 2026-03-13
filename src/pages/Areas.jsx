@@ -57,7 +57,6 @@ const ADMIN_AREA_OPTIONS = ['Admin', ...STAGE_FLOW.map((stage) => formatStageNam
 
 const DETAIL_TABS = [
   { id: 'details', label: 'Details' },
-  { id: 'stages', label: 'Stages' },
   { id: 'files', label: 'Files & Photos' }
 ];
 
@@ -1057,6 +1056,72 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
           <div className="detail-grid">
             {detailTab === 'details' ? (
             <div className="detail-card">
+              <h3>Current stage</h3>
+              <div className="table-scroll project-stage-table">
+                <table className="project-table">
+                  <thead>
+                    <tr>
+                      <th>Stage</th>
+                      <th>Owner</th>
+                      <th>Status</th>
+                      <th>Accepted</th>
+                      <th>Expected</th>
+                      <th>Countdown</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{formatStageName(selectedRow.stage.name, selectedRow.stage.id)}</td>
+                      <td>{selectedRow.stage.owner}</td>
+                      <td>
+                        <span className={`status-pill ${stageStatusClass(selectedRow.stage.status)}`}>
+                          {STATUS_LABELS[selectedRow.stage.status] || selectedRow.stage.status}
+                        </span>
+                      </td>
+                      <td>{formatAcceptedAt(selectedRow.stage.started_at)}</td>
+                      <td>
+                        <div className="expected-cell">
+                          <span>
+                            {selectedRow.stage.expected_hours
+                              ? `${selectedRow.stage.expected_hours}h`
+                              : '-'}
+                          </span>
+                          {canEditExpectedTime ? (
+                            <button
+                              type="button"
+                              className="ghost tiny-button"
+                              onClick={() => handleEditExpected(selectedRow.project.id, selectedRow.stage)}
+                              disabled={savingExpectedId === `${selectedRow.project.id}-${selectedRow.stage.id}`}
+                            >
+                              {savingExpectedId === `${selectedRow.project.id}-${selectedRow.stage.id}`
+                                ? 'Saving...'
+                                : 'Edit'}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status-pill ${countdownForStage(selectedRow.stage, nowMs).tone}`}>
+                          {countdownForStage(selectedRow.stage, nowMs).label}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="actions-grid">
+                {getRowAction(selectedRow.project, selectedRow.stage) ? (
+                  <button
+                    type="button"
+                    className={getRowAction(selectedRow.project, selectedRow.stage).className}
+                    onClick={getRowAction(selectedRow.project, selectedRow.stage).onClick}
+                  >
+                    {getRowAction(selectedRow.project, selectedRow.stage).label}
+                  </button>
+                ) : (
+                  <span className="muted">No actions available for your role.</span>
+                )}
+              </div>
               <div className="form-grid project-detail-form">
                 <label>
                   Requester
@@ -1125,77 +1190,6 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                     {areaNoteSaving ? 'Saving...' : 'Add note'}
                   </button>
                 </div>
-              </div>
-            </div>
-            ) : null}
-
-            {detailTab === 'stages' ? (
-            <div className="detail-card">
-              <h3>Current stage</h3>
-              <div className="table-scroll project-stage-table">
-                <table className="project-table">
-                  <thead>
-                    <tr>
-                      <th>Stage</th>
-                      <th>Owner</th>
-                      <th>Status</th>
-                      <th>Accepted</th>
-                      <th>Expected</th>
-                      <th>Countdown</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{formatStageName(selectedRow.stage.name, selectedRow.stage.id)}</td>
-                      <td>{selectedRow.stage.owner}</td>
-                      <td>
-                        <span className={`status-pill ${stageStatusClass(selectedRow.stage.status)}`}>
-                          {STATUS_LABELS[selectedRow.stage.status] || selectedRow.stage.status}
-                        </span>
-                      </td>
-                      <td>{formatAcceptedAt(selectedRow.stage.started_at)}</td>
-                      <td>
-                        <div className="expected-cell">
-                          <span>
-                            {selectedRow.stage.expected_hours
-                              ? `${selectedRow.stage.expected_hours}h`
-                              : '-'}
-                          </span>
-                          {canEditExpectedTime ? (
-                            <button
-                              type="button"
-                              className="ghost tiny-button"
-                              onClick={() => handleEditExpected(selectedRow.project.id, selectedRow.stage)}
-                              disabled={savingExpectedId === `${selectedRow.project.id}-${selectedRow.stage.id}`}
-                            >
-                              {savingExpectedId === `${selectedRow.project.id}-${selectedRow.stage.id}`
-                                ? 'Saving...'
-                                : 'Edit'}
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status-pill ${countdownForStage(selectedRow.stage, nowMs).tone}`}>
-                          {countdownForStage(selectedRow.stage, nowMs).label}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="actions-grid">
-                {getRowAction(selectedRow.project, selectedRow.stage) ? (
-                  <button
-                    type="button"
-                    className={getRowAction(selectedRow.project, selectedRow.stage).className}
-                    onClick={getRowAction(selectedRow.project, selectedRow.stage).onClick}
-                  >
-                    {getRowAction(selectedRow.project, selectedRow.stage).label}
-                  </button>
-                ) : (
-                  <span className="muted">No actions available for your role.</span>
-                )}
               </div>
             </div>
             ) : null}
