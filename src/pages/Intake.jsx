@@ -514,7 +514,7 @@ export default function Intake() {
         <div className="intake-actions">
           <span className="muted">{status}</span>
           <button className="primary" type="submit" disabled={saving}>
-            {saving ? 'Submitting...' : 'Start budget request'}
+            {saving ? 'Submitting...' : 'Start project request'}
           </button>
         </div>
       </form>
