@@ -1142,19 +1142,27 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
               <div className="form-grid project-detail-form">
                 <label>
                   Requester
-                  <input value={selectedRow.project.requester || ''} readOnly />
+                  <div className={`field-static${selectedRow.project.requester ? '' : ' empty'}`}>
+                    {selectedRow.project.requester || '-'}
+                  </div>
                 </label>
                 <label>
                   Due date
-                  <input value={selectedRow.project.due_date || ''} readOnly />
+                  <div className={`field-static${selectedRow.project.due_date ? '' : ' empty'}`}>
+                    {selectedRow.project.due_date || '-'}
+                  </div>
                 </label>
                 <label>
                   Urgency
-                  <input value={selectedRow.project.urgency || ''} readOnly />
+                  <div className={`field-static${selectedRow.project.urgency ? '' : ' empty'}`}>
+                    {selectedRow.project.urgency || '-'}
+                  </div>
                 </label>
                 <label>
                   Budget
-                  <input value={selectedRow.project.budget || ''} readOnly />
+                  <div className={`field-static${selectedRow.project.budget ? '' : ' empty'}`}>
+                    {selectedRow.project.budget || '-'}
+                  </div>
                 </label>
                 <div className="intake-docs span-2" role="group" aria-labelledby="area-required-docs-title">
                   <div id="area-required-docs-title" className="intake-docs-title">
@@ -1171,7 +1179,9 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                 </div>
                 <label className="span-2">
                   Notes
-                  <textarea value={detailSummary.notes || ''} rows={3} readOnly placeholder="No notes." />
+                  <div className={`field-static field-static-multiline${detailSummary.notes ? '' : ' empty'}`}>
+                    {detailSummary.notes || 'No notes.'}
+                  </div>
                 </label>
               </div>
               <div className="area-notes-history">

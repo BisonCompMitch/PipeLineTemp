@@ -739,6 +739,23 @@ export default function Pipeline({
     });
     return counts;
   }, [stageNotesHistory]);
+  const currentAreaNotes = useMemo(() => {
+    const stageId = String(detailCurrentStage?.id || '').trim();
+    if (!stageId) return [];
+    return stageNotesHistory
+      .filter((entry) => String(entry?.stage_id || '').trim() === stageId)
+      .sort((a, b) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime());
+  }, [stageNotesHistory, detailCurrentStage?.id]);
+  const currentAreaNotesText = useMemo(() => {
+    if (!currentAreaNotes.length) return '';
+    return currentAreaNotes
+      .map((entry) => {
+        const user = String(entry?.created_by || '').trim() || '-';
+        const note = String(entry?.note || '').trim() || '-';
+        return `User: ${user}\nNote:\n${note}`;
+      })
+      .join('\n\n');
+  }, [currentAreaNotes]);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -1623,63 +1640,95 @@ export default function Pipeline({
                   <div className="form-grid project-detail-form">
                     <label>
                       Project #
-                      <input
-                        value={detailForm.project_number}
-                        onChange={(event) => setDetailForm({ ...detailForm, project_number: event.target.value })}
-                        readOnly={!canEditProjectDetails}
-                      />
+                      {canEditProjectDetails ? (
+                        <input
+                          value={detailForm.project_number}
+                          onChange={(event) => setDetailForm({ ...detailForm, project_number: event.target.value })}
+                        />
+                      ) : (
+                        <div className={`field-static${detailForm.project_number ? '' : ' empty'}`}>
+                          {detailForm.project_number || '-'}
+                        </div>
+                      )}
                     </label>
                     <label>
                       Project name
-                      <input
-                        value={detailForm.name}
-                        onChange={(event) => setDetailForm({ ...detailForm, name: event.target.value })}
-                        readOnly={!canEditProjectDetails}
-                      />
+                      {canEditProjectDetails ? (
+                        <input
+                          value={detailForm.name}
+                          onChange={(event) => setDetailForm({ ...detailForm, name: event.target.value })}
+                        />
+                      ) : (
+                        <div className={`field-static${detailForm.name ? '' : ' empty'}`}>
+                          {detailForm.name || '-'}
+                        </div>
+                      )}
                     </label>
                     <label>
                       Requester
-                      <input
-                        value={detailForm.requester}
-                        list="shared-party-options"
-                        onChange={(event) => setDetailForm({ ...detailForm, requester: event.target.value })}
-                        readOnly={!canEditProjectDetails}
-                      />
-                      <datalist id="shared-party-options">
-                        {requesterOptions.map((requester) => (
-                          <option key={requester} value={requester} />
-                        ))}
-                      </datalist>
+                      {canEditProjectDetails ? (
+                        <>
+                          <input
+                            value={detailForm.requester}
+                            list="shared-party-options"
+                            onChange={(event) => setDetailForm({ ...detailForm, requester: event.target.value })}
+                          />
+                          <datalist id="shared-party-options">
+                            {requesterOptions.map((requester) => (
+                              <option key={requester} value={requester} />
+                            ))}
+                          </datalist>
+                        </>
+                      ) : (
+                        <div className={`field-static${detailForm.requester ? '' : ' empty'}`}>
+                          {detailForm.requester || '-'}
+                        </div>
+                      )}
                     </label>
                     <label>
                       Due date
-                      <input
-                        type="date"
-                        value={detailForm.due_date}
-                        onChange={(event) => setDetailForm({ ...detailForm, due_date: event.target.value })}
-                        readOnly={!canEditProjectDetails}
-                      />
+                      {canEditProjectDetails ? (
+                        <input
+                          type="date"
+                          value={detailForm.due_date}
+                          onChange={(event) => setDetailForm({ ...detailForm, due_date: event.target.value })}
+                        />
+                      ) : (
+                        <div className={`field-static${detailForm.due_date ? '' : ' empty'}`}>
+                          {detailForm.due_date || '-'}
+                        </div>
+                      )}
                     </label>
                     <label>
                       Urgency
-                      <select
-                        value={detailForm.urgency}
-                        onChange={(event) => setDetailForm({ ...detailForm, urgency: event.target.value })}
-                        disabled={!canEditProjectDetails}
-                      >
-                        <option value="low">Low</option>
-                        <option value="standard">Standard</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                      </select>
+                      {canEditProjectDetails ? (
+                        <select
+                          value={detailForm.urgency}
+                          onChange={(event) => setDetailForm({ ...detailForm, urgency: event.target.value })}
+                        >
+                          <option value="low">Low</option>
+                          <option value="standard">Standard</option>
+                          <option value="high">High</option>
+                          <option value="critical">Critical</option>
+                        </select>
+                      ) : (
+                        <div className={`field-static${detailForm.urgency ? '' : ' empty'}`}>
+                          {detailForm.urgency || '-'}
+                        </div>
+                      )}
                     </label>
                     <label>
                       Budget
-                      <input
-                        value={detailForm.budget}
-                        onChange={(event) => setDetailForm({ ...detailForm, budget: event.target.value })}
-                        readOnly={!canEditProjectDetails}
-                      />
+                      {canEditProjectDetails ? (
+                        <input
+                          value={detailForm.budget}
+                          onChange={(event) => setDetailForm({ ...detailForm, budget: event.target.value })}
+                        />
+                      ) : (
+                        <div className={`field-static${detailForm.budget ? '' : ' empty'}`}>
+                          {detailForm.budget || '-'}
+                        </div>
+                      )}
                     </label>
                     <label className="span-2">
                       Current area
@@ -1687,12 +1736,14 @@ export default function Pipeline({
                         <select value={areaSelection} onChange={(event) => setAreaSelection(event.target.value)}>
                           {stageOptions.map((stage) => (
                             <option key={stage.id} value={stage.id}>
-                              {formatStageName(stage.name, stage.id)}
-                            </option>
-                          ))}
+                            {formatStageName(stage.name, stage.id)}
+                          </option>
+                        ))}
                         </select>
                       ) : (
-                        <input value={formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'} readOnly />
+                        <div className="field-static">
+                          {formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'}
+                        </div>
                       )}
                     </label>
                     <div className="intake-docs span-2" role="group" aria-labelledby="detail-required-docs-title">
@@ -1715,12 +1766,17 @@ export default function Pipeline({
                     </div>
                     <label className="span-2">
                       Notes
-                      <textarea
-                        value={detailForm.summary}
-                        onChange={(event) => setDetailForm({ ...detailForm, summary: event.target.value })}
-                        rows={4}
-                        readOnly={!canEditProjectDetails}
-                      />
+                      {canEditProjectDetails ? (
+                        <textarea
+                          value={detailForm.summary}
+                          onChange={(event) => setDetailForm({ ...detailForm, summary: event.target.value })}
+                          rows={4}
+                        />
+                      ) : (
+                        <div className={`field-static field-static-multiline${detailForm.summary ? '' : ' empty'}`}>
+                          {detailForm.summary || 'No notes.'}
+                        </div>
+                      )}
                     </label>
                     <label className="span-2">
                       Add note
@@ -1752,6 +1808,20 @@ export default function Pipeline({
                         {saving ? 'Saving...' : 'Save changes'}
                       </button>
                     ) : null}
+                  </div>
+                  <div className="area-notes-history">
+                    <div className="detail-card-header">
+                      <h3>
+                        All notes ({formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || 'Current area'})
+                      </h3>
+                    </div>
+                    <textarea
+                      className="notes-history-window"
+                      value={currentAreaNotesText}
+                      readOnly
+                      rows={8}
+                      placeholder="No notes yet for this area."
+                    />
                   </div>
                 </div>
                 ) : null}

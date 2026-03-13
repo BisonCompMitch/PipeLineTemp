@@ -2190,6 +2190,25 @@ body[data-theme='light'] .file-upload-actions .muted {
   font-family: inherit;
 }
 
+.field-static {
+  min-height: 42px;
+  padding: 10px 2px;
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.4;
+  user-select: text;
+}
+
+.field-static.empty {
+  color: var(--muted);
+}
+
+.field-static-multiline {
+  min-height: 72px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .checkbox-line {
   display: flex;
   align-items: center;
