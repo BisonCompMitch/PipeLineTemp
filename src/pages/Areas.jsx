@@ -958,8 +958,8 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
         </div>
       </div>
       {loading ? <p className="muted">Loading area queue...</p> : null}
-      <div className="table-scroll">
-        <table className="project-table">
+      <div className="table-scroll dashboard-table-scroll">
+        <table className="project-table dashboard-table area-queue-table">
           <thead>
             <tr>
               <th>#</th>

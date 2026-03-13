@@ -4813,6 +4813,57 @@ body[data-theme='light'] .compact-card-switch {
   max-height: none;
 }
 
+.area-queue-table.project-table {
+  min-width: 1220px;
+  table-layout: auto;
+}
+
+.area-queue-table th:nth-child(1),
+.area-queue-table td:nth-child(1) {
+  width: 90px;
+  min-width: 90px;
+}
+
+.area-queue-table th:nth-child(2),
+.area-queue-table td:nth-child(2) {
+  width: 220px;
+  min-width: 220px;
+}
+
+.area-queue-table th:nth-child(3),
+.area-queue-table td:nth-child(3) {
+  width: 130px;
+  min-width: 130px;
+}
+
+.area-queue-table th:nth-child(4),
+.area-queue-table td:nth-child(4) {
+  width: 250px;
+  min-width: 250px;
+}
+
+.area-queue-table th:nth-child(5),
+.area-queue-table td:nth-child(5) {
+  width: 220px;
+  min-width: 220px;
+}
+
+.area-queue-table th:nth-child(6),
+.area-queue-table td:nth-child(6) {
+  width: 180px;
+  min-width: 180px;
+}
+
+.area-queue-table th:nth-child(7),
+.area-queue-table td:nth-child(7) {
+  width: 170px;
+  min-width: 170px;
+}
+
+.area-queue-table .status-pill {
+  white-space: nowrap;
+}
+
 .dashboard-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5400,19 +5451,43 @@ body[data-theme='light'] .progress-meta .muted {
     padding: 10px 12px;
   }
 
-  .dashboard-table.project-table {
-    min-width: 100% !important;
-    table-layout: fixed;
+  .dashboard-table.project-table:not(.area-queue-table) {
+    min-width: 740px !important;
+    table-layout: auto;
   }
 
-  .dashboard-table th:nth-child(1),
-  .dashboard-table td:nth-child(1) {
-    width: 58%;
+  .dashboard-table:not(.area-queue-table) th:nth-child(1),
+  .dashboard-table:not(.area-queue-table) td:nth-child(1) {
+    width: 420px;
+    min-width: 420px;
   }
 
-  .dashboard-table th:nth-child(2),
-  .dashboard-table td:nth-child(2) {
-    width: 42%;
+  .dashboard-table:not(.area-queue-table) th:nth-child(2),
+  .dashboard-table:not(.area-queue-table) td:nth-child(2) {
+    width: 320px;
+    min-width: 320px;
+  }
+
+  .dashboard-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-table:not(.area-queue-table) td:nth-child(2) {
+    white-space: nowrap;
+  }
+
+  .dashboard-table .area-pill {
+    white-space: nowrap;
+  }
+
+  .area-queue-table.project-table {
+    min-width: 1220px !important;
+  }
+
+  .area-queue-table td,
+  .area-queue-table th {
+    white-space: nowrap;
   }
 
   .upload-card-gallery {
