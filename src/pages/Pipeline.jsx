@@ -180,6 +180,7 @@ function toRow(project) {
     areaNote: String(stage?.area_note || '').trim(),
     areaNoteUpdatedBy: String(stage?.area_note_updated_by || '').trim(),
     areaNoteUpdatedAt: stage?.area_note_updated_at || null,
+    stage,
     progress: completionPercent(normalizedStages),
     statusTone: stageNoticeTone(stage),
     isDeleted: Boolean(project.is_deleted),
@@ -213,6 +214,62 @@ function formatDateTime(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '-';
   return parsed.toLocaleString();
+}
+
+function formatDateOnly(value) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleDateString();
+}
+
+function formatTimeOnly(value) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleTimeString();
+}
+
+function formatDurationMinutes(totalMinutes) {
+  const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  const parts = [];
+  if (days) parts.push(`${days}d`);
+  if (hours) parts.push(`${hours}h`);
+  if (mins || !parts.length) parts.push(`${mins}m`);
+  return parts.join(' ');
+}
+
+function formatExpectedHours(hours) {
+  const value = Number(hours || 0);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
+}
+
+function formatStageEstimateTooltip(stage) {
+  if (!stage) return 'No stage timing available.';
+  const stageName = formatStageName(stage.name, stage.id) || 'Current stage';
+  const expected = Number(stage.expected_hours ?? stage.default_duration_hours ?? 0);
+  const expectedText = formatExpectedHours(expected);
+  if (!expectedText) {
+    return `${stageName}\nNo estimated duration.`;
+  }
+  const startedAt = stage.started_at ? new Date(stage.started_at) : null;
+  if (!startedAt || Number.isNaN(startedAt.getTime())) {
+    return `${stageName}\nEstimate: ${expectedText}h\nNot started yet.`;
+  }
+  const elapsedMinutes = Math.max(0, Math.round((Date.now() - startedAt.getTime()) / 60000));
+  const remainingMinutes = Math.round(expected * 60) - elapsedMinutes;
+  if (remainingMinutes > 0) {
+    return `${stageName}\n${formatDurationMinutes(remainingMinutes)} left of ${expectedText}h estimate.`;
+  }
+  if (remainingMinutes === 0) {
+    return `${stageName}\nDue now (${expectedText}h estimate).`;
+  }
+  return `${stageName}\n${formatDurationMinutes(Math.abs(remainingMinutes))} overdue (${expectedText}h estimate).`;
 }
 
 function formatBytes(value) {
@@ -399,28 +456,6 @@ function triggerBrowserDownload(blob, filename) {
   window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
 }
 
-function dashboardAreaNotesKey(projectId, stageId) {
-  const project = String(projectId || '').trim();
-  const stage = String(stageId || '').trim();
-  if (!project || !stage) return '';
-  return `${project}:${stage}`;
-}
-
-function formatDashboardAreaNotesTooltip(entries = [], areaName = '') {
-  const safeAreaName = formatStageName(areaName) || 'Area';
-  if (!entries.length) {
-    return `All notes (${safeAreaName})\n\nNo notes yet.`;
-  }
-  const body = entries
-    .map((entry) => {
-      const user = String(entry?.created_by || '').trim() || '-';
-      const note = String(entry?.note || '').trim() || '-';
-      return `User: ${user}\nNote:\n${note}`;
-    })
-    .join('\n\n');
-  return `All notes (${safeAreaName})\n\n${body}`;
-}
-
 function formatStageNotesTooltip(entries = [], stageName = '') {
   const safeStageName = formatStageName(stageName) || 'Stage';
   if (!entries.length) {
@@ -463,7 +498,6 @@ export default function Pipeline({
   const [detailStageNoteSaving, setDetailStageNoteSaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [areaSelection, setAreaSelection] = useState('');
-  const [dashboardAreaNotes, setDashboardAreaNotes] = useState(() => ({}));
   const [stageNotesHistory, setStageNotesHistory] = useState([]);
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -768,50 +802,13 @@ export default function Pipeline({
           ? mapped
           : mapped.filter((row) => row.areaId && allowedStageIds.has(row.areaId));
       setRows(filtered.sort(sortByProjectNumber));
-      setDashboardAreaNotes({});
     } catch (_err) {
       setRows([]);
       setError('Unable to reach the projects list.');
-      setDashboardAreaNotes({});
     } finally {
       setLoading(false);
     }
   }, [showArchived, allowedStageIds]);
-
-  const loadDashboardAreaNotes = useCallback(async (projectId, stageId, areaName) => {
-    const key = dashboardAreaNotesKey(projectId, stageId);
-    if (!key) return;
-    const existing = dashboardAreaNotes[key];
-    if (existing?.status === 'ready' || existing?.status === 'loading') return;
-    setDashboardAreaNotes((prev) => ({
-      ...prev,
-      [key]: { status: 'loading', tooltip: `Loading notes for ${areaName || 'area'}...` }
-    }));
-    try {
-      const params = new URLSearchParams();
-      params.set('stage_ids', String(stageId));
-      params.set('limit', '1000');
-      const data = await listProjectAreaNotes(projectId, params.toString());
-      const entries = Array.isArray(data)
-        ? [...data].sort((a, b) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime())
-        : [];
-      setDashboardAreaNotes((prev) => ({
-        ...prev,
-        [key]: {
-          status: 'ready',
-          tooltip: formatDashboardAreaNotesTooltip(entries, areaName)
-        }
-      }));
-    } catch (_err) {
-      setDashboardAreaNotes((prev) => ({
-        ...prev,
-        [key]: {
-          status: 'error',
-          tooltip: `Unable to load notes for ${areaName || 'area'}.`
-        }
-      }));
-    }
-  }, [dashboardAreaNotes]);
 
   const loadFiles = useCallback(async (projectId) => {
     if (!projectId) {
@@ -1425,11 +1422,7 @@ export default function Pipeline({
   const renderDashboardRow = (row, idx, keyPrefix = 'row') => {
     const areaColor = AREA_COLORS[row.areaId] || 'rgba(148, 163, 184, 0.2)';
     const areaText = textColorForHex(areaColor);
-    const notesKey = dashboardAreaNotesKey(row.id, row.areaId);
-    const cachedAreaNotes = notesKey ? dashboardAreaNotes[notesKey] : null;
-    const areaNoteTitle = showHoverNotes
-      ? cachedAreaNotes?.tooltip || `All notes (${row.area})\n\nLoading notes...`
-      : undefined;
+    const areaNoteTitle = formatStageEstimateTooltip(row.stage);
     const projectSummary = String(row.project?.summary || '').trim();
     const projectNotesTitle = showHoverNotes
       ? projectSummary
@@ -1450,10 +1443,6 @@ export default function Pipeline({
             className={`area-pill${showHoverNotes ? ' dashboard-area-with-notes' : ''}`}
             style={{ backgroundColor: areaColor, color: areaText }}
             title={areaNoteTitle}
-            onMouseEnter={() => {
-              if (!showHoverNotes || !row.id || !row.areaId) return;
-              loadDashboardAreaNotes(row.id, row.areaId, row.area);
-            }}
           >
             {row.area}
           </span>
@@ -1628,6 +1617,18 @@ export default function Pipeline({
                 {detailStatus ? <p className="muted">{detailStatus}</p> : null}
                 {detailProject ? (
                   <div className="project-detail-grid">
+                {detailTab === 'project' ? (
+                <div className="detail-card">
+                  <div className="detail-card-header">
+                    <h3>Progress</h3>
+                    <span className="progress-pill">{`${detailProgress}%`}</span>
+                  </div>
+                  <div className="progress-track">
+                    <div className="progress-fill" style={{ width: `${detailProgress}%` }} />
+                  </div>
+                </div>
+                ) : null}
+
                 {detailTab === 'project' ? (
                 <div className="detail-card">
                   {!canEditProjectDetails ? (
@@ -1828,18 +1829,6 @@ export default function Pipeline({
 
                 {detailTab === 'project' ? (
                 <div className="detail-card">
-                  <div className="detail-card-header">
-                    <h3>Progress</h3>
-                    <span className="progress-pill">{`${detailProgress}%`}</span>
-                  </div>
-                  <div className="progress-track">
-                    <div className="progress-fill" style={{ width: `${detailProgress}%` }} />
-                  </div>
-                </div>
-                ) : null}
-
-                {detailTab === 'project' ? (
-                <div className="detail-card">
                   <h3>Stages</h3>
                   <div className="table-scroll project-stage-table">
                     {detailStages.length ? (
@@ -1892,16 +1881,16 @@ export default function Pipeline({
                           <tr>
                             <th className="stage-matrix-label">Started</th>
                             {detailStages.map((stage) => (
-                              <td key={`${stage.id}-started`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
-                                {formatDateTime(stage.started_at)}
+                              <td key={`${stage.id}-started`} title={formatTimeOnly(stage.started_at)}>
+                                {formatDateOnly(stage.started_at)}
                               </td>
                             ))}
                           </tr>
                           <tr>
                             <th className="stage-matrix-label">Completed</th>
                             {detailStages.map((stage) => (
-                              <td key={`${stage.id}-completed`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
-                                {formatDateTime(stage.completed_at)}
+                              <td key={`${stage.id}-completed`} title={formatTimeOnly(stage.completed_at)}>
+                                {formatDateOnly(stage.completed_at)}
                               </td>
                             ))}
                           </tr>
