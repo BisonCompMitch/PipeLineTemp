@@ -46,32 +46,49 @@ export function parseProjectSummary(summary) {
   const requiredDocs = buildEmptyRequiredDocs();
   const notesLines = [];
 
-  let inRequiredDocs = false;
+  let inProvidedDocs = false;
+  let inMissingDocs = false;
   let inNotes = false;
-  let sawRequiredHeader = false;
+  let sawDocsHeader = false;
 
   text.split('\n').forEach((line) => {
     const trimmed = line.trim();
 
     if (!inNotes && /^required docs\s*:?\s*$/i.test(trimmed)) {
-      inRequiredDocs = true;
-      sawRequiredHeader = true;
+      inProvidedDocs = true;
+      inMissingDocs = false;
+      sawDocsHeader = true;
+      return;
+    }
+
+    if (!inNotes && /^provided docs\s*:?\s*$/i.test(trimmed)) {
+      inProvidedDocs = true;
+      inMissingDocs = false;
+      sawDocsHeader = true;
+      return;
+    }
+
+    if (!inNotes && /^missing docs?\s*:?\s*$/i.test(trimmed)) {
+      inProvidedDocs = false;
+      inMissingDocs = true;
+      sawDocsHeader = true;
       return;
     }
 
     if (/^notes\s*:?\s*$/i.test(trimmed)) {
-      inRequiredDocs = false;
+      inProvidedDocs = false;
+      inMissingDocs = false;
       inNotes = true;
       return;
     }
 
-    if (inRequiredDocs) {
+    if (inProvidedDocs || inMissingDocs) {
       if (!trimmed) return;
       if (trimmed.startsWith('-')) {
         const docText = trimmed.replace(/^\-\s*/, '').trim();
-        if (!docText || /^none selected$/i.test(docText)) return;
+        if (!docText || /^none selected$/i.test(docText) || /^none listed$/i.test(docText) || /^none$/i.test(docText)) return;
         const docId = resolveDocIdFromLabel(docText);
-        if (docId) requiredDocs[docId] = true;
+        if (docId) requiredDocs[docId] = inProvidedDocs;
         return;
       }
       return;
@@ -81,21 +98,30 @@ export function parseProjectSummary(summary) {
   });
 
   const notes = notesLines.join('\n').trim();
-  if (!sawRequiredHeader) {
-    return { requiredDocs, notes: text.trim() };
+  if (!sawDocsHeader) {
+    return { requiredDocs, notes: text.trim(), hasDocsSection: false };
   }
-  return { requiredDocs, notes };
+  return { requiredDocs, notes, hasDocsSection: true };
 }
 
 export function buildProjectSummary(requiredDocs, notes) {
-  const selectedDocs = REQUIRED_DOC_OPTIONS.filter((option) => Boolean(requiredDocs?.[option.id])).map(
+  const providedDocs = REQUIRED_DOC_OPTIONS.filter((option) => Boolean(requiredDocs?.[option.id])).map(
+    (option) => option.label
+  );
+  const missingDocs = REQUIRED_DOC_OPTIONS.filter((option) => !Boolean(requiredDocs?.[option.id])).map(
     (option) => option.label
   );
   const parts = [];
-  if (selectedDocs.length) {
-    parts.push(`Required docs:\n- ${selectedDocs.join('\n- ')}`);
+  if (providedDocs.length) {
+    parts.push(`Provided docs:\n- ${providedDocs.join('\n- ')}`);
   } else {
-    parts.push('Required docs:\n- None selected');
+    parts.push('Provided docs:\n- None listed');
+  }
+
+  if (missingDocs.length) {
+    parts.push(`Missing docs:\n- ${missingDocs.join('\n- ')}`);
+  } else {
+    parts.push('Missing docs:\n- None');
   }
 
   const trimmedNotes = String(notes || '').trim();

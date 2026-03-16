@@ -507,6 +507,37 @@ function formatStageNotesTooltip(entries = [], stageName = '') {
   return `All notes (${safeStageName})\n\n${body}`;
 }
 
+function formatDashboardProjectNotesTooltip(summaryText) {
+  const raw = String(summaryText || '').trim();
+  if (!raw) {
+    return 'Notes:\nNo notes yet.';
+  }
+  const parsed = parseProjectSummary(raw);
+  const providedDocs = REQUIRED_DOC_OPTIONS.filter((option) => Boolean(parsed.requiredDocs?.[option.id])).map(
+    (option) => option.label
+  );
+  const missingDocs = REQUIRED_DOC_OPTIONS.filter((option) => !Boolean(parsed.requiredDocs?.[option.id])).map(
+    (option) => option.label
+  );
+  const hasDocContent = Boolean(parsed.hasDocsSection || providedDocs.length);
+  if (!hasDocContent) {
+    return `Notes:\n${parsed.notes || raw}`;
+  }
+
+  const blocks = [
+    'Notes:',
+    providedDocs.length
+      ? `Provided docs:\n- ${providedDocs.join('\n- ')}`
+      : 'Provided docs:\n- None listed',
+    missingDocs.length ? `Missing docs:\n- ${missingDocs.join('\n- ')}` : 'Missing docs:\n- None'
+  ];
+  const trimmedNotes = String(parsed.notes || '').trim();
+  if (trimmedNotes) {
+    blocks.push(trimmedNotes);
+  }
+  return blocks.join('\n\n');
+}
+
 export default function Pipeline({
   canEditProjects = false,
   canEditProjectDetails = false,
@@ -1465,11 +1496,8 @@ export default function Pipeline({
     const areaColor = AREA_COLORS[row.areaId] || 'rgba(148, 163, 184, 0.2)';
     const areaText = textColorForHex(areaColor);
     const areaNoteTitle = formatStageEstimateTooltip(row.stage, row.stageWaitingSince, dashboardClockMs);
-    const projectSummary = String(row.project?.summary || '').trim();
     const projectNotesTitle = showHoverNotes
-      ? projectSummary
-        ? `Notes:\n${projectSummary}`
-        : 'Notes:\nNo notes yet.'
+      ? formatDashboardProjectNotesTooltip(row.project?.summary || '')
       : undefined;
     return (
       <tr
