@@ -168,9 +168,37 @@ function isCompletedDashboardRow(row) {
   return areaId === 'completed' || areaName === 'completed';
 }
 
+function resolveStageWaitingSince(stages = [], stage = null, projectCreatedAt = null) {
+  if (!stage) return null;
+  const status = String(stage.status || '').trim().toLowerCase();
+  const waitingForReceipt = ['pending', 'awaiting_approval'].includes(status);
+  if (!waitingForReceipt) return null;
+  const candidates = [];
+  if (stage.approved_at) candidates.push(stage.approved_at);
+  if (stage.accepted_at) candidates.push(stage.accepted_at);
+  const stageIndex = stages.findIndex((entry) => String(entry?.id || '') === String(stage.id || ''));
+  if (stageIndex > 0) {
+    for (let index = stageIndex - 1; index >= 0; index -= 1) {
+      const previous = stages[index];
+      if (previous?.completed_at) {
+        candidates.push(previous.completed_at);
+        break;
+      }
+      if (previous?.approved_at) {
+        candidates.push(previous.approved_at);
+        break;
+      }
+    }
+  }
+  if (projectCreatedAt) candidates.push(projectCreatedAt);
+  const firstValid = candidates.find((value) => !Number.isNaN(new Date(value).getTime()));
+  return firstValid || null;
+}
+
 function toRow(project) {
   const normalizedStages = normalizeProjectStages(project.stages || []);
   const stage = currentStage(normalizedStages);
+  const waitingSince = resolveStageWaitingSince(normalizedStages, stage, project?.created_at || null);
   return {
     id: project.id,
     projectNumber: project.project_number || '',
@@ -181,6 +209,7 @@ function toRow(project) {
     areaNoteUpdatedBy: String(stage?.area_note_updated_by || '').trim(),
     areaNoteUpdatedAt: stage?.area_note_updated_at || null,
     stage,
+    stageWaitingSince: waitingSince,
     progress: completionPercent(normalizedStages),
     statusTone: stageNoticeTone(stage),
     isDeleted: Boolean(project.is_deleted),
@@ -249,9 +278,16 @@ function formatExpectedHours(hours) {
   return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
 }
 
-function formatStageEstimateTooltip(stage) {
+function formatStageEstimateTooltip(stage, waitingSince = null, nowMs = Date.now()) {
   if (!stage) return 'No stage timing available.';
   const stageName = formatStageName(stage.name, stage.id) || 'Current stage';
+  if (waitingSince) {
+    const waitStartMs = new Date(waitingSince).getTime();
+    if (!Number.isNaN(waitStartMs)) {
+      const elapsedMinutes = Math.max(0, Math.round((nowMs - waitStartMs) / 60000));
+      return `${stageName}\nWaiting to be received: ${formatDurationMinutes(elapsedMinutes)}.`;
+    }
+  }
   const expected = Number(stage.expected_hours ?? stage.default_duration_hours ?? 0);
   const expectedText = formatExpectedHours(expected);
   if (!expectedText) {
@@ -261,7 +297,7 @@ function formatStageEstimateTooltip(stage) {
   if (!startedAt || Number.isNaN(startedAt.getTime())) {
     return `${stageName}\nEstimate: ${expectedText}h\nNot started yet.`;
   }
-  const elapsedMinutes = Math.max(0, Math.round((Date.now() - startedAt.getTime()) / 60000));
+  const elapsedMinutes = Math.max(0, Math.round((nowMs - startedAt.getTime()) / 60000));
   const remainingMinutes = Math.round(expected * 60) - elapsedMinutes;
   if (remainingMinutes > 0) {
     return `${stageName}\n${formatDurationMinutes(remainingMinutes)} left of ${expectedText}h estimate.`;
@@ -534,6 +570,7 @@ export default function Pipeline({
       ? window.matchMedia('(min-width: 1101px)').matches
       : true
   );
+  const [dashboardClockMs, setDashboardClockMs] = useState(() => Date.now());
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
 
   const closePreview = useCallback(() => {
@@ -905,6 +942,11 @@ export default function Pipeline({
     }
     media.addListener(onChange);
     return () => media.removeListener(onChange);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setDashboardClockMs(Date.now()), 60000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -1422,7 +1464,7 @@ export default function Pipeline({
   const renderDashboardRow = (row, idx, keyPrefix = 'row') => {
     const areaColor = AREA_COLORS[row.areaId] || 'rgba(148, 163, 184, 0.2)';
     const areaText = textColorForHex(areaColor);
-    const areaNoteTitle = formatStageEstimateTooltip(row.stage);
+    const areaNoteTitle = formatStageEstimateTooltip(row.stage, row.stageWaitingSince, dashboardClockMs);
     const projectSummary = String(row.project?.summary || '').trim();
     const projectNotesTitle = showHoverNotes
       ? projectSummary
