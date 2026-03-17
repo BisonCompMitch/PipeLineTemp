@@ -4063,6 +4063,23 @@ body::before {
   min-height: 140px;
 }
 
+.lead-upload-section {
+  margin-top: 2px;
+}
+
+.lead-files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lead-file-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .lead-actions {
   display: flex;
   justify-content: flex-end;

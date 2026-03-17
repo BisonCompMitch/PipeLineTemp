@@ -458,6 +458,56 @@ export async function deleteLead(leadId) {
   return apiJson(`/leads/${leadId}`, { method: 'DELETE' });
 }
 
+export async function listLeadFiles(leadId) {
+  return apiJson(`/leads/${encodeURIComponent(leadId)}/files`);
+}
+
+export async function uploadLeadFile(leadId, file, options = {}) {
+  const filename = options.filename || file?.name || 'file';
+  const params = new URLSearchParams({ filename });
+  if (options.content_type) {
+    params.set('content_type', options.content_type);
+  }
+  const response = await apiRequest(`/leads/${encodeURIComponent(leadId)}/files/upload?${params.toString()}`, {
+    method: 'POST',
+    body: file
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const data = await response.json();
+      if (typeof data?.detail === 'string' && data.detail.trim()) {
+        message = data.detail.trim();
+      }
+    } catch (_error) {
+      // ignore body parsing errors on non-JSON failures
+    }
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+export async function downloadLeadFile(leadId, fileId) {
+  const response = await apiRequest(`/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(fileId)}/download`);
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const data = await response.json();
+      if (typeof data?.detail === 'string' && data.detail.trim()) {
+        message = data.detail.trim();
+      }
+    } catch (_error) {
+      // ignore body parsing errors on non-JSON failures
+    }
+    throw new Error(message);
+  }
+  return response.blob();
+}
+
+export async function deleteLeadFile(leadId, fileId) {
+  return apiJson(`/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+}
+
 export async function listCustomers() {
   return apiJson('/customers');
 }
