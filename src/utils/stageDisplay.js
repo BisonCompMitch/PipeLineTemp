@@ -70,17 +70,17 @@ export const STAGE_FLOW = SLAB_STAGE_FLOW;
 const SLAB_STAGE_IDS = new Set(['money_slab', 'slab_work']);
 const MONEY_STAGE_IDS = new Set(['money_design', 'money_slab', 'money_production', 'money_shipping', 'final_payment']);
 
-const COLOR_PLANS = '#7DD3FC';
-const COLOR_BUDGET = '#22C55E';
-const COLOR_MONEY = '#DC2626';
-const COLOR_DESIGN = '#A78BFA';
-const COLOR_ENGINEERING = '#60A5FA';
-const COLOR_ESTIMATING = '#FACC15';
-const COLOR_MANUFACTURING = '#FB923C';
-const COLOR_SHIPPING = '#2DD4BF';
-const COLOR_COMPLETED = '#9CA3AF';
+const COLOR_PLANS = '#BAE6FD';
+const COLOR_BUDGET = '#86EFAC';
+const COLOR_MONEY = '#FCA5A5';
+const COLOR_DESIGN = '#C4B5FD';
+const COLOR_ENGINEERING = '#93C5FD';
+const COLOR_ESTIMATING = '#FDE68A';
+const COLOR_MANUFACTURING = '#FDBA74';
+const COLOR_SHIPPING = '#99F6E4';
+const COLOR_COMPLETED = '#CBD5E1';
 const COLOR_SLAB_MONEY = COLOR_MONEY;
-const COLOR_SLAB_WORK = '#EC4899';
+const COLOR_SLAB_WORK = '#FBCFE8';
 
 export const STAGE_COLORS = {
   plans_received: COLOR_PLANS,
