@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { listProjects } from '../api.js';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
-import { formatMoneyStageGlyph, formatStageName, normalizeProjectStages } from '../utils/stageDisplay.js';
+import {
+  coerceSlabWorkFlag,
+  formatMoneyStageGlyph,
+  formatStageName,
+  getStageBadgeStyle,
+  normalizeProjectStages
+} from '../utils/stageDisplay.js';
 
 function completionPercent(stages = []) {
   if (!Array.isArray(stages) || stages.length === 0) return 0;
@@ -14,12 +20,6 @@ function completionPercent(stages = []) {
 function currentStage(stages = []) {
   if (!Array.isArray(stages) || stages.length === 0) return null;
   return stages.find((stage) => stage.status !== 'complete') || stages[stages.length - 1];
-}
-
-function customerStageCellClass(status) {
-  if (status === 'complete') return 'customer-stage-cell complete';
-  if (status === 'in_progress') return 'customer-stage-cell in-progress';
-  return 'customer-stage-cell';
 }
 
 export default function Customer() {
@@ -43,8 +43,11 @@ export default function Customer() {
           setProgress(0);
           return;
         }
+        const normalizedStages = normalizeProjectStages(item.stages || [], {
+          hasSlabWork: coerceSlabWorkFlag(item?.slab_work)
+        });
         setProject(item);
-        setProgress(completionPercent(item.stages));
+        setProgress(completionPercent(normalizedStages));
       })
       .catch(() => {
         if (!active) return;
@@ -80,7 +83,13 @@ export default function Customer() {
     };
   }, [status, alertDialog]);
 
-  const stages = useMemo(() => normalizeProjectStages(project?.stages || []), [project?.stages]);
+  const stages = useMemo(
+    () =>
+      normalizeProjectStages(project?.stages || [], {
+        hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+      }),
+    [project?.stages, project?.slab_work]
+  );
   const stage = currentStage(stages);
   const stageRows = useMemo(() => {
     const rowCount = isTabletView ? 3 : 2;
@@ -103,7 +112,7 @@ export default function Customer() {
           <div className="customer-progress-title">{project?.name || 'No project linked yet'}</div>
           <div className="muted customer-current-stage-label">Your Project Is In</div>
           <p className="customer-current-stage">
-            {stage ? formatStageName(stage.name, stage.id) : 'Waiting for project assignment.'}
+            {stage ? formatStageName(stage.name, stage.id, { audience: 'external' }) : 'Waiting for project assignment.'}
           </p>
         </div>
         <div className="progress-track">
@@ -119,8 +128,8 @@ export default function Customer() {
               <div className="customer-stage-grid">
                 {stageRows.map((row, rowIndex) => {
                   const cells = row.map((item) => {
-                    const fullName = formatStageName(item?.name, item?.id);
-                    const compactName = formatMoneyStageGlyph(item?.name, item?.id);
+                    const fullName = formatStageName(item?.name, item?.id, { audience: 'external' });
+                    const compactName = formatMoneyStageGlyph(item?.name, item?.id, { audience: 'external' });
                     const isMoneyGlyph = compactName === '$';
                     return { item, fullName, compactName, isMoneyGlyph };
                   });
@@ -136,8 +145,9 @@ export default function Customer() {
                       {cells.map(({ item, fullName, compactName, isMoneyGlyph }) => (
                         <div
                           key={item.id}
-                          className={`${customerStageCellClass(item.status)}${isMoneyGlyph ? ' money-glyph' : ''}`}
+                          className={`customer-stage-cell${isMoneyGlyph ? ' money-glyph' : ''}`}
                           title={compactName !== fullName ? fullName : undefined}
+                          style={getStageBadgeStyle(item.id)}
                         >
                           <span className="customer-stage-label-desktop">{compactName}</span>
                           <span className="customer-stage-label-mobile">{fullName}</span>

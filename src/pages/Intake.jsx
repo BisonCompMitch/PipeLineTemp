@@ -56,6 +56,7 @@ export default function Intake() {
     requester: '',
     urgency: 'standard',
     budget: '',
+    slab_work: false,
     summary: '',
     required_docs: emptyRequiredDocs
   });
@@ -202,6 +203,7 @@ export default function Intake() {
         due_date: todayLocalIso(),
         urgency: form.urgency,
         budget: form.budget.trim(),
+        slab_work: Boolean(form.slab_work),
         summary: buildProjectSummary(form.required_docs, form.summary)
       });
       const projectId = String(createdProject?.id || '').trim();
@@ -249,6 +251,7 @@ export default function Intake() {
         requester: '',
         urgency: 'standard',
         budget: '',
+        slab_work: false,
         summary: '',
         required_docs: emptyRequiredDocs
       });
@@ -304,6 +307,22 @@ export default function Intake() {
           <label className="span-2">
             Budget
             <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
+          </label>
+          <label className="switch-field span-2 intake-slab-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(form.slab_work)}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  slab_work: event.target.checked
+                }))
+              }
+            />
+            <span className="switch-track" aria-hidden="true">
+              <span className="switch-thumb" />
+            </span>
+            <span className="switch-text">Include slab work stages</span>
           </label>
           <div className="intake-docs span-2" role="group" aria-labelledby="required-docs-title">
             <div id="required-docs-title" className="intake-docs-title">

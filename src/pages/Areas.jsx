@@ -13,7 +13,7 @@ import {
 import ModalPortal from '../components/ModalPortal.jsx';
 import BlockingOverlay from '../components/BlockingOverlay.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
-import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
+import { coerceSlabWorkFlag, formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
 import { REQUIRED_DOC_OPTIONS, parseProjectSummary } from '../utils/requiredDocs.js';
 
 const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
@@ -30,6 +30,13 @@ const AREA_STAGE_MAP = {
   'money - design': ['money_design'],
   'money design': ['money_design'],
   money_design: ['money_design'],
+  'money - slab': ['money_slab'],
+  'money slab': ['money_slab'],
+  money_slab: ['money_slab'],
+  'slab work': ['slab_work'],
+  slab_work: ['slab_work'],
+  'design & engineering': ['design', 'engineering'],
+  'design and engineering': ['design', 'engineering'],
   design: ['design'],
   engineering: ['engineering'],
   estimating: ['estimating'],
@@ -41,6 +48,7 @@ const AREA_STAGE_MAP = {
   'money shipping': ['money_shipping'],
   money_shipping: ['money_shipping'],
   shipping: ['shipping'],
+  'collect final payment': ['final_payment'],
   'final payment': ['final_payment'],
   final_payment: ['final_payment'],
   completed: ['completed'],
@@ -194,6 +202,12 @@ function compareRowsByProjectNumber(a, b) {
 function currentProjectStage(stages = []) {
   if (!Array.isArray(stages) || stages.length === 0) return null;
   return stages.find((stage) => stage.status !== 'complete') || stages[stages.length - 1];
+}
+
+function normalizeStagesForProject(project) {
+  return normalizeProjectStages(project?.stages || [], {
+    hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+  });
 }
 
 function triggerBrowserDownload(blob, filename) {
@@ -478,13 +492,13 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
             : new Set(['awaiting_approval', 'in_progress']);
       const filtered = selectedKey === 'admin'
         ? (Array.isArray(projects) ? projects : []).flatMap((project) => {
-            const stage = currentProjectStage(normalizeProjectStages(project.stages || []));
+            const stage = currentProjectStage(normalizeStagesForProject(project));
             if (!stage || !visibleStatuses.has(stage.status)) return [];
             return [{ project, stage }];
           })
         : (Array.isArray(projects) ? projects : [])
             .flatMap((project) =>
-              normalizeProjectStages(project.stages || [])
+              normalizeStagesForProject(project)
                 .filter((stage) => stageIds.includes(stage.id) && visibleStatuses.has(stage.status))
                 .map((stage) => ({ project, stage }))
             );

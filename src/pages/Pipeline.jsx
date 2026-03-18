@@ -18,7 +18,13 @@ import {
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
-import { formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
+import {
+  coerceSlabWorkFlag,
+  formatStageName,
+  getStageBadgeStyle,
+  normalizeProjectStages,
+  STAGE_FLOW
+} from '../utils/stageDisplay.js';
 import {
   REQUIRED_DOC_OPTIONS,
   buildEmptyRequiredDocs,
@@ -39,21 +45,6 @@ const TONE_LABELS = {
   red: 'Critical',
   neutral: 'On Time'
 };
-const AREA_COLORS = {
-  plans_received: '#D9D5FF',
-  budget: '#C9D1DA',
-  money_design: '#C4CEDB',
-  design: '#A5C9FF',
-  engineering: '#A6F0FF',
-  estimating: '#AEEFE6',
-  money_production: '#FFE08F',
-  manufacturing: '#FFD2A8',
-  money_shipping: '#FFD0B5',
-  final_payment: '#FCA5A5',
-  shipping: '#CFF4A8',
-  completed: '#9FF0BD'
-};
-
 const DETAIL_TABS = [
   { id: 'project', label: 'Project' },
   { id: 'files', label: 'Files & Photos' }
@@ -75,6 +66,13 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'money - design': ['money_design'],
   'money design': ['money_design'],
   money_design: ['money_design'],
+  'money - slab': ['money_slab'],
+  'money slab': ['money_slab'],
+  money_slab: ['money_slab'],
+  'slab work': ['slab_work'],
+  slab_work: ['slab_work'],
+  'design & engineering': ['design', 'engineering'],
+  'design and engineering': ['design', 'engineering'],
   design: ['design'],
   engineering: ['engineering'],
   estimating: ['estimating'],
@@ -86,6 +84,7 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'money shipping': ['money_shipping'],
   money_shipping: ['money_shipping'],
   shipping: ['shipping'],
+  'collect final payment': ['final_payment'],
   'final payment': ['final_payment'],
   final_payment: ['final_payment'],
   completed: ['completed'],
@@ -137,17 +136,6 @@ function completionPercent(stages = []) {
   return Math.round((done / total) * 100);
 }
 
-function textColorForHex(color) {
-  if (!color || color[0] !== '#' || color.length !== 7) {
-    return '#111827';
-  }
-  const r = parseInt(color.slice(1, 3), 16);
-  const g = parseInt(color.slice(3, 5), 16);
-  const b = parseInt(color.slice(5, 7), 16);
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-  return yiq >= 140 ? '#111827' : '#f8fafc';
-}
-
 function sortByProjectNumber(a, b) {
   const aRaw = (a.projectNumber || '').toString().trim();
   const bRaw = (b.projectNumber || '').toString().trim();
@@ -195,15 +183,17 @@ function resolveStageWaitingSince(stages = [], stage = null, projectCreatedAt = 
   return firstValid || null;
 }
 
-function toRow(project) {
-  const normalizedStages = normalizeProjectStages(project.stages || []);
+function toRow(project, formatStageNameFn = formatStageName) {
+  const normalizedStages = normalizeProjectStages(project.stages || [], {
+    hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+  });
   const stage = currentStage(normalizedStages);
   const waitingSince = resolveStageWaitingSince(normalizedStages, stage, project?.created_at || null);
   return {
     id: project.id,
     projectNumber: project.project_number || '',
     name: project.name || 'Unnamed project',
-    area: formatStageName(stage?.name, stage?.id) || 'Pending',
+    area: formatStageNameFn(stage?.name, stage?.id) || 'Pending',
     areaId: stage?.id || '',
     areaNote: String(stage?.area_note || '').trim(),
     areaNoteUpdatedBy: String(stage?.area_note_updated_by || '').trim(),
@@ -278,9 +268,9 @@ function formatExpectedHours(hours) {
   return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
 }
 
-function formatStageEstimateTooltip(stage, waitingSince = null, nowMs = Date.now()) {
+function formatStageEstimateTooltip(stage, waitingSince = null, nowMs = Date.now(), formatStageNameFn = formatStageName) {
   if (!stage) return 'No stage timing available.';
-  const stageName = formatStageName(stage.name, stage.id) || 'Current stage';
+  const stageName = formatStageNameFn(stage.name, stage.id) || 'Current stage';
   if (waitingSince) {
     const waitStartMs = new Date(waitingSince).getTime();
     if (!Number.isNaN(waitStartMs)) {
@@ -493,7 +483,7 @@ function triggerBrowserDownload(blob, filename) {
 }
 
 function formatStageNotesTooltip(entries = [], stageName = '') {
-  const safeStageName = formatStageName(stageName) || 'Stage';
+  const safeStageName = String(stageName || '').trim() || 'Stage';
   if (!entries.length) {
     return `All notes (${safeStageName})\n\nNo notes yet.`;
   }
@@ -603,6 +593,11 @@ export default function Pipeline({
   );
   const [dashboardClockMs, setDashboardClockMs] = useState(() => Date.now());
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
+  const externalStageLabels = Boolean(canUploadProjectFiles) && !canEditProjects;
+  const formatDisplayStageName = useCallback(
+    (name, stageId) => formatStageName(name, stageId, { audience: externalStageLabels ? 'external' : 'internal' }),
+    [externalStageLabels]
+  );
 
   const closePreview = useCallback(() => {
     if (preview.url) {
@@ -798,8 +793,11 @@ export default function Pipeline({
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
   const detailStages = useMemo(
-    () => normalizeProjectStages(detailProject?.stages || []),
-    [detailProject?.stages]
+    () =>
+      normalizeProjectStages(detailProject?.stages || [], {
+        hasSlabWork: coerceSlabWorkFlag(detailProject?.slab_work)
+      }),
+    [detailProject?.stages, detailProject?.slab_work]
   );
   const canUploadInFilesTab = canEditProjects || canUploadProjectFiles;
   const projectIsComplete = useMemo(() => {
@@ -828,10 +826,10 @@ export default function Pipeline({
       const entries = [...(grouped.get(stage.id) || [])].sort(
         (a, b) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime()
       );
-      tooltips.set(stage.id, formatStageNotesTooltip(entries, formatStageName(stage.name, stage.id)));
+      tooltips.set(stage.id, formatStageNotesTooltip(entries, formatDisplayStageName(stage.name, stage.id)));
     });
     return tooltips;
-  }, [stageNotesHistory, detailStages]);
+  }, [stageNotesHistory, detailStages, formatDisplayStageName]);
   const stageNoteCountByStageId = useMemo(() => {
     const counts = new Map();
     stageNotesHistory.forEach((entry) => {
@@ -864,7 +862,7 @@ export default function Pipeline({
     setError('');
     try {
       const data = await listProjects(showArchived ? 'include_deleted=true' : '');
-      const mapped = (Array.isArray(data) ? data : []).map(toRow);
+      const mapped = (Array.isArray(data) ? data : []).map((project) => toRow(project, formatDisplayStageName));
       const filtered =
         allowedStageIds === null
           ? mapped
@@ -876,7 +874,7 @@ export default function Pipeline({
     } finally {
       setLoading(false);
     }
-  }, [showArchived, allowedStageIds]);
+  }, [showArchived, allowedStageIds, formatDisplayStageName]);
 
   const loadFiles = useCallback(async (projectId) => {
     if (!projectId) {
@@ -1059,7 +1057,11 @@ export default function Pipeline({
       setDetailProject(latest);
       setDetailForm(toEditForm(latest));
       setDetailStageNoteDraft('');
-      setRows((prev) => prev.map((item) => (item.id === row.id ? toRow(latest) : item)));
+      setRows((prev) =>
+        prev.map((item) =>
+          item.id === row.id ? toRow(latest, formatDisplayStageName) : item
+        )
+      );
       await loadFiles(row.id);
       await loadStageNotesHistory(row.id);
     } catch (_err) {
@@ -1123,7 +1125,11 @@ export default function Pipeline({
 
       setDetailProject(updated);
       setDetailForm(toEditForm(updated));
-      setRows((prev) => prev.map((item) => (item.id === updated.id ? toRow(updated) : item)));
+      setRows((prev) =>
+        prev.map((item) =>
+          item.id === updated.id ? toRow(updated, formatDisplayStageName) : item
+        )
+      );
       await loadStageNotesHistory(detailProject.id);
       setDetailStatus(areaChanged ? 'Project updated. Current area updated.' : 'Project updated.');
     } catch (_err) {
@@ -1159,7 +1165,13 @@ export default function Pipeline({
       };
       setDetailProject(nextProject);
       setDetailStageNoteDraft('');
-      setRows((prev) => prev.map((item) => (item.id === nextProject.id ? toRow(nextProject) : item)));
+      setRows((prev) =>
+        prev.map((item) =>
+          item.id === nextProject.id
+            ? toRow(nextProject, formatDisplayStageName)
+            : item
+        )
+      );
       await loadStageNotesHistory(detailProject.id);
       setDetailStatus('Note added.');
     } catch (_err) {
@@ -1493,9 +1505,13 @@ export default function Pipeline({
   };
 
   const renderDashboardRow = (row, idx, keyPrefix = 'row') => {
-    const areaColor = AREA_COLORS[row.areaId] || 'rgba(148, 163, 184, 0.2)';
-    const areaText = textColorForHex(areaColor);
-    const areaNoteTitle = formatStageEstimateTooltip(row.stage, row.stageWaitingSince, dashboardClockMs);
+    const areaStyle = getStageBadgeStyle(row.areaId);
+    const areaNoteTitle = formatStageEstimateTooltip(
+      row.stage,
+      row.stageWaitingSince,
+      dashboardClockMs,
+      formatDisplayStageName
+    );
     const projectNotesTitle = showHoverNotes
       ? formatDashboardProjectNotesTooltip(row.project?.summary || '')
       : undefined;
@@ -1511,7 +1527,7 @@ export default function Pipeline({
         <td>
           <span
             className={`area-pill${showHoverNotes ? ' dashboard-area-with-notes' : ''}`}
-            style={{ backgroundColor: areaColor, color: areaText }}
+            style={areaStyle}
             title={areaNoteTitle}
           >
             {row.area}
@@ -1807,13 +1823,13 @@ export default function Pipeline({
                         <select value={areaSelection} onChange={(event) => setAreaSelection(event.target.value)}>
                           {stageOptions.map((stage) => (
                             <option key={stage.id} value={stage.id}>
-                            {formatStageName(stage.name, stage.id)}
+                            {formatDisplayStageName(stage.name, stage.id)}
                           </option>
                         ))}
                         </select>
                       ) : (
                         <div className="field-static">
-                          {formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'}
+                          {formatDisplayStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'}
                         </div>
                       )}
                     </label>
@@ -1883,7 +1899,7 @@ export default function Pipeline({
                   <div className="area-notes-history">
                     <div className="detail-card-header">
                       <h3>
-                        All notes ({formatStageName(detailCurrentStage?.name, detailCurrentStage?.id) || 'Current area'})
+                        All notes ({formatDisplayStageName(detailCurrentStage?.name, detailCurrentStage?.id) || 'Current area'})
                       </h3>
                     </div>
                     <textarea
@@ -1915,7 +1931,7 @@ export default function Pipeline({
                                   className={`stage-matrix-stage${count ? ' has-notes' : ''}`}
                                   title={notesTitle}
                                 >
-                                  {formatStageName(stage.name, stage.id)}
+                                  {formatDisplayStageName(stage.name, stage.id)}
                                 </th>
                               );
                             })}

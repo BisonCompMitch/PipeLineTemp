@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { listProjects } from '../api.js';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
-import { formatStageName, normalizeProjectStages } from '../utils/stageDisplay.js';
+import { coerceSlabWorkFlag, formatStageName, getStageBadgeStyle, normalizeProjectStages } from '../utils/stageDisplay.js';
 
 const NOTICE_LEVELS = ['green', 'yellow', 'red'];
 const TONE_COLORS = {
@@ -68,13 +68,16 @@ export default function Contractor() {
       .then((projects) => {
         if (!active) return;
         const mapped = (projects || []).map((project) => {
-          const stages = normalizeProjectStages(project.stages || []);
+          const stages = normalizeProjectStages(project.stages || [], {
+            hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+          });
           const stage = currentStage(stages);
           return {
             id: project.id,
             projectNumber: project.project_number || '',
             name: project.name || 'Unnamed project',
-            area: formatStageName(stage?.name, stage?.id) || 'Pending',
+            areaId: stage?.id || '',
+            area: formatStageName(stage?.name, stage?.id, { audience: 'external' }) || 'Pending',
             progress: completionPercent(stages),
             statusTone: stageNoticeTone(stage)
           };
@@ -138,7 +141,11 @@ export default function Contractor() {
                   <tr key={row.id}>
                     <td>{row.projectNumber || '-'}</td>
                     <td>{row.name}</td>
-                    <td>{row.area}</td>
+                    <td>
+                      <span className="area-pill" style={getStageBadgeStyle(row.areaId)}>
+                        {row.area}
+                      </span>
+                    </td>
                     <td>{`${row.progress || 0}%`}</td>
                     <td>
                       <span className="status-pill" style={{ backgroundColor: statusColor, color: '#111827' }}>
