@@ -4076,6 +4076,10 @@ body::before {
   grid-column: 1 / -1;
 }
 
+.lead-create-grid .lead-upload-section {
+  grid-column: 1 / -1;
+}
+
 .lead-create-grid .lead-notes-field textarea {
   min-height: 140px;
 }

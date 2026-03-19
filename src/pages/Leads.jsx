@@ -363,7 +363,7 @@ export default function Leads({ isAdminView = false }) {
             Notes
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={6} />
           </label>
-          <div className="intake-upload-section lead-upload-section span-2">
+          <div className="intake-upload-section lead-upload-section">
             <div className="intake-docs-title">Files</div>
             <div className="file-upload-form">
               <div
