@@ -3598,6 +3598,12 @@ body::before {
   cursor: pointer;
 }
 
+.intake-fields label.intake-slab-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .intake-slab-toggle input[type='checkbox'],
 .intake-docs-grid .intake-doc-option input[type='checkbox'] {
   width: 18px;

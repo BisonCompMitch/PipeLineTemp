@@ -319,7 +319,7 @@ export default function Intake() {
                 }))
               }
             />
-            <span>Include slab work stages</span>
+            <span>Slab work required</span>
           </label>
           <div className="intake-docs span-2" role="group" aria-labelledby="required-docs-title">
             <div id="required-docs-title" className="intake-docs-title">
