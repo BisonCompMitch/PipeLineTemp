@@ -100,8 +100,6 @@ export default function Users() {
   const [editing, setEditing] = useState(null);
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
   const [createBisonForm, setCreateBisonForm] = useState({
-    username: '',
-    full_name: '',
     email: '',
     rolesText: '',
     areas: []
@@ -280,7 +278,10 @@ export default function Users() {
   );
 
   const sortedBison = useMemo(
-    () => [...bisonUsers].sort((a, b) => normalize(a.username).localeCompare(normalize(b.username))),
+    () =>
+      [...bisonUsers].sort((a, b) =>
+        normalize(a.login_username || a.username).localeCompare(normalize(b.login_username || b.username))
+      ),
     [bisonUsers]
   );
   const sortedContractors = useMemo(
@@ -462,26 +463,18 @@ export default function Users() {
 
   const handleCreateBison = async (event) => {
     event.preventDefault();
-    if (
-      !createBisonForm.username.trim() ||
-      !createBisonForm.full_name.trim() ||
-      !createBisonForm.email.trim()
-    ) {
-      setBisonStatus({ tone: 'error', text: 'Username, full name, and email are required for Bison users.' });
+    if (!createBisonForm.email.trim()) {
+      setBisonStatus({ tone: 'error', text: 'Email is required for Bison users.' });
       return;
     }
     try {
       await createUser({
-        username: createBisonForm.username.trim(),
-        full_name: createBisonForm.full_name.trim(),
         email: createBisonForm.email.trim(),
         roles: splitRoles(createBisonForm.rolesText),
         areas: createBisonForm.areas || [],
         must_reset_password: true
       });
       setCreateBisonForm({
-        username: '',
-        full_name: '',
         email: '',
         rolesText: '',
         areas: []
@@ -607,23 +600,7 @@ export default function Users() {
           </div>
         </div>
         <form className="form-grid user-create-form user-create-form--bison" onSubmit={handleCreateBison}>
-          <label>
-            Username
-            <input
-              value={createBisonForm.username}
-              onChange={(event) => setCreateBisonForm({ ...createBisonForm, username: event.target.value })}
-              placeholder="username"
-            />
-          </label>
-          <label>
-            Full name
-            <input
-              value={createBisonForm.full_name}
-              onChange={(event) => setCreateBisonForm({ ...createBisonForm, full_name: event.target.value })}
-              placeholder="Full name"
-            />
-          </label>
-          <label>
+          <label className="span-2">
             Email
             <input
               value={createBisonForm.email}
@@ -631,7 +608,7 @@ export default function Users() {
               placeholder="user@email.com"
             />
           </label>
-          <label className="span-2">
+          <label className="span-3">
             Roles (comma separated)
             <input
               value={createBisonForm.rolesText}
@@ -640,7 +617,7 @@ export default function Users() {
             />
           </label>
           <div className="user-create-note">
-            A temporary password is generated automatically and reset is required on first sign in.
+            A temporary password is generated automatically. Full name and username are set by the user on first sign in.
           </div>
           <div className="area-check-section span-3">
             <div className="muted">Areas</div>
@@ -687,8 +664,8 @@ export default function Users() {
                     {};
                   return (
                     <tr key={user.username} onDoubleClick={() => startEditBison(user)}>
-                      <td>{user.username}</td>
-                      <td>{user.full_name}</td>
+                      <td>{user.login_username || user.username}</td>
+                      <td>{user.full_name || '-'}</td>
                       <td>{user.email}</td>
                       <td>{(user.roles || []).join(', ') || '-'}</td>
                       <td>{(user.areas || []).join(', ') || '-'}</td>

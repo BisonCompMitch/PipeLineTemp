@@ -59,6 +59,7 @@ const DEFAULT_FIRST_LOGIN_STATE = {
   required: false,
   usernameNeedsSetup: false,
   suggestedUsername: '',
+  suggestedFullName: '',
   email: ''
 };
 
@@ -222,6 +223,7 @@ export default function App() {
       required: mustResetPassword,
       usernameNeedsSetup: Boolean(tokenPayload?.username_needs_setup),
       suggestedUsername,
+      suggestedFullName: String(tokenPayload?.full_name || '').trim(),
       email: String(tokenPayload?.email || '').trim()
     });
     setProfileLoading(true);
@@ -273,6 +275,7 @@ export default function App() {
             required: Boolean(user?.must_reset_password),
             usernameNeedsSetup: !String(user?.login_username || '').trim(),
             suggestedUsername: String(user?.login_username || user?.email || user?.username || '').trim(),
+            suggestedFullName: String(user?.full_name || '').trim(),
             email: String(user?.email || '').trim()
           });
           setProfileLoading(false);
@@ -515,11 +518,16 @@ export default function App() {
               <Protected authed={authed} allowed={firstLoginRequired} fallback={defaultRoute} loading={accessLoading}>
                 <FirstLoginSetup
                   initialUsername={firstLoginState.suggestedUsername}
+                  initialFullName={firstLoginState.suggestedFullName}
                   email={firstLoginState.email}
                   onComplete={(result) => {
                     const nextUsername = String(result?.login_username || result?.username || '').trim();
+                    const nextFullName = String(result?.full_name || '').trim();
                     if (nextUsername) {
                       setStoredUsername(nextUsername);
+                    }
+                    if (nextFullName) {
+                      setDisplayName(nextFullName);
                     }
                     setFirstLoginState(DEFAULT_FIRST_LOGIN_STATE);
                     navigate(defaultRoute, { replace: true });

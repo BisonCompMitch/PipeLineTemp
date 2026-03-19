@@ -3,22 +3,43 @@ import logo from '../assets/BisonWorksFavicon.png';
 import { completeFirstLogin } from '../api.js';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 
-export default function FirstLoginSetup({ initialUsername = '', email = '', onComplete, onSignOut }) {
+export default function FirstLoginSetup({
+  initialUsername = '',
+  initialFullName = '',
+  email = '',
+  onComplete,
+  onSignOut
+}) {
   const suggestedUsername = useMemo(() => {
     const fromInitial = String(initialUsername || '').trim();
     if (fromInitial) return fromInitial;
     return String(email || '').trim();
   }, [email, initialUsername]);
+  const suggestedFullName = useMemo(() => String(initialFullName || '').trim(), [initialFullName]);
   const [username, setUsername] = useState(suggestedUsername);
+  const [fullName, setFullName] = useState(suggestedFullName);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const { alertDialog, dialogPortal } = useSiteDialog();
 
+  React.useEffect(() => {
+    setUsername((current) => current || suggestedUsername);
+  }, [suggestedUsername]);
+
+  React.useEffect(() => {
+    setFullName((current) => current || suggestedFullName);
+  }, [suggestedFullName]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     const normalizedUsername = String(username || '').trim();
+    const normalizedFullName = String(fullName || '').trim();
+    if (!normalizedFullName) {
+      setError('Full name is required.');
+      return;
+    }
     if (!normalizedUsername) {
       setError('Username is required.');
       return;
@@ -39,6 +60,7 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
     setError('');
     try {
       const result = await completeFirstLogin({
+        full_name: normalizedFullName,
         login_username: normalizedUsername,
         new_password: password
       });
@@ -69,10 +91,20 @@ export default function FirstLoginSetup({ initialUsername = '', email = '', onCo
           <img src={logo} alt="BisonWorks" className="login-logo" />
           <div>
             <h2>Complete Setup</h2>
-            <p className="muted">Set your username and a new password to continue.</p>
+            <p className="muted">Set your full name, username, and new password to continue.</p>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
+          <label>
+            Full name
+            <input
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="Full name"
+              autoComplete="name"
+              disabled={saving}
+            />
+          </label>
           <label>
             Username
             <input
