@@ -308,7 +308,7 @@ export default function Intake() {
             Budget
             <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
           </label>
-          <label className="switch-field span-2 intake-slab-toggle">
+          <label className="span-2 intake-slab-toggle">
             <input
               type="checkbox"
               checked={Boolean(form.slab_work)}
@@ -319,10 +319,7 @@ export default function Intake() {
                 }))
               }
             />
-            <span className="switch-track" aria-hidden="true">
-              <span className="switch-thumb" />
-            </span>
-            <span className="switch-text">Include slab work stages</span>
+            <span>Include slab work stages</span>
           </label>
           <div className="intake-docs span-2" role="group" aria-labelledby="required-docs-title">
             <div id="required-docs-title" className="intake-docs-title">
