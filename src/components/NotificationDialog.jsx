@@ -8,6 +8,7 @@ const AREA_OPTIONS = [...STAGE_FLOW.map((stage) => formatStageName(stage.name, s
 const MONEY_CHECK_AREA_LABELS = {
   'Money - D&E': 'Design',
   'Money - Production': 'Manufacturing',
+  'Manufacturing - Invoice Sent': 'Shipping',
   'Money - Shipping': 'Shipping'
 };
 

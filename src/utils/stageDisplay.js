@@ -35,14 +35,14 @@ function textColorForHex(color) {
 
 export const BASE_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'budget', name: 'CFS Budget', owner: 'CFS', default_duration_hours: 24 },
+  { id: 'budget', name: 'Rough Estimate', owner: 'CFS', default_duration_hours: 24 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
   { id: 'engineering', name: 'Engineering', owner: 'Engineering Lead', default_duration_hours: 24 },
   { id: 'estimating', name: 'Estimating', owner: 'Estimating Lead', default_duration_hours: 24 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
-  { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_shipping', name: 'Manufacturing - Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
   { id: 'final_payment', name: 'Collect Final Payment', owner: 'Admin', default_duration_hours: 1 },
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
@@ -50,7 +50,7 @@ export const BASE_STAGE_FLOW = [
 
 export const SLAB_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'budget', name: 'CFS Budget', owner: 'CFS', default_duration_hours: 24 },
+  { id: 'budget', name: 'Rough Estimate', owner: 'CFS', default_duration_hours: 24 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
   { id: 'engineering', name: 'Engineering', owner: 'Engineering Lead', default_duration_hours: 24 },
@@ -59,7 +59,7 @@ export const SLAB_STAGE_FLOW = [
   { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
-  { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_shipping', name: 'Manufacturing - Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
   { id: 'final_payment', name: 'Collect Final Payment', owner: 'Admin', default_duration_hours: 1 },
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
@@ -68,7 +68,7 @@ export const SLAB_STAGE_FLOW = [
 export const STAGE_FLOW = SLAB_STAGE_FLOW;
 
 const SLAB_STAGE_IDS = new Set(['money_slab', 'slab_work']);
-const MONEY_STAGE_IDS = new Set(['money_design', 'money_slab', 'money_production', 'money_shipping', 'final_payment']);
+const MONEY_STAGE_IDS = new Set(['money_design', 'money_slab', 'money_production', 'final_payment']);
 
 const COLOR_PLANS = '#BAE6FD';
 const COLOR_BUDGET = '#86EFAC';
@@ -131,6 +131,10 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (/^plans\s+revieved$/i.test(rawName)) return 'Plans Received';
   if (/^plans\s+received$/i.test(rawName)) return 'Plans Received';
 
+  if (id === 'budget') return 'Rough Estimate';
+  if (/^cfs\s+budget$/i.test(rawName)) return 'Rough Estimate';
+  if (/^rough\s+estimate$/i.test(rawName)) return 'Rough Estimate';
+
   if (id === 'money_design') return 'Money - D&E';
   if (/^money\s*(check\s*)?-\s*(design|d&e|de)$/i.test(rawName)) return 'Money - D&E';
   if (/^money\s*design$/i.test(rawName)) return 'Money - D&E';
@@ -138,6 +142,12 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (id === 'money_slab') return 'Money - Slab';
   if (/^money\s*(check\s*)?-\s*slab$/i.test(rawName)) return 'Money - Slab';
   if (/^money\s*slab$/i.test(rawName)) return 'Money - Slab';
+
+  if (id === 'money_shipping') return 'Manufacturing - Invoice Sent';
+  if (/^money\s*(check\s*)?-\s*shipping$/i.test(rawName)) return 'Manufacturing - Invoice Sent';
+  if (/^money\s*shipping$/i.test(rawName)) return 'Manufacturing - Invoice Sent';
+  if (/^manufacturing\s*-\s*invoice\s*sent$/i.test(rawName)) return 'Manufacturing - Invoice Sent';
+  if (/^manufacturing\s*invoice\s*sent$/i.test(rawName)) return 'Manufacturing - Invoice Sent';
 
   if (id === 'slab_work') return 'Slab Work';
   if (/^slab\s*work$/i.test(rawName)) return 'Slab Work';

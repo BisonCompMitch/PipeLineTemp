@@ -61,6 +61,8 @@ const AREA_FILTER_TO_STAGE_IDS = {
   plans_received: ['plans_received'],
   budget: ['budget'],
   'cfs budget': ['budget'],
+  'rough estimate': ['budget'],
+  rough_estimate: ['budget'],
   'money - d&e': ['money_design'],
   'money - de': ['money_design'],
   'money - design': ['money_design'],
@@ -83,6 +85,9 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'money - shipping': ['money_shipping'],
   'money shipping': ['money_shipping'],
   money_shipping: ['money_shipping'],
+  'manufacturing - invoice sent': ['money_shipping'],
+  'manufacturing invoice sent': ['money_shipping'],
+  'invoice sent': ['money_shipping'],
   shipping: ['shipping'],
   'collect final payment': ['final_payment'],
   'final payment': ['final_payment'],
@@ -1572,7 +1577,7 @@ export default function Pipeline({
                 <span className="switch-track" aria-hidden="true">
                   <span className="switch-thumb" />
                 </span>
-                <span className="switch-text">Show archived</span>
+                <span className="switch-text">{showArchived ? 'Archived Showing' : 'Archived Hidden'}</span>
               </label>
             ) : null}
           </div>
