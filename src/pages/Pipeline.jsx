@@ -1848,7 +1848,6 @@ export default function Pipeline({
                           onChange={(event) =>
                             setDetailForm({ ...detailForm, slab_work: event.target.checked })
                           }
-                          disabled={Boolean(detailProject?.slab_work)}
                         />
                         <span>
                           {detailForm.slab_work

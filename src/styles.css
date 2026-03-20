@@ -3604,6 +3604,13 @@ body::before {
   gap: 10px;
 }
 
+.project-detail-form label.intake-slab-toggle.detail-slab-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
 .intake-slab-toggle input[type='checkbox'],
 .intake-docs-grid .intake-doc-option input[type='checkbox'] {
   width: 18px;
