@@ -1852,8 +1852,8 @@ export default function Pipeline({
                         />
                         <span>
                           {detailForm.slab_work
-                            ? 'Slab work required (enabled)'
-                            : 'Enable slab work stages for this project'}
+                            ? 'Slab work required'
+                            : 'Enable slab work'}
                         </span>
                       </label>
                     ) : (
