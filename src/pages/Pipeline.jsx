@@ -221,6 +221,7 @@ function toEditForm(project) {
     due_date: project?.due_date || '',
     urgency: project?.urgency || 'standard',
     budget: project?.budget || '',
+    slab_work: Boolean(project?.slab_work),
     summary: parsedSummary.notes,
     required_docs: parsedSummary.requiredDocs || buildEmptyRequiredDocs()
   };
@@ -1122,6 +1123,7 @@ export default function Pipeline({
         due_date: trimOrNull(detailForm.due_date),
         urgency: trimOrNull(detailForm.urgency) || 'standard',
         budget: trimOrNull(detailForm.budget),
+        slab_work: Boolean(detailForm.slab_work),
         summary: trimOrNull(buildProjectSummary(detailForm.required_docs, detailForm.summary)),
         stage_id: requestedStageId && requestedStageId !== currentStageId ? requestedStageId : undefined
       };
@@ -1838,6 +1840,30 @@ export default function Pipeline({
                         </div>
                       )}
                     </label>
+                    {canEditProjectDetails ? (
+                      <label className="span-2 intake-slab-toggle detail-slab-toggle">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(detailForm.slab_work)}
+                          onChange={(event) =>
+                            setDetailForm({ ...detailForm, slab_work: event.target.checked })
+                          }
+                          disabled={Boolean(detailProject?.slab_work)}
+                        />
+                        <span>
+                          {detailForm.slab_work
+                            ? 'Slab work required (enabled)'
+                            : 'Enable slab work stages for this project'}
+                        </span>
+                      </label>
+                    ) : (
+                      <label className="span-2">
+                        Slab work
+                        <div className="field-static">
+                          {detailForm.slab_work ? 'Required' : 'Not required'}
+                        </div>
+                      </label>
+                    )}
                     <div className="intake-docs span-2" role="group" aria-labelledby="detail-required-docs-title">
                       <div id="detail-required-docs-title" className="intake-docs-title">
                         Required docs
