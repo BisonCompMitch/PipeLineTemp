@@ -453,7 +453,7 @@ export default function Users() {
       setCreateContractorForm({ company: '', full_name: '', email: '' });
       setContractorStatus({
         tone: 'success',
-        text: 'Contractor created. Temporary password email sent when SMTP is configured.'
+        text: 'Contractor created. Temporary password email sent.'
       });
       loadAll({ preserveStatus: true });
     } catch (err) {
@@ -481,7 +481,7 @@ export default function Users() {
       });
       setBisonStatus({
         tone: 'success',
-        text: 'Bison user created. Temporary password email sent when SMTP is configured.'
+        text: 'Bison user created. Temporary password email sent.'
       });
       loadAll({ preserveStatus: true });
     } catch (_err) {
@@ -515,7 +515,7 @@ export default function Users() {
       setCreateCustomerForm({ email: '', project_id: '' });
       setCustomerStatus({
         tone: 'success',
-        text: 'Customer created. Temporary password email sent when SMTP is configured.'
+        text: 'Customer created. Temporary password email sent.'
       });
       loadAll({ preserveStatus: true });
     } catch (err) {
