@@ -203,103 +203,151 @@ function buildTutorialSteps({
   hasContractor,
   hasCustomer
 }) {
+  const buildNavStep = (id, title, path, description, actionEvent = 'click') => ({
+    id,
+    title,
+    description,
+    route: path,
+    routeLabel: title,
+    targetSelector: `[data-tutorial-nav="${path}"]`,
+    requiredAction: true,
+    actionEvent
+  });
+  const needsNavOpenStep =
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1000px)').matches;
+  let navStepPrepAdded = false;
   const steps = [
     {
       id: 'help-entry',
-      title: 'Help Menu',
+      title: 'Help',
       description:
-        'Open the user menu in the top-right corner and click Help to start this tutorial again at any time.'
+        'You can open this tutorial any time from the user menu in the top-right corner using Help.'
     }
   ];
 
-  if (canAccessDashboard) {
+  const ensureNavStepPrep = () => {
+    if (!needsNavOpenStep || navStepPrepAdded) return;
+    navStepPrepAdded = true;
     steps.push({
-      id: 'dashboard',
-      title: 'Dashboard',
+      id: 'open-navigation',
+      title: 'Open Navigation',
+      description: 'Click the menu button to open the navigation list.',
+      targetSelector: '[data-tutorial-id="nav-toggle-button"]',
+      requiredAction: true
+    });
+  };
+
+  if (canAccessDashboard) {
+    ensureNavStepPrep();
+    steps.push(
+      buildNavStep(
+        'dashboard',
+        'Dashboard',
+        '/pipeline',
+        'Click Dashboard in the left navigation to open the project dashboard.'
+      )
+    );
+    steps.push({
+      id: 'dashboard-open-project',
+      title: 'Open Project Details',
       description:
-        'Track projects by project number and current stage. Open project details from the table to review stage progress, notes, and files.',
-      route: '/pipeline',
-      routeLabel: 'Dashboard'
+        'Double-click a project row in the dashboard table to open project details.',
+      targetSelector: '[data-tutorial-id="dashboard-project-row"]',
+      requiredAction: true,
+      actionEvent: 'dblclick'
+    });
+    steps.push({
+      id: 'dashboard-switch-files-tab',
+      title: 'Switch To Files & Photos',
+      description:
+        'Click the Files & Photos tab in the project details window.',
+      targetSelector: '[data-tutorial-id="detail-tab-files"]',
+      requiredAction: true
+    });
+    steps.push({
+      id: 'dashboard-switch-project-tab',
+      title: 'Switch Back To Project',
+      description:
+        'Click the Project tab to return to the details view.',
+      targetSelector: '[data-tutorial-id="detail-tab-project"]',
+      requiredAction: true
     });
   }
 
   if (hasBison) {
-    steps.push({
-      id: 'areas',
-      title: 'Areas',
-      description:
-        'Work projects in each area queue, review countdown status, and hand off projects to the next stage when the work is complete.',
-      route: '/areas',
-      routeLabel: 'Areas'
-    });
+    ensureNavStepPrep();
+    steps.push(
+      buildNavStep(
+        'areas',
+        'Areas',
+        '/areas',
+        'Click Areas to open the area queues and stage handoff workflow.'
+      )
+    );
   }
 
   if (hasBison && hasAdminArea) {
-    steps.push({
-      id: 'intake',
-      title: 'Project Intake',
-      description:
-        'Create projects, capture requester details, mark required docs, set slab work, and upload initial files or photos during intake.',
-      route: '/intake',
-      routeLabel: 'Project Intake'
-    });
+    ensureNavStepPrep();
+    steps.push(
+      buildNavStep(
+        'intake',
+        'Project Intake',
+        '/intake',
+        'Click Project Intake to create a project, mark required docs, and upload files or photos.'
+      )
+    );
   }
 
   if (hasContractor || hasAdminArea) {
-    steps.push({
-      id: 'leads',
-      title: 'Leads',
-      description:
-        'Create and manage leads, track lead status, and keep lead notes and uploads in one place.',
-      route: '/leads',
-      routeLabel: 'Leads'
-    });
+    ensureNavStepPrep();
+    steps.push(
+      buildNavStep(
+        'leads',
+        'Leads',
+        '/leads',
+        'Click Leads to manage leads, notes, and lead uploads.'
+      )
+    );
   }
 
   if (hasBison && hasAdminArea) {
-    steps.push({
-      id: 'users',
-      title: 'Manage Users',
-      description:
-        'Create users, update usernames, assign roles and areas, and maintain account settings for your team.',
-      route: '/users',
-      routeLabel: 'Manage Users'
-    });
+    ensureNavStepPrep();
+    steps.push(
+      buildNavStep(
+        'users',
+        'Manage Users',
+        '/users',
+        'Click Manage Users to create accounts and maintain roles, areas, and usernames.'
+      )
+    );
   }
 
   if (hasCustomer) {
-    steps.push({
-      id: 'customer-progress',
-      title: 'Progress',
-      description:
-        'Follow the current project stage and progress timeline so customers can see where their project is right now.',
-      route: '/customer',
-      routeLabel: 'Progress'
-    });
-    steps.push({
-      id: 'customer-files',
-      title: 'Files For Review',
-      description:
-        'Open shared project files, preview supported file types, and download documents for review.',
-      route: '/customer/files',
-      routeLabel: 'Files for Review'
-    });
-    steps.push({
-      id: 'customer-pictures',
-      title: 'Project Pictures',
-      description:
-        'Review customer-visible project photos and open them in the preview viewer for full detail.',
-      route: '/customer/pictures',
-      routeLabel: 'Project Pictures'
-    });
-  }
-
-  if (!steps.length) {
-    steps.push({
-      id: 'welcome',
-      title: 'Workspace',
-      description: 'Use the side navigation to open your available workspaces and manage your active items.'
-    });
+    ensureNavStepPrep();
+    steps.push(
+      buildNavStep(
+        'customer-progress',
+        'Progress',
+        '/customer',
+        'Click Progress to view the active stage and timeline.'
+      )
+    );
+    steps.push(
+      buildNavStep(
+        'customer-files',
+        'Files For Review',
+        '/customer/files',
+        'Click Files for Review to open and download shared project files.'
+      )
+    );
+    steps.push(
+      buildNavStep(
+        'customer-pictures',
+        'Project Pictures',
+        '/customer/pictures',
+        'Click Project Pictures to review customer-visible photos.'
+      )
+    );
   }
 
   return steps;
@@ -991,7 +1039,6 @@ export default function App() {
         steps={tutorialSteps}
         dontShowAgain={tutorialDontShowAgain}
         onDontShowAgainChange={handleTutorialPreferenceChange}
-        onNavigate={(path) => navigate(path)}
         onClose={() => setTutorialOpen(false)}
       />
     </div>

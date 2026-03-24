@@ -1526,6 +1526,7 @@ export default function Pipeline({
       <tr
         key={row.id || `${row.name}-${keyPrefix}-${idx}`}
         className={row.isDeleted ? 'row-archived' : ''}
+        data-tutorial-id={idx === 0 ? 'dashboard-project-row' : undefined}
         onDoubleClick={() => openDetails(row)}
       >
         <td className={showHoverNotes ? 'dashboard-name-with-notes' : ''} title={projectNotesTitle}>
@@ -1696,6 +1697,7 @@ export default function Pipeline({
                         type="button"
                         role="tab"
                         aria-selected={detailTab === tab.id}
+                        data-tutorial-id={tab.id === 'project' ? 'detail-tab-project' : tab.id === 'files' ? 'detail-tab-files' : undefined}
                         className={`stage-tab${detailTab === tab.id ? ' active' : ''}`}
                         onClick={() => setDetailTab(tab.id)}
                       >

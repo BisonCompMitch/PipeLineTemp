@@ -21,6 +21,11 @@ function getActivePath(currentPath, items) {
   return active;
 }
 
+function tutorialNavId(path) {
+  const normalized = normalizePath(path);
+  return normalized || '';
+}
+
 export default function Sidebar({ currentPath = '', onNavigate, navItems = [], isOpen = false, onClose }) {
   const items = navItems.length ? navItems : [{ label: 'Dashboard', path: '/pipeline' }];
   const activePath = getActivePath(currentPath, items);
@@ -39,6 +44,7 @@ export default function Sidebar({ currentPath = '', onNavigate, navItems = [], i
               key={`${item.path}-${item.label}`}
               type="button"
               className={`nav-link${normalizePath(item.path) === activePath ? ' active' : ''}`}
+              data-tutorial-nav={tutorialNavId(item.path)}
               onClick={() => {
                 onNavigate?.(item.path);
                 onClose?.();

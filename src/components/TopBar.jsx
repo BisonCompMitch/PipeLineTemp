@@ -92,6 +92,7 @@ export default function TopBar({
             type="button"
             onClick={onToggleNav}
             aria-label="Toggle navigation menu"
+            data-tutorial-id="nav-toggle-button"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -177,6 +178,7 @@ export default function TopBar({
               onClick={onToggleTheme}
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              data-tutorial-id="theme-toggle-button"
             >
               {theme === 'dark' ? (
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -207,6 +209,7 @@ export default function TopBar({
             <button
               className="topbar-user"
               type="button"
+              data-tutorial-id="user-menu-button"
               onClick={() => {
                 setTestingOpen(false);
                 setMenuOpen((open) => !open);
@@ -221,7 +224,12 @@ export default function TopBar({
             {menuOpen ? (
               <div className="user-dropdown">
                 {onOpenHelp ? (
-                  <button className="dropdown-item" type="button" onClick={handleOpenHelp}>
+                  <button
+                    className="dropdown-item"
+                    type="button"
+                    data-tutorial-id="help-button"
+                    onClick={handleOpenHelp}
+                  >
                     Help
                   </button>
                 ) : null}

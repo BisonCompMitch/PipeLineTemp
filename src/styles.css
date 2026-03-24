@@ -1189,11 +1189,40 @@ body::before {
   color: var(--text);
   font-family: inherit;
 }
-.tutorial-backdrop {
+.tutorial-layer {
+  position: fixed;
+  inset: 0;
   z-index: 9400;
+  pointer-events: none;
+}
+
+.tutorial-screen-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 32, 0.66);
+}
+
+.tutorial-highlight {
+  position: fixed;
+  border-radius: 12px;
+  border: 2px solid rgba(96, 165, 250, 0.95);
+  box-shadow:
+    0 0 0 9999px rgba(10, 18, 32, 0.68),
+    0 0 0 2px rgba(255, 255, 255, 0.16),
+    0 0 18px rgba(79, 142, 247, 0.65);
+  transition: top 0.16s ease, left 0.16s ease, width 0.16s ease, height 0.16s ease;
+}
+
+.tutorial-target-active {
+  position: relative !important;
+  z-index: 9502 !important;
 }
 
 .tutorial-modal {
+  pointer-events: auto;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
   width: min(700px, calc(100vw - 40px));
   max-height: calc(100vh - 40px);
   display: grid;
@@ -1225,8 +1254,10 @@ body::before {
   line-height: 1.5;
 }
 
-.tutorial-route-button {
-  justify-self: start;
+.tutorial-step-hint {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .tutorial-footer {
@@ -5802,6 +5833,9 @@ body[data-theme='light'] .progress-meta .muted {
   }
 
   .tutorial-modal {
+    left: 9px;
+    right: 9px;
+    bottom: 9px;
     width: min(700px, calc(100vw - 18px));
     padding: 14px;
   }
