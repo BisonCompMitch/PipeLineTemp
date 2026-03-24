@@ -20,6 +20,7 @@ export default function FirstLoginSetup({
   const [fullName, setFullName] = useState(suggestedFullName);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswords, setShowPasswords] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const { alertDialog, dialogPortal } = useSiteDialog();
@@ -117,25 +118,45 @@ export default function FirstLoginSetup({
           </label>
           <label>
             New password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="New password"
-              autoComplete="new-password"
-              disabled={saving}
-            />
+            <div className="password-input-row">
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="New password"
+                autoComplete="new-password"
+                disabled={saving}
+              />
+              <button
+                type="button"
+                className="ghost password-toggle-btn"
+                onClick={() => setShowPasswords((value) => !value)}
+                disabled={saving}
+              >
+                {showPasswords ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </label>
           <label>
             Confirm password
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              placeholder="Confirm password"
-              autoComplete="new-password"
-              disabled={saving}
-            />
+            <div className="password-input-row">
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                disabled={saving}
+              />
+              <button
+                type="button"
+                className="ghost password-toggle-btn"
+                onClick={() => setShowPasswords((value) => !value)}
+                disabled={saving}
+              >
+                {showPasswords ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </label>
           <p className="muted first-login-hint">Password must be at least 8 characters.</p>
           <div className="actions first-login-actions">

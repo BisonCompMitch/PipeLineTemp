@@ -22,6 +22,7 @@ import {
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar.jsx';
 import TopBar from './components/TopBar.jsx';
+import TutorialDialog from './components/TutorialDialog.jsx';
 import Login from './pages/Login.jsx';
 import FirstLoginSetup from './pages/FirstLoginSetup.jsx';
 import Pipeline from './pages/Pipeline.jsx';
@@ -62,6 +63,9 @@ const DEFAULT_FIRST_LOGIN_STATE = {
   suggestedFullName: '',
   email: ''
 };
+
+const TUTORIAL_PREFERENCE_PREFIX = 'bw_tutorial_dont_show:';
+const TUTORIAL_SESSION_PREFIX = 'bw_tutorial_seen:';
 
 function titleForPath(pathname) {
   if (!pathname) return 'BisonWorks';
@@ -118,6 +122,189 @@ function usernameFromAccessToken(token) {
   }
 }
 
+function tutorialStorageKey(prefix, userKey) {
+  const normalized = String(userKey || '').trim().toLowerCase();
+  if (!normalized) return '';
+  return `${prefix}${normalized}`;
+}
+
+function readTutorialPreference(userKey) {
+  const key = tutorialStorageKey(TUTORIAL_PREFERENCE_PREFIX, userKey);
+  if (!key || typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(key) === '1';
+  } catch (_error) {
+    return false;
+  }
+}
+
+function writeTutorialPreference(userKey, value) {
+  const key = tutorialStorageKey(TUTORIAL_PREFERENCE_PREFIX, userKey);
+  if (!key || typeof window === 'undefined') return;
+  try {
+    if (value) {
+      window.localStorage.setItem(key, '1');
+      return;
+    }
+    window.localStorage.removeItem(key);
+  } catch (_error) {
+    // Ignore storage write failures.
+  }
+}
+
+function hasTutorialBeenShownThisSession(userKey) {
+  const key = tutorialStorageKey(TUTORIAL_SESSION_PREFIX, userKey);
+  if (!key || typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(key) === '1';
+  } catch (_error) {
+    return false;
+  }
+}
+
+function markTutorialShownThisSession(userKey) {
+  const key = tutorialStorageKey(TUTORIAL_SESSION_PREFIX, userKey);
+  if (!key || typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(key, '1');
+  } catch (_error) {
+    // Ignore session storage write failures.
+  }
+}
+
+function clearTutorialSessionFlags() {
+  if (typeof window === 'undefined') return;
+  try {
+    const keys = [];
+    for (let index = 0; index < window.sessionStorage.length; index += 1) {
+      const key = window.sessionStorage.key(index);
+      if (key && key.startsWith(TUTORIAL_SESSION_PREFIX)) {
+        keys.push(key);
+      }
+    }
+    keys.forEach((key) => window.sessionStorage.removeItem(key));
+  } catch (_error) {
+    // Ignore session storage cleanup failures.
+  }
+}
+
+function tutorialRoleLabel({ hasBison, hasAdminArea, hasContractor, hasCustomer }) {
+  if (hasBison && hasAdminArea) return 'Bison Admin';
+  if (hasBison) return 'Bison';
+  if (hasContractor) return 'Contractor';
+  if (hasCustomer) return 'Customer';
+  return 'User';
+}
+
+function buildTutorialSteps({
+  canAccessDashboard,
+  hasBison,
+  hasAdminArea,
+  hasContractor,
+  hasCustomer
+}) {
+  const steps = [
+    {
+      id: 'help-entry',
+      title: 'Help Menu',
+      description:
+        'Open the user menu in the top-right corner and click Help to start this tutorial again at any time.'
+    }
+  ];
+
+  if (canAccessDashboard) {
+    steps.push({
+      id: 'dashboard',
+      title: 'Dashboard',
+      description:
+        'Track projects by project number and current stage. Open project details from the table to review stage progress, notes, and files.',
+      route: '/pipeline',
+      routeLabel: 'Dashboard'
+    });
+  }
+
+  if (hasBison) {
+    steps.push({
+      id: 'areas',
+      title: 'Areas',
+      description:
+        'Work projects in each area queue, review countdown status, and hand off projects to the next stage when the work is complete.',
+      route: '/areas',
+      routeLabel: 'Areas'
+    });
+  }
+
+  if (hasBison && hasAdminArea) {
+    steps.push({
+      id: 'intake',
+      title: 'Project Intake',
+      description:
+        'Create projects, capture requester details, mark required docs, set slab work, and upload initial files or photos during intake.',
+      route: '/intake',
+      routeLabel: 'Project Intake'
+    });
+  }
+
+  if (hasContractor || hasAdminArea) {
+    steps.push({
+      id: 'leads',
+      title: 'Leads',
+      description:
+        'Create and manage leads, track lead status, and keep lead notes and uploads in one place.',
+      route: '/leads',
+      routeLabel: 'Leads'
+    });
+  }
+
+  if (hasBison && hasAdminArea) {
+    steps.push({
+      id: 'users',
+      title: 'Manage Users',
+      description:
+        'Create users, update usernames, assign roles and areas, and maintain account settings for your team.',
+      route: '/users',
+      routeLabel: 'Manage Users'
+    });
+  }
+
+  if (hasCustomer) {
+    steps.push({
+      id: 'customer-progress',
+      title: 'Progress',
+      description:
+        'Follow the current project stage and progress timeline so customers can see where their project is right now.',
+      route: '/customer',
+      routeLabel: 'Progress'
+    });
+    steps.push({
+      id: 'customer-files',
+      title: 'Files For Review',
+      description:
+        'Open shared project files, preview supported file types, and download documents for review.',
+      route: '/customer/files',
+      routeLabel: 'Files for Review'
+    });
+    steps.push({
+      id: 'customer-pictures',
+      title: 'Project Pictures',
+      description:
+        'Review customer-visible project photos and open them in the preview viewer for full detail.',
+      route: '/customer/pictures',
+      routeLabel: 'Project Pictures'
+    });
+  }
+
+  if (!steps.length) {
+    steps.push({
+      id: 'welcome',
+      title: 'Workspace',
+      description: 'Use the side navigation to open your available workspaces and manage your active items.'
+    });
+  }
+
+  return steps;
+}
+
 function Protected({ authed, allowed, fallback, loading = false, children }) {
   if (!authed) {
     return <Navigate to="/login" replace />;
@@ -135,6 +322,7 @@ function PageShell({
   title,
   displayName,
   onSignOut,
+  onOpenHelp,
   theme,
   onToggleTheme,
   testingOverride,
@@ -149,6 +337,7 @@ function PageShell({
         title={title}
         displayName={displayName}
         onSignOut={onSignOut}
+        onOpenHelp={onOpenHelp}
         theme={theme}
         onToggleTheme={onToggleTheme}
         testingOverride={testingOverride}
@@ -199,8 +388,12 @@ export default function App() {
     }
   });
   const [firstLoginState, setFirstLoginState] = useState(DEFAULT_FIRST_LOGIN_STATE);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialDontShowAgain, setTutorialDontShowAgain] = useState(false);
+  const [tutorialUserKey, setTutorialUserKey] = useState('');
 
   const handleLogin = (username, tokenPayload) => {
+    clearTutorialSessionFlags();
     const canonicalUsername = String(
       tokenPayload?.username || tokenPayload?.login_username || username || ''
     ).trim();
@@ -237,9 +430,11 @@ export default function App() {
       logoutRequest(refreshToken).catch(() => null);
     }
     clearAuthState();
+    clearTutorialSessionFlags();
     setAuthed(false);
     setFirstLoginState(DEFAULT_FIRST_LOGIN_STATE);
     setProfileLoading(false);
+    setTutorialOpen(false);
     navigate('/login');
   };
 
@@ -354,6 +549,21 @@ export default function App() {
   const canEditProjectDetails = hasAdminArea;
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
+  const tutorialTitle = useMemo(
+    () => `${tutorialRoleLabel({ hasBison, hasAdminArea, hasContractor, hasCustomer })} quick tour`,
+    [hasBison, hasAdminArea, hasContractor, hasCustomer]
+  );
+  const tutorialSteps = useMemo(
+    () =>
+      buildTutorialSteps({
+        canAccessDashboard,
+        hasBison,
+        hasAdminArea,
+        hasContractor,
+        hasCustomer
+      }),
+    [canAccessDashboard, hasBison, hasAdminArea, hasContractor, hasCustomer]
+  );
   const accessLoading = authed && profileLoading;
   const firstLoginRequired = authed && firstLoginState.required;
 
@@ -392,6 +602,18 @@ export default function App() {
     if (!authed || !firstLoginRequired || location.pathname === '/first-login-setup') return;
     navigate('/first-login-setup', { replace: true });
   }, [authed, firstLoginRequired, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!authed || profileLoading || firstLoginRequired) return;
+    const key = String(profile?.username || getStoredUsername() || '').trim().toLowerCase();
+    if (!key) return;
+    setTutorialUserKey(key);
+    const dontShowAgain = readTutorialPreference(key);
+    setTutorialDontShowAgain(dontShowAgain);
+    if (dontShowAgain || hasTutorialBeenShownThisSession(key)) return;
+    markTutorialShownThisSession(key);
+    setTutorialOpen(true);
+  }, [authed, profileLoading, firstLoginRequired, profile?.username]);
 
   useEffect(() => {
     if (!authed) return;
@@ -490,6 +712,21 @@ export default function App() {
     };
   }, [navOpen]);
 
+  const handleOpenHelp = () => {
+    const key = String(profile?.username || getStoredUsername() || '').trim().toLowerCase();
+    if (key) {
+      setTutorialUserKey(key);
+      setTutorialDontShowAgain(readTutorialPreference(key));
+    }
+    setTutorialOpen(true);
+  };
+
+  const handleTutorialPreferenceChange = (value) => {
+    setTutorialDontShowAgain(Boolean(value));
+    if (!tutorialUserKey) return;
+    writeTutorialPreference(tutorialUserKey, Boolean(value));
+  };
+
   return (
     <div className={showSidebar ? `app-shell${navOpen ? ' nav-open' : ''}` : 'app-shell no-sidebar'}>
       {showSidebar ? (
@@ -545,6 +782,7 @@ export default function App() {
                   title={pageTitle}
                   displayName={topBarDisplayName}
                   onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
                   testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -575,6 +813,7 @@ export default function App() {
                   title={pageTitle}
                   displayName={topBarDisplayName}
                   onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
                   testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -598,6 +837,7 @@ export default function App() {
                   title={pageTitle}
                   displayName={topBarDisplayName}
                   onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
                   testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -624,6 +864,7 @@ export default function App() {
                   title={pageTitle}
                   displayName={topBarDisplayName}
                   onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
                   testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -644,6 +885,7 @@ export default function App() {
                   title={pageTitle}
                   displayName={topBarDisplayName}
                   onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
                   testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -664,6 +906,7 @@ export default function App() {
                     title={pageTitle}
                     displayName={topBarDisplayName}
                     onSignOut={handleLogout}
+                    onOpenHelp={handleOpenHelp}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
                     testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -684,6 +927,7 @@ export default function App() {
                     title={pageTitle}
                     displayName={topBarDisplayName}
                     onSignOut={handleLogout}
+                    onOpenHelp={handleOpenHelp}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
                     testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -704,6 +948,7 @@ export default function App() {
                     title={pageTitle}
                     displayName={topBarDisplayName}
                     onSignOut={handleLogout}
+                    onOpenHelp={handleOpenHelp}
                     theme={theme}
                     onToggleTheme={handleToggleTheme}
                     testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -725,6 +970,7 @@ export default function App() {
                   title="Not Found"
                   displayName={topBarDisplayName}
                   onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
                   theme={theme}
                   onToggleTheme={handleToggleTheme}
                   testingOverride={canUseTestingOverride ? testingOverride : null}
@@ -739,6 +985,15 @@ export default function App() {
           />
         </Routes>
       </main>
+      <TutorialDialog
+        open={tutorialOpen && authed && !firstLoginRequired}
+        title={tutorialTitle}
+        steps={tutorialSteps}
+        dontShowAgain={tutorialDontShowAgain}
+        onDontShowAgainChange={handleTutorialPreferenceChange}
+        onNavigate={(path) => navigate(path)}
+        onClose={() => setTutorialOpen(false)}
+      />
     </div>
   );
 }

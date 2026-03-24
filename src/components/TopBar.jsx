@@ -23,6 +23,7 @@ export default function TopBar({
   title,
   displayName = 'User',
   onSignOut,
+  onOpenHelp,
   theme,
   onToggleTheme,
   testingOverride,
@@ -59,6 +60,12 @@ export default function TopBar({
     setMenuOpen(false);
     setTestingOpen(false);
     onSignOut?.();
+  };
+
+  const handleOpenHelp = () => {
+    setMenuOpen(false);
+    setTestingOpen(false);
+    onOpenHelp?.();
   };
 
   const handleApplyTesting = () => {
@@ -213,6 +220,11 @@ export default function TopBar({
             </button>
             {menuOpen ? (
               <div className="user-dropdown">
+                {onOpenHelp ? (
+                  <button className="dropdown-item" type="button" onClick={handleOpenHelp}>
+                    Help
+                  </button>
+                ) : null}
                 <button className="dropdown-item" type="button" onClick={handleLogout}>
                   Log out
                 </button>

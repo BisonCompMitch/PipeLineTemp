@@ -98,6 +98,11 @@ export default function Users() {
   const [editStatus, setEditStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [passwordVisible, setPasswordVisible] = useState({
+    bison: false,
+    contractor: false,
+    customer: false
+  });
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
   const [createBisonForm, setCreateBisonForm] = useState({
     email: '',
@@ -311,10 +316,12 @@ export default function Users() {
 
   const startEditBison = (user) => {
     setEditStatus(null);
+    setPasswordVisible({ bison: false, contractor: false, customer: false });
     setEditing({
       type: 'bison',
       form: {
         username: user.username,
+        login_username: user.login_username || user.username || '',
         full_name: user.full_name || '',
         email: user.email || '',
         rolesText: (user.roles || []).join(', '),
@@ -327,6 +334,7 @@ export default function Users() {
 
   const startEditContractor = (contractor) => {
     setEditStatus(null);
+    setPasswordVisible({ bison: false, contractor: false, customer: false });
     setEditing({
       type: 'contractor',
       form: {
@@ -339,6 +347,7 @@ export default function Users() {
 
   const startEditCustomer = (customer) => {
     setEditStatus(null);
+    setPasswordVisible({ bison: false, contractor: false, customer: false });
     setEditing({
       type: 'customer',
       form: {
@@ -352,6 +361,7 @@ export default function Users() {
   const closeEdit = () => {
     setEditing(null);
     setEditStatus(null);
+    setPasswordVisible({ bison: false, contractor: false, customer: false });
   };
 
   const handleToggleArea = (area) => {
@@ -370,11 +380,21 @@ export default function Users() {
   const handleSaveBison = async () => {
     if (!editing || editing.type !== 'bison') return;
     const form = editing.form;
+    const nextLoginUsername = String(form.login_username || '').trim();
     if (!form.email.trim() || !form.full_name.trim()) {
       setEditStatus({ tone: 'error', text: 'Full name and email are required.' });
       return;
     }
+    if (!nextLoginUsername) {
+      setEditStatus({ tone: 'error', text: 'Username is required.' });
+      return;
+    }
+    if (/\s/.test(nextLoginUsername)) {
+      setEditStatus({ tone: 'error', text: 'Username cannot contain spaces.' });
+      return;
+    }
     const payload = {
+      login_username: nextLoginUsername,
       email: form.email.trim(),
       full_name: form.full_name.trim(),
       roles: splitRoles(form.rolesText),
@@ -453,7 +473,7 @@ export default function Users() {
       setCreateContractorForm({ company: '', full_name: '', email: '' });
       setContractorStatus({
         tone: 'success',
-        text: 'Contractor created. Temporary password email sent.'
+        text: 'Contractor created. Temporary password email sent when SMTP is configured.'
       });
       loadAll({ preserveStatus: true });
     } catch (err) {
@@ -481,7 +501,7 @@ export default function Users() {
       });
       setBisonStatus({
         tone: 'success',
-        text: 'Bison user created. Temporary password email sent.'
+        text: 'Bison user created. Temporary password email sent when SMTP is configured.'
       });
       loadAll({ preserveStatus: true });
     } catch (_err) {
@@ -515,7 +535,7 @@ export default function Users() {
       setCreateCustomerForm({ email: '', project_id: '' });
       setCustomerStatus({
         tone: 'success',
-        text: 'Customer created. Temporary password email sent.'
+        text: 'Customer created. Temporary password email sent when SMTP is configured.'
       });
       loadAll({ preserveStatus: true });
     } catch (err) {
@@ -872,6 +892,16 @@ export default function Users() {
                 <div className="user-form-grid">
                   <label>
                     Username
+                    <input
+                      value={editing.form.login_username}
+                      onChange={(event) =>
+                        setEditing({ ...editing, form: { ...editing.form, login_username: event.target.value } })
+                      }
+                    />
+                    <span className="muted">Sign-in username</span>
+                  </label>
+                  <label>
+                    Account key
                     <input value={editing.form.username} disabled />
                   </label>
                   <label>
@@ -903,14 +933,23 @@ export default function Users() {
                   </label>
                   <label>
                     Password
-                    <input
-                      type="password"
-                      value={editing.form.password}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
-                      }
-                      placeholder="Leave blank to keep current"
-                    />
+                    <div className="password-input-row">
+                      <input
+                        type={passwordVisible.bison ? 'text' : 'password'}
+                        value={editing.form.password}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                        }
+                        placeholder="Leave blank to keep current"
+                      />
+                      <button
+                        type="button"
+                        className="ghost password-toggle-btn"
+                        onClick={() => setPasswordVisible((prev) => ({ ...prev, bison: !prev.bison }))}
+                      >
+                        {passwordVisible.bison ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
                   </label>
                   <label className="switch-field">
                     <input
@@ -975,14 +1014,23 @@ export default function Users() {
                   </label>
                   <label>
                     New password
-                    <input
-                      type="password"
-                      value={editing.form.password}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
-                      }
-                      placeholder="Enter new password"
-                    />
+                    <div className="password-input-row">
+                      <input
+                        type={passwordVisible.contractor ? 'text' : 'password'}
+                        value={editing.form.password}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                        }
+                        placeholder="Enter new password"
+                      />
+                      <button
+                        type="button"
+                        className="ghost password-toggle-btn"
+                        onClick={() => setPasswordVisible((prev) => ({ ...prev, contractor: !prev.contractor }))}
+                      >
+                        {passwordVisible.contractor ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
                   </label>
                 </div>
                 <div className="actions">
@@ -1008,14 +1056,23 @@ export default function Users() {
                   </label>
                   <label>
                     New password
-                    <input
-                      type="password"
-                      value={editing.form.password}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
-                      }
-                      placeholder="Leave blank to keep current"
-                    />
+                    <div className="password-input-row">
+                      <input
+                        type={passwordVisible.customer ? 'text' : 'password'}
+                        value={editing.form.password}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                        }
+                        placeholder="Leave blank to keep current"
+                      />
+                      <button
+                        type="button"
+                        className="ghost password-toggle-btn"
+                        onClick={() => setPasswordVisible((prev) => ({ ...prev, customer: !prev.customer }))}
+                      >
+                        {passwordVisible.customer ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
                   </label>
                   <label className="span-2">
                     Linked project
