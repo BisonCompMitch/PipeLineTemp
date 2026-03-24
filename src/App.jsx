@@ -213,6 +213,11 @@ function buildTutorialSteps({
     requiredAction: true,
     actionEvent
   });
+  const buildInfoStep = (id, title, description) => ({
+    id,
+    title,
+    description
+  });
   const needsNavOpenStep =
     typeof window !== 'undefined' && window.matchMedia('(max-width: 1000px)').matches;
   let navStepPrepAdded = false;
@@ -247,6 +252,13 @@ function buildTutorialSteps({
         'Click Dashboard in the left navigation to open the project dashboard.'
       )
     );
+    steps.push(
+      buildInfoStep(
+        'dashboard-details',
+        'Dashboard View',
+        'Dashboard shows one row per project with Project (# + name) and Current Stage. At the top you get Requester/Contractor filtering plus the Archived Showing/Hidden toggle. Rows stay ordered by project number, and you can open full project details from the table.'
+      )
+    );
     steps.push({
       id: 'dashboard-open-project',
       title: 'Open Project Details',
@@ -256,6 +268,13 @@ function buildTutorialSteps({
       requiredAction: true,
       actionEvent: 'dblclick'
     });
+    steps.push(
+      buildInfoStep(
+        'dashboard-project-modal-details',
+        'Project Window',
+        'The project window header shows project name + number with action buttons. Inside, it shows progress, the full stage matrix, required docs, requester/budget/urgency details, notes, and files/photos access in one place.'
+      )
+    );
     steps.push({
       id: 'dashboard-switch-files-tab',
       title: 'Switch To Files & Photos',
@@ -264,6 +283,13 @@ function buildTutorialSteps({
       targetSelector: '[data-tutorial-id="detail-tab-files"]',
       requiredAction: true
     });
+    steps.push(
+      buildInfoStep(
+        'dashboard-files-tab-details',
+        'Files & Photos Tab',
+        'This tab shows document and photo cards with filename, date, and size. You can open the preview modal, use download/delete actions (when allowed), and set customer/contractor visibility toggles on uploads and existing files.'
+      )
+    );
     steps.push({
       id: 'dashboard-switch-project-tab',
       title: 'Switch Back To Project',
@@ -272,6 +298,13 @@ function buildTutorialSteps({
       targetSelector: '[data-tutorial-id="detail-tab-project"]',
       requiredAction: true
     });
+    steps.push(
+      buildInfoStep(
+        'dashboard-project-tab-details',
+        'Project Tab',
+        'The Project tab shows progress first, then stage details and timing, followed by requester, due date, urgency, budget, required docs, and notes. Date fields display date directly, with time shown on hover where available.'
+      )
+    );
   }
 
   if (hasBison) {
@@ -282,6 +315,13 @@ function buildTutorialSteps({
         'Areas',
         '/areas',
         'Click Areas to open the area queues and stage handoff workflow.'
+      )
+    );
+    steps.push(
+      buildInfoStep(
+        'areas-details',
+        'Areas View',
+        'Areas shows the live queue for the selected stage. The table includes project number/name, status, accepted timestamp, countdown, expected hours, and move/accept actions. Opening a project uses the same detail window layout as Dashboard.'
       )
     );
   }
@@ -296,6 +336,13 @@ function buildTutorialSteps({
         'Click Project Intake to create a project, mark required docs, and upload files or photos.'
       )
     );
+    steps.push(
+      buildInfoStep(
+        'intake-details',
+        'Project Intake View',
+        'Project Intake captures project name, requester, urgency, budget, slab-work required, required docs checklist, and notes. It also includes initial document/photo uploads with visibility controls so project handoff starts with complete context.'
+      )
+    );
   }
 
   if (hasContractor || hasAdminArea) {
@@ -308,6 +355,13 @@ function buildTutorialSteps({
         'Click Leads to manage leads, notes, and lead uploads.'
       )
     );
+    steps.push(
+      buildInfoStep(
+        'leads-details',
+        'Leads View',
+        'Leads includes lead create/edit fields (name, company, email, phone, status), notes, and lead-level uploads. The table keeps lead records together with status so users can move from intake to follow-up without losing history.'
+      )
+    );
   }
 
   if (hasBison && hasAdminArea) {
@@ -318,6 +372,13 @@ function buildTutorialSteps({
         'Manage Users',
         '/users',
         'Click Manage Users to create accounts and maintain roles, areas, and usernames.'
+      )
+    );
+    steps.push(
+      buildInfoStep(
+        'users-details',
+        'Manage Users View',
+        'Manage Users is split into Bison, Contractors, and Customers sections with create forms and editable user rows. Admins can update username, email, display name, password state, area/role assignments, and company/requester links.'
       )
     );
   }
@@ -333,6 +394,13 @@ function buildTutorialSteps({
       )
     );
     steps.push(
+      buildInfoStep(
+        'customer-progress-details',
+        'Progress View',
+        'Progress shows project name, current stage, percent complete, and the full stage flow with status colors for complete, in-progress, and pending. Compact stage names expand on hover where needed so users can read each full stage label.'
+      )
+    );
+    steps.push(
       buildNavStep(
         'customer-files',
         'Files For Review',
@@ -341,11 +409,25 @@ function buildTutorialSteps({
       )
     );
     steps.push(
+      buildInfoStep(
+        'customer-files-details',
+        'Files For Review View',
+        'Files for Review lists customer-visible documents as cards with filename, uploaded date, and size. Supported files open in preview, and all files keep direct download actions for review workflows.'
+      )
+    );
+    steps.push(
       buildNavStep(
         'customer-pictures',
         'Project Pictures',
         '/customer/pictures',
         'Click Project Pictures to review customer-visible photos.'
+      )
+    );
+    steps.push(
+      buildInfoStep(
+        'customer-pictures-details',
+        'Project Pictures View',
+        'Project Pictures shows customer-visible image cards with thumbnail, file name, date, and size. Selecting a card opens the full preview window for closer review and download.'
       )
     );
   }
