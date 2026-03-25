@@ -987,7 +987,6 @@ export default function Users() {
                           setEditing({ ...editing, form: { ...editing.form, login_username: event.target.value } })
                         }
                       />
-                      <span className="muted">Used for sign in</span>
                     </label>
                     <label>
                       Account key

@@ -268,7 +268,7 @@ export async function deleteUser(username) {
 }
 
 export async function forceLogoutUser(username) {
-  return apiJson(`/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST' });
+  return apiJson(`/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST', body: {} });
 }
 
 export async function listProjects(params = '') {

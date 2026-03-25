@@ -5150,6 +5150,13 @@ body[data-theme='light'] .compact-card-switch {
   align-self: end;
 }
 
+.user-edit-card .user-form-grid input,
+.user-edit-card .user-form-grid select {
+  height: 52px;
+  min-height: 52px;
+  box-sizing: border-box;
+}
+
 /* --- Final layout spacing overrides --- */
 :root {
   --layout-space: 16px;
