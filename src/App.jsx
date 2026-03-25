@@ -203,6 +203,7 @@ function buildTutorialSteps({
   hasContractor,
   hasCustomer
 }) {
+  const showDashboardFilters = !hasContractor || hasBison;
   const buildNavStep = (id, title, path, description, actionEvent = 'click') => ({
     id,
     title,
@@ -256,7 +257,9 @@ function buildTutorialSteps({
       buildInfoStep(
         'dashboard-details',
         'Dashboard View',
-        'Dashboard shows one row per project with Project (# + name) and Current Stage. At the top you get Requester/Contractor filtering plus the Archived Showing/Hidden toggle. Rows stay ordered by project number, and you can open full project details from the table.'
+        showDashboardFilters
+          ? 'Dashboard shows one row per project with Project (# + name) and Current Stage. At the top you get Requester/Contractor filtering plus the Archived Showing/Hidden toggle. Rows stay ordered by project number, and you can open full project details from the table.'
+          : 'Dashboard shows one row per project with Project (# + name) and Current Stage. Rows stay ordered by project number, and you can open full project details from the table.'
       )
     );
     steps.push({

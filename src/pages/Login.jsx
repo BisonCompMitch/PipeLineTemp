@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import logo from '../assets/BisonWorksFavicon.png';
 import { loginRequest } from '../api.js';
+import PasswordToggleButton from '../components/PasswordToggleButton.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 export default function Login({ onLogin }) {
@@ -79,14 +80,11 @@ export default function Login({ onLogin }) {
                 placeholder="Password"
                 autoComplete="current-password"
               />
-              <button
-                type="button"
-                className="ghost password-toggle-btn"
+              <PasswordToggleButton
+                shown={showPassword}
                 onClick={() => setShowPassword((value) => !value)}
                 disabled={loading}
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
+              />
             </div>
           </label>
           <button className="primary login-button" type="submit" disabled={loading}>

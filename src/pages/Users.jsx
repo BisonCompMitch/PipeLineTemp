@@ -6,6 +6,7 @@ import {
   deleteContractor,
   deleteCustomer,
   deleteUser,
+  forceLogoutUser,
   listContractors,
   listCustomers,
   listProjects,
@@ -15,6 +16,7 @@ import {
   updateCustomer,
   updateUser
 } from '../api.js';
+import PasswordToggleButton from '../components/PasswordToggleButton.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, STAGE_FLOW } from '../utils/stageDisplay.js';
 
@@ -87,6 +89,7 @@ function sortProjects(a, b) {
 }
 
 export default function Users() {
+  const [allUsers, setAllUsers] = useState([]);
   const [bisonUsers, setBisonUsers] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -128,11 +131,14 @@ export default function Users() {
       ]);
 
       if (usersResult.status === 'fulfilled') {
-        const filtered = (Array.isArray(usersResult.value) ? usersResult.value : []).filter(
+        const all = Array.isArray(usersResult.value) ? usersResult.value : [];
+        setAllUsers(all);
+        const filtered = all.filter(
           (user) => !isCustomerOnly(user) && !isContractorOnly(user)
         );
         setBisonUsers(filtered);
       } else {
+        setAllUsers([]);
         setBisonUsers([]);
         setBisonStatus({ tone: 'error', text: 'Unable to load Bison users.' });
       }
@@ -314,6 +320,17 @@ export default function Users() {
     return Array.from(unique.values()).sort((a, b) => a.localeCompare(b));
   }, [projects, contractors]);
 
+  const linkedUsersByIdentity = useMemo(() => {
+    const map = new Map();
+    allUsers.forEach((user) => {
+      const usernameKey = normalize(user?.username);
+      const emailKey = normalize(user?.email);
+      if (usernameKey && !map.has(usernameKey)) map.set(usernameKey, user);
+      if (emailKey && !map.has(emailKey)) map.set(emailKey, user);
+    });
+    return map;
+  }, [allUsers]);
+
   const startEditBison = (user) => {
     setEditStatus(null);
     setPasswordVisible({ bison: false, contractor: false, customer: false });
@@ -327,6 +344,7 @@ export default function Users() {
         rolesText: (user.roles || []).join(', '),
         password: '',
         must_reset_password: Boolean(user.must_reset_password),
+        is_locked: Boolean(user.is_locked),
         areas: Array.isArray(user.areas) ? user.areas : []
       }
     });
@@ -335,12 +353,17 @@ export default function Users() {
   const startEditContractor = (contractor) => {
     setEditStatus(null);
     setPasswordVisible({ bison: false, contractor: false, customer: false });
+    const linkedUser =
+      linkedUsersByIdentity.get(normalize(contractor?.email)) ||
+      linkedUsersByIdentity.get(normalize(contractor?.username));
     setEditing({
       type: 'contractor',
       form: {
+        username: linkedUser?.username || contractor.email,
         email: contractor.email,
         company: contractor.company || '',
-        password: ''
+        password: '',
+        is_locked: Boolean(linkedUser?.is_locked)
       }
     });
   };
@@ -348,12 +371,17 @@ export default function Users() {
   const startEditCustomer = (customer) => {
     setEditStatus(null);
     setPasswordVisible({ bison: false, contractor: false, customer: false });
+    const linkedUser =
+      linkedUsersByIdentity.get(normalize(customer?.email)) ||
+      linkedUsersByIdentity.get(normalize(customer?.username));
     setEditing({
       type: 'customer',
       form: {
+        username: linkedUser?.username || customer.email,
         email: customer.email,
         password: '',
-        project_id: customer.project_id || ''
+        project_id: customer.project_id || '',
+        is_locked: Boolean(linkedUser?.is_locked)
       }
     });
   };
@@ -399,7 +427,8 @@ export default function Users() {
       full_name: form.full_name.trim(),
       roles: splitRoles(form.rolesText),
       areas: form.areas || [],
-      must_reset_password: Boolean(form.must_reset_password)
+      must_reset_password: Boolean(form.must_reset_password),
+      is_locked: Boolean(form.is_locked)
     };
     if (form.password.trim()) {
       payload.password = form.password.trim();
@@ -427,6 +456,9 @@ export default function Users() {
     }
     try {
       await updateContractor(form.email, payload);
+      if (form.username) {
+        await updateUser(form.username, { is_locked: Boolean(form.is_locked) });
+      }
       setContractorStatus({ tone: 'success', text: 'Contractor updated.' });
       closeEdit();
       loadAll({ preserveStatus: true });
@@ -446,11 +478,34 @@ export default function Users() {
     }
     try {
       await updateCustomer(form.email, payload);
+      if (form.username) {
+        await updateUser(form.username, { is_locked: Boolean(form.is_locked) });
+      }
       setCustomerStatus({ tone: 'success', text: 'Customer updated.' });
       closeEdit();
       loadAll({ preserveStatus: true });
     } catch (err) {
       setEditStatus({ tone: 'error', text: 'Unable to update customer.' });
+    }
+  };
+
+  const handleForceLogout = async (usernameOrEmail) => {
+    const target = String(usernameOrEmail || '').trim();
+    if (!target) {
+      setEditStatus({ tone: 'error', text: 'Unable to determine which account to sign out.' });
+      return;
+    }
+    const shouldForce = await confirmDialog(`Force sign out for ${target}?`, {
+      title: 'Force sign out',
+      confirmText: 'Force sign out'
+    });
+    if (!shouldForce) return;
+    try {
+      await forceLogoutUser(target);
+      setEditStatus({ tone: 'success', text: 'User was signed out from active sessions.' });
+      await loadAll({ preserveStatus: true });
+    } catch (_err) {
+      setEditStatus({ tone: 'error', text: 'Unable to force sign out.' });
     }
   };
 
@@ -672,7 +727,10 @@ export default function Users() {
                 <th>Theme</th>
                 <th>Active</th>
                 <th>Instances</th>
+                <th>Locked?</th>
+                <th>Locked?</th>
                 <th>Reset?</th>
+                <th>Locked?</th>
               </tr>
             </thead>
             <tbody>
@@ -693,12 +751,13 @@ export default function Users() {
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
                       <td>{activity.active_instances ?? 0}</td>
                       <td>{user.must_reset_password ? 'Yes' : 'No'}</td>
+                      <td>{user.is_locked ? 'Yes' : 'No'}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr className="empty-row">
-                  <td colSpan={9}>No Bison users available.</td>
+                  <td colSpan={10}>No Bison users available.</td>
                 </tr>
               )}
             </tbody>
@@ -774,6 +833,9 @@ export default function Users() {
               {sortedContractors.length ? (
                 sortedContractors.map((contractor) => {
                   const activity = activityMap.get(activityKey(contractor.email)) || {};
+                  const linkedUser =
+                    linkedUsersByIdentity.get(normalize(contractor.email)) ||
+                    linkedUsersByIdentity.get(normalize(contractor.username));
                   return (
                     <tr key={contractor.email} onDoubleClick={() => startEditContractor(contractor)}>
                       <td>{contractor.email}</td>
@@ -783,12 +845,13 @@ export default function Users() {
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
                       <td>{activity.active_instances ?? 0}</td>
+                      <td>{linkedUser?.is_locked ? 'Yes' : 'No'}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr className="empty-row">
-                  <td colSpan={7}>No contractor users yet.</td>
+                  <td colSpan={8}>No contractor users yet.</td>
                 </tr>
               )}
             </tbody>
@@ -851,6 +914,9 @@ export default function Users() {
               {sortedCustomers.length ? (
                 sortedCustomers.map((customer) => {
                   const activity = activityMap.get(activityKey(customer.email)) || {};
+                  const linkedUser =
+                    linkedUsersByIdentity.get(normalize(customer.email)) ||
+                    linkedUsersByIdentity.get(normalize(customer.username));
                   return (
                     <tr key={customer.email} onDoubleClick={() => startEditCustomer(customer)}>
                       <td>{customer.email}</td>
@@ -859,12 +925,13 @@ export default function Users() {
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
                       <td>{activity.active_instances ?? 0}</td>
+                      <td>{linkedUser?.is_locked ? 'Yes' : 'No'}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr className="empty-row">
-                  <td colSpan={6}>No customer users yet.</td>
+                  <td colSpan={7}>No customer users yet.</td>
                 </tr>
               )}
             </tbody>
@@ -942,13 +1009,10 @@ export default function Users() {
                         }
                         placeholder="Leave blank to keep current"
                       />
-                      <button
-                        type="button"
-                        className="ghost password-toggle-btn"
+                      <PasswordToggleButton
+                        shown={passwordVisible.bison}
                         onClick={() => setPasswordVisible((prev) => ({ ...prev, bison: !prev.bison }))}
-                      >
-                        {passwordVisible.bison ? 'Hide' : 'Show'}
-                      </button>
+                      />
                     </div>
                   </label>
                   <label className="switch-field">
@@ -963,6 +1027,19 @@ export default function Users() {
                       <span className="switch-thumb" />
                     </span>
                     <span className="switch-text">Require password reset</span>
+                  </label>
+                  <label className="switch-field">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editing.form.is_locked)}
+                      onChange={(event) =>
+                        setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
+                      }
+                    />
+                    <span className="switch-track" aria-hidden="true">
+                      <span className="switch-thumb" />
+                    </span>
+                    <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
                   </label>
                 </div>
                 <div className="area-check-section">
@@ -983,6 +1060,13 @@ export default function Users() {
                 <div className="actions">
                   <button className="ghost" type="button" onClick={closeEdit}>
                     Cancel
+                  </button>
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => handleForceLogout(editing.form.username)}
+                  >
+                    Force sign out
                   </button>
                   <button className="danger" type="button" onClick={() => handleDeleteBison({ username: editing.form.username })}>
                     Delete
@@ -1023,19 +1107,36 @@ export default function Users() {
                         }
                         placeholder="Enter new password"
                       />
-                      <button
-                        type="button"
-                        className="ghost password-toggle-btn"
+                      <PasswordToggleButton
+                        shown={passwordVisible.contractor}
                         onClick={() => setPasswordVisible((prev) => ({ ...prev, contractor: !prev.contractor }))}
-                      >
-                        {passwordVisible.contractor ? 'Hide' : 'Show'}
-                      </button>
+                      />
                     </div>
+                  </label>
+                  <label className="switch-field">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editing.form.is_locked)}
+                      onChange={(event) =>
+                        setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
+                      }
+                    />
+                    <span className="switch-track" aria-hidden="true">
+                      <span className="switch-thumb" />
+                    </span>
+                    <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
                   </label>
                 </div>
                 <div className="actions">
                   <button className="ghost" type="button" onClick={closeEdit}>
                     Cancel
+                  </button>
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => handleForceLogout(editing.form.username || editing.form.email)}
+                  >
+                    Force sign out
                   </button>
                   <button className="danger" type="button" onClick={() => handleDeleteContractor({ email: editing.form.email })}>
                     Delete
@@ -1065,13 +1166,10 @@ export default function Users() {
                         }
                         placeholder="Leave blank to keep current"
                       />
-                      <button
-                        type="button"
-                        className="ghost password-toggle-btn"
+                      <PasswordToggleButton
+                        shown={passwordVisible.customer}
                         onClick={() => setPasswordVisible((prev) => ({ ...prev, customer: !prev.customer }))}
-                      >
-                        {passwordVisible.customer ? 'Hide' : 'Show'}
-                      </button>
+                      />
                     </div>
                   </label>
                   <label className="span-2">
@@ -1090,10 +1188,30 @@ export default function Users() {
                       ))}
                     </select>
                   </label>
+                  <label className="switch-field span-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editing.form.is_locked)}
+                      onChange={(event) =>
+                        setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
+                      }
+                    />
+                    <span className="switch-track" aria-hidden="true">
+                      <span className="switch-thumb" />
+                    </span>
+                    <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
+                  </label>
                 </div>
                 <div className="actions">
                   <button className="ghost" type="button" onClick={closeEdit}>
                     Cancel
+                  </button>
+                  <button
+                    className="ghost"
+                    type="button"
+                    onClick={() => handleForceLogout(editing.form.username || editing.form.email)}
+                  >
+                    Force sign out
                   </button>
                   <button className="danger" type="button" onClick={() => handleDeleteCustomer({ email: editing.form.email })}>
                     Delete

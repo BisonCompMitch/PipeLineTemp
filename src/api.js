@@ -267,6 +267,10 @@ export async function deleteUser(username) {
   return apiJson(`/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
 }
 
+export async function forceLogoutUser(username) {
+  return apiJson(`/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST' });
+}
+
 export async function listProjects(params = '') {
   const suffix = params ? `?${params}` : '';
   return apiJson(`/projects${suffix}`);

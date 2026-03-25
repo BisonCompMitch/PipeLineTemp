@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import logo from '../assets/BisonWorksFavicon.png';
 import { completeFirstLogin } from '../api.js';
+import PasswordToggleButton from '../components/PasswordToggleButton.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 
 export default function FirstLoginSetup({
@@ -127,14 +128,11 @@ export default function FirstLoginSetup({
                 autoComplete="new-password"
                 disabled={saving}
               />
-              <button
-                type="button"
-                className="ghost password-toggle-btn"
+              <PasswordToggleButton
+                shown={showPasswords}
                 onClick={() => setShowPasswords((value) => !value)}
                 disabled={saving}
-              >
-                {showPasswords ? 'Hide' : 'Show'}
-              </button>
+              />
             </div>
           </label>
           <label>
@@ -148,14 +146,11 @@ export default function FirstLoginSetup({
                 autoComplete="new-password"
                 disabled={saving}
               />
-              <button
-                type="button"
-                className="ghost password-toggle-btn"
+              <PasswordToggleButton
+                shown={showPasswords}
                 onClick={() => setShowPasswords((value) => !value)}
                 disabled={saving}
-              >
-                {showPasswords ? 'Hide' : 'Show'}
-              </button>
+              />
             </div>
           </label>
           <p className="muted first-login-hint">Password must be at least 8 characters.</p>
