@@ -362,7 +362,7 @@ function buildTutorialSteps({
       buildInfoStep(
         'leads-details',
         'Leads View',
-        'Leads includes lead create/edit fields (name, company, email, phone, status), notes, and lead-level uploads. The table keeps lead records together with status so users can move from intake to follow-up without losing history.'
+        'Leads includes create/edit fields for name, company, email, phone, status, notes, and file uploads. The table keeps lead records together with status so users can move from intake to follow-up without losing history.'
       )
     );
   }

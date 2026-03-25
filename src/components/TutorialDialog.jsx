@@ -289,9 +289,11 @@ export default function TutorialDialog({
                   Skip
                 </button>
               ) : null}
-              <button className="primary" type="button" onClick={handleNext} disabled={requiresAction}>
-                {isLast ? 'Done' : 'Next'}
-              </button>
+              {!requiresAction ? (
+                <button className="primary" type="button" onClick={handleNext}>
+                  {isLast ? 'Done' : 'Next'}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
