@@ -5,7 +5,6 @@ import {
   coerceSlabWorkFlag,
   formatMoneyStageGlyph,
   formatStageName,
-  getStageBadgeStyle,
   normalizeProjectStages
 } from '../utils/stageDisplay.js';
 
@@ -20,6 +19,13 @@ function completionPercent(stages = []) {
 function currentStage(stages = []) {
   if (!Array.isArray(stages) || stages.length === 0) return null;
   return stages.find((stage) => stage.status !== 'complete') || stages[stages.length - 1];
+}
+
+function stageStatusClass(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'complete') return 'complete';
+  if (normalized === 'in_progress' || normalized === 'awaiting_approval') return 'in-progress';
+  return 'pending';
 }
 
 export default function Customer() {
@@ -145,9 +151,8 @@ export default function Customer() {
                       {cells.map(({ item, fullName, compactName, isMoneyGlyph }) => (
                         <div
                           key={item.id}
-                          className={`customer-stage-cell${isMoneyGlyph ? ' money-glyph' : ''}`}
+                          className={`customer-stage-cell ${stageStatusClass(item.status)}${isMoneyGlyph ? ' money-glyph' : ''}`}
                           title={compactName !== fullName ? fullName : undefined}
-                          style={getStageBadgeStyle(item.id)}
                         >
                           <span className="customer-stage-label-desktop">{compactName}</span>
                           <span className="customer-stage-label-mobile">{fullName}</span>

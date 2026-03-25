@@ -34,6 +34,7 @@ export default function TutorialDialog({
   const [highlightRect, setHighlightRect] = useState(null);
   const [actionCompleted, setActionCompleted] = useState(false);
   const [modalStyle, setModalStyle] = useState({});
+  const [viewportMode, setViewportMode] = useState('desktop');
   const targetRef = useRef(null);
   const targetClickHandlerRef = useRef(null);
   const modalRef = useRef(null);
@@ -50,6 +51,30 @@ export default function TutorialDialog({
   const isLast = currentIndex === maxIndex;
   const requiresAction = Boolean(step?.requiredAction && step?.targetSelector);
   const actionEvent = step?.actionEvent === 'dblclick' ? 'dblclick' : 'click';
+  const isMobileViewport = viewportMode === 'mobile';
+  const isCompactViewport = viewportMode !== 'desktop';
+
+  useEffect(() => {
+    if (!open) return;
+    const syncViewportMode = () => {
+      const width = window.innerWidth || 0;
+      if (width <= 700) {
+        setViewportMode('mobile');
+        return;
+      }
+      if (width <= 1024) {
+        setViewportMode('tablet');
+        return;
+      }
+      setViewportMode('desktop');
+    };
+
+    syncViewportMode();
+    window.addEventListener('resize', syncViewportMode);
+    return () => {
+      window.removeEventListener('resize', syncViewportMode);
+    };
+  }, [open]);
 
   useEffect(() => {
     setActionCompleted(false);
@@ -64,44 +89,62 @@ export default function TutorialDialog({
       return;
     }
     const applyPlacement = () => {
-      const margin = 20;
+      const horizontalMargin = isCompactViewport ? 10 : 20;
+      const verticalMargin = isCompactViewport ? 10 : 20;
       const viewportWidth = Math.max(window.innerWidth, 320);
       const viewportHeight = Math.max(window.innerHeight, 320);
       const element = modalRef.current;
+      const maxModalWidth = Math.max(280, viewportWidth - horizontalMargin * 2);
+      const maxModalHeight = Math.max(220, viewportHeight - verticalMargin * 2);
       const modalWidth = Math.min(
-        element?.offsetWidth || 700,
-        Math.max(280, viewportWidth - margin * 2)
+        element?.offsetWidth || (isCompactViewport ? maxModalWidth : 700),
+        maxModalWidth
       );
       const modalHeight = Math.min(
-        element?.offsetHeight || 360,
-        Math.max(220, viewportHeight - margin * 2)
+        element?.offsetHeight || (isCompactViewport ? 380 : 360),
+        maxModalHeight
       );
 
       let top = (viewportHeight - modalHeight) / 2;
       let left = (viewportWidth - modalWidth) / 2;
 
       if (requiresAction && highlightRect) {
-        const centeredRect = { top, left, width: modalWidth, height: modalHeight };
-        if (intersectsRect(centeredRect, highlightRect)) {
-          const belowTop = highlightRect.top + highlightRect.height + 12;
-          const aboveTop = highlightRect.top - modalHeight - 12;
-          if (belowTop + modalHeight <= viewportHeight - margin) {
-            top = belowTop;
-          } else if (aboveTop >= margin) {
-            top = aboveTop;
-          } else {
-            top = clamp(belowTop, margin, viewportHeight - modalHeight - margin);
-          }
+        const spacing = 10;
+        const spaceAbove = highlightRect.top - verticalMargin;
+        const spaceBelow = viewportHeight - (highlightRect.top + highlightRect.height) - verticalMargin;
+        if (spaceBelow >= modalHeight + spacing) {
+          top = highlightRect.top + highlightRect.height + spacing;
+        } else if (spaceAbove >= modalHeight + spacing) {
+          top = highlightRect.top - modalHeight - spacing;
+        } else if (spaceBelow >= spaceAbove) {
+          top = highlightRect.top + highlightRect.height + spacing;
+        } else {
+          top = highlightRect.top - modalHeight - spacing;
         }
-        const targetCenterX = highlightRect.left + highlightRect.width / 2;
-        left = clamp(targetCenterX - modalWidth / 2, margin, viewportWidth - modalWidth - margin);
+        if (isMobileViewport) {
+          left = horizontalMargin;
+        } else {
+          const targetCenterX = highlightRect.left + highlightRect.width / 2;
+          left = targetCenterX - modalWidth / 2;
+        }
+        const positionedRect = { top, left, width: modalWidth, height: modalHeight };
+        if (intersectsRect(positionedRect, highlightRect)) {
+          top = viewportHeight - modalHeight - verticalMargin;
+        }
+      } else if (isMobileViewport) {
+        top = viewportHeight - modalHeight - verticalMargin;
+        left = (viewportWidth - modalWidth) / 2;
       }
 
-      top = clamp(top, margin, viewportHeight - modalHeight - margin);
-      left = clamp(left, margin, viewportWidth - modalWidth - margin);
+      const maxTop = Math.max(verticalMargin, viewportHeight - modalHeight - verticalMargin);
+      const maxLeft = Math.max(horizontalMargin, viewportWidth - modalWidth - horizontalMargin);
+      top = clamp(top, verticalMargin, maxTop);
+      left = clamp(left, horizontalMargin, maxLeft);
       setModalStyle({
         top: `${Math.round(top)}px`,
         left: `${Math.round(left)}px`,
+        width: `${Math.round(modalWidth)}px`,
+        maxHeight: `${Math.round(maxModalHeight)}px`,
       });
     };
 
@@ -114,7 +157,7 @@ export default function TutorialDialog({
       window.removeEventListener('resize', applyPlacement);
       window.removeEventListener('scroll', applyPlacement, true);
     };
-  }, [open, requiresAction, highlightRect, currentIndex]);
+  }, [open, requiresAction, highlightRect, currentIndex, isCompactViewport]);
 
   useEffect(() => {
     if (!open || !requiresAction) return;
@@ -169,7 +212,11 @@ export default function TutorialDialog({
         target.addEventListener(actionEvent, targetClickHandlerRef.current, true);
 
         if (!actionCompleted) {
-          target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+          target.scrollIntoView({
+            block: viewportMode === 'desktop' ? 'center' : 'start',
+            inline: 'nearest',
+            behavior: 'smooth',
+          });
         }
       }
 
@@ -200,7 +247,7 @@ export default function TutorialDialog({
       window.removeEventListener('scroll', syncHighlight, true);
       removeTargetState();
     };
-  }, [open, requiresAction, step?.targetSelector, actionCompleted, actionEvent]);
+  }, [open, requiresAction, step?.targetSelector, actionCompleted, actionEvent, viewportMode]);
 
   if (!open) return null;
 
@@ -229,7 +276,11 @@ export default function TutorialDialog({
           />
         ) : null}
 
-        <div ref={modalRef} className="modal tutorial-modal" style={modalStyle}>
+        <div
+          ref={modalRef}
+          className={`modal tutorial-modal tutorial-modal-${viewportMode}`}
+          style={modalStyle}
+        >
           <div className="modal-header">
             <div>
               <div className="modal-title">{title}</div>

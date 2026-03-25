@@ -154,8 +154,11 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (/^slab\s*work$/i.test(rawName)) return 'Slab Work';
 
   if (audience === 'external') {
-    if (id === 'design' || id === 'engineering') return 'Design & Engineering';
-    if (/^(design|engineering)$/i.test(rawName)) return 'Design & Engineering';
+    if (id === 'design') return 'Design';
+    if (id === 'engineering') return 'Engineering';
+    if (/^design\s*&\s*engineering$/i.test(rawName)) {
+      return id === 'engineering' ? 'Engineering' : 'Design';
+    }
   }
 
   return rawName;
