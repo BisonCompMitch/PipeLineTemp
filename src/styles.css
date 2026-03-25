@@ -1221,10 +1221,9 @@ body::before {
 .tutorial-modal {
   pointer-events: auto;
   position: fixed;
-  right: 20px;
-  bottom: 20px;
   width: min(700px, calc(100vw - 40px));
   max-height: calc(100vh - 40px);
+  overflow: auto;
   display: grid;
   gap: 14px;
 }
@@ -5115,6 +5114,42 @@ body[data-theme='light'] .compact-card-switch {
   min-width: max(1100px, 100%);
 }
 
+.users-table td {
+  vertical-align: top;
+}
+
+.users-cell-areas {
+  white-space: normal !important;
+  line-height: 1.35;
+  min-width: 260px;
+}
+
+.user-modal {
+  width: min(1120px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+.user-edit-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.user-edit-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  color: var(--text);
+}
+
+.user-form-grid .switch-field {
+  align-self: end;
+}
+
 /* --- Final layout spacing overrides --- */
 :root {
   --layout-space: 16px;
@@ -5844,11 +5879,8 @@ body[data-theme='light'] .progress-meta .muted {
   }
 
   .tutorial-modal {
-    left: 9px;
-    right: 9px;
-    bottom: 9px;
     width: min(700px, calc(100vw - 18px));
-    padding: 14px;
+    max-height: calc(100vh - 18px);
   }
 
   .tutorial-step-title {

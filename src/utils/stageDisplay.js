@@ -35,7 +35,7 @@ function textColorForHex(color) {
 
 export const BASE_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'budget', name: 'Rough Estimate', owner: 'CFS', default_duration_hours: 24 },
+  { id: 'budget', name: 'Rough Estimate / Sales Tax Certificate', owner: 'CFS', default_duration_hours: 24 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
   { id: 'engineering', name: 'Engineering', owner: 'Engineering Lead', default_duration_hours: 24 },
@@ -50,7 +50,7 @@ export const BASE_STAGE_FLOW = [
 
 export const SLAB_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'budget', name: 'Rough Estimate', owner: 'CFS', default_duration_hours: 24 },
+  { id: 'budget', name: 'Rough Estimate / Sales Tax Certificate', owner: 'CFS', default_duration_hours: 24 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
   { id: 'engineering', name: 'Engineering', owner: 'Engineering Lead', default_duration_hours: 24 },
@@ -131,9 +131,10 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (/^plans\s+revieved$/i.test(rawName)) return 'Plans Received';
   if (/^plans\s+received$/i.test(rawName)) return 'Plans Received';
 
-  if (id === 'budget') return 'Rough Estimate';
-  if (/^cfs\s+budget$/i.test(rawName)) return 'Rough Estimate';
-  if (/^rough\s+estimate$/i.test(rawName)) return 'Rough Estimate';
+  if (id === 'budget') return 'Rough Estimate / Sales Tax Certificate';
+  if (/^cfs\s+budget$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
+  if (/^rough\s+estimate$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
+  if (/^rough\s+estimate\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
 
   if (id === 'money_design') return 'Money - D&E';
   if (/^money\s*(check\s*)?-\s*(design|d&e|de)$/i.test(rawName)) return 'Money - D&E';

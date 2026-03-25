@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModalPortal from './ModalPortal.jsx';
 
+function intersectsRect(a, b) {
+  if (!a || !b) return false;
+  return !(a.left + a.width <= b.left || b.left + b.width <= a.left || a.top + a.height <= b.top || b.top + b.height <= a.top);
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 export default function TutorialDialog({
   open,
   title = 'Quick tour',
@@ -24,8 +33,10 @@ export default function TutorialDialog({
   const [targetReady, setTargetReady] = useState(false);
   const [highlightRect, setHighlightRect] = useState(null);
   const [actionCompleted, setActionCompleted] = useState(false);
+  const [modalStyle, setModalStyle] = useState({});
   const targetRef = useRef(null);
   const targetClickHandlerRef = useRef(null);
+  const modalRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -44,7 +55,66 @@ export default function TutorialDialog({
     setActionCompleted(false);
     setTargetReady(false);
     setHighlightRect(null);
+    setModalStyle({});
   }, [open, currentIndex]);
+
+  useEffect(() => {
+    if (!open) {
+      setModalStyle({});
+      return;
+    }
+    const applyPlacement = () => {
+      const margin = 20;
+      const viewportWidth = Math.max(window.innerWidth, 320);
+      const viewportHeight = Math.max(window.innerHeight, 320);
+      const element = modalRef.current;
+      const modalWidth = Math.min(
+        element?.offsetWidth || 700,
+        Math.max(280, viewportWidth - margin * 2)
+      );
+      const modalHeight = Math.min(
+        element?.offsetHeight || 360,
+        Math.max(220, viewportHeight - margin * 2)
+      );
+
+      let top = (viewportHeight - modalHeight) / 2;
+      let left = (viewportWidth - modalWidth) / 2;
+
+      if (requiresAction && highlightRect) {
+        const centeredRect = { top, left, width: modalWidth, height: modalHeight };
+        if (intersectsRect(centeredRect, highlightRect)) {
+          const belowTop = highlightRect.top + highlightRect.height + 12;
+          const aboveTop = highlightRect.top - modalHeight - 12;
+          if (belowTop + modalHeight <= viewportHeight - margin) {
+            top = belowTop;
+          } else if (aboveTop >= margin) {
+            top = aboveTop;
+          } else {
+            top = clamp(belowTop, margin, viewportHeight - modalHeight - margin);
+          }
+        }
+        const targetCenterX = highlightRect.left + highlightRect.width / 2;
+        left = clamp(targetCenterX - modalWidth / 2, margin, viewportWidth - modalWidth - margin);
+      }
+
+      top = clamp(top, margin, viewportHeight - modalHeight - margin);
+      left = clamp(left, margin, viewportWidth - modalWidth - margin);
+      setModalStyle({
+        top: `${Math.round(top)}px`,
+        left: `${Math.round(left)}px`,
+      });
+    };
+
+    applyPlacement();
+    const rafId = window.requestAnimationFrame(applyPlacement);
+    window.addEventListener('resize', applyPlacement);
+    window.addEventListener('scroll', applyPlacement, true);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', applyPlacement);
+      window.removeEventListener('scroll', applyPlacement, true);
+    };
+  }, [open, requiresAction, highlightRect, currentIndex]);
 
   useEffect(() => {
     if (!open || !requiresAction) return;
@@ -159,7 +229,7 @@ export default function TutorialDialog({
           />
         ) : null}
 
-        <div className="modal tutorial-modal">
+        <div ref={modalRef} className="modal tutorial-modal" style={modalStyle}>
           <div className="modal-header">
             <div>
               <div className="modal-title">{title}</div>

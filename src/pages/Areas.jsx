@@ -26,6 +26,7 @@ const AREA_STAGE_MAP = {
   budget: ['budget'],
   'cfs budget': ['budget'],
   'rough estimate': ['budget'],
+  'rough estimate / sales tax certificate': ['budget'],
   rough_estimate: ['budget'],
   'money - d&e': ['money_design'],
   'money - de': ['money_design'],

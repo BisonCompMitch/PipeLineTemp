@@ -489,9 +489,16 @@ export default function Users() {
     }
   };
 
-  const handleForceLogout = async (usernameOrEmail) => {
-    const target = String(usernameOrEmail || '').trim();
-    if (!target) {
+  const handleForceLogout = async (...usernameOrEmailCandidates) => {
+    const candidates = Array.from(
+      new Set(
+        usernameOrEmailCandidates
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+      )
+    );
+    const target = candidates[0] || '';
+    if (!target || !candidates.length) {
       setEditStatus({ tone: 'error', text: 'Unable to determine which account to sign out.' });
       return;
     }
@@ -501,11 +508,24 @@ export default function Users() {
     });
     if (!shouldForce) return;
     try {
-      await forceLogoutUser(target);
+      let success = false;
+      let lastError = null;
+      for (const candidate of candidates) {
+        try {
+          await forceLogoutUser(candidate);
+          success = true;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (!success) {
+        throw lastError || new Error('Unable to force sign out.');
+      }
       setEditStatus({ tone: 'success', text: 'User was signed out from active sessions.' });
       await loadAll({ preserveStatus: true });
-    } catch (_err) {
-      setEditStatus({ tone: 'error', text: 'Unable to force sign out.' });
+    } catch (err) {
+      setEditStatus({ tone: 'error', text: err?.message || 'Unable to force sign out.' });
     }
   };
 
@@ -727,8 +747,6 @@ export default function Users() {
                 <th>Theme</th>
                 <th>Active</th>
                 <th>Instances</th>
-                <th>Locked?</th>
-                <th>Locked?</th>
                 <th>Reset?</th>
                 <th>Locked?</th>
               </tr>
@@ -746,7 +764,7 @@ export default function Users() {
                       <td>{user.full_name || '-'}</td>
                       <td>{user.email}</td>
                       <td>{(user.roles || []).join(', ') || '-'}</td>
-                      <td>{(user.areas || []).join(', ') || '-'}</td>
+                      <td className="users-cell-areas">{(user.areas || []).join(', ') || '-'}</td>
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
                       <td>{activity.active_instances ?? 0}</td>
@@ -827,6 +845,7 @@ export default function Users() {
                 <th>Theme</th>
                 <th>Active</th>
                 <th>Instances</th>
+                <th>Locked?</th>
               </tr>
             </thead>
             <tbody>
@@ -908,6 +927,7 @@ export default function Users() {
                 <th>Theme</th>
                 <th>Active</th>
                 <th>Instances</th>
+                <th>Locked?</th>
               </tr>
             </thead>
             <tbody>
@@ -956,94 +976,104 @@ export default function Users() {
             </div>
             {editing.type === 'bison' ? (
               <div className="user-edit-card">
-                <div className="user-form-grid">
-                  <label>
-                    Username
-                    <input
-                      value={editing.form.login_username}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, login_username: event.target.value } })
-                      }
-                    />
-                    <span className="muted">Sign-in username</span>
-                  </label>
-                  <label>
-                    Account key
-                    <input value={editing.form.username} disabled />
-                  </label>
-                  <label>
-                    Full name
-                    <input
-                      value={editing.form.full_name}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, full_name: event.target.value } })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Email
-                    <input
-                      value={editing.form.email}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, email: event.target.value } })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Roles (comma separated)
-                    <input
-                      value={editing.form.rolesText}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, rolesText: event.target.value } })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Password
-                    <div className="password-input-row">
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Identity</h3>
+                  <div className="user-form-grid">
+                    <label>
+                      Username
                       <input
-                        type={passwordVisible.bison ? 'text' : 'password'}
-                        value={editing.form.password}
+                        value={editing.form.login_username}
                         onChange={(event) =>
-                          setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                          setEditing({ ...editing, form: { ...editing.form, login_username: event.target.value } })
                         }
-                        placeholder="Leave blank to keep current"
                       />
-                      <PasswordToggleButton
-                        shown={passwordVisible.bison}
-                        onClick={() => setPasswordVisible((prev) => ({ ...prev, bison: !prev.bison }))}
+                      <span className="muted">Used for sign in</span>
+                    </label>
+                    <label>
+                      Account key
+                      <input value={editing.form.username} disabled />
+                    </label>
+                    <label>
+                      Full name
+                      <input
+                        value={editing.form.full_name}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, full_name: event.target.value } })
+                        }
                       />
-                    </div>
-                  </label>
-                  <label className="switch-field">
-                    <input
-                      type="checkbox"
-                      checked={editing.form.must_reset_password}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, must_reset_password: event.target.checked } })
-                      }
-                    />
-                    <span className="switch-track" aria-hidden="true">
-                      <span className="switch-thumb" />
-                    </span>
-                    <span className="switch-text">Require password reset</span>
-                  </label>
-                  <label className="switch-field">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(editing.form.is_locked)}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
-                      }
-                    />
-                    <span className="switch-track" aria-hidden="true">
-                      <span className="switch-thumb" />
-                    </span>
-                    <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
-                  </label>
+                    </label>
+                    <label>
+                      Email
+                      <input
+                        value={editing.form.email}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, email: event.target.value } })
+                        }
+                      />
+                    </label>
+                    <label className="span-2">
+                      Roles (comma separated)
+                      <input
+                        value={editing.form.rolesText}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, rolesText: event.target.value } })
+                        }
+                      />
+                    </label>
+                  </div>
                 </div>
-                <div className="area-check-section">
-                  <div className="muted">Areas</div>
+
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Security</h3>
+                  <div className="user-form-grid">
+                    <label className="span-2">
+                      Password
+                      <div className="password-input-row">
+                        <input
+                          type={passwordVisible.bison ? 'text' : 'password'}
+                          value={editing.form.password}
+                          onChange={(event) =>
+                            setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                          }
+                          placeholder="Leave blank to keep current"
+                        />
+                        <PasswordToggleButton
+                          shown={passwordVisible.bison}
+                          onClick={() => setPasswordVisible((prev) => ({ ...prev, bison: !prev.bison }))}
+                        />
+                      </div>
+                    </label>
+                    <label className="switch-field">
+                      <input
+                        type="checkbox"
+                        checked={editing.form.must_reset_password}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, must_reset_password: event.target.checked } })
+                        }
+                      />
+                      <span className="switch-track" aria-hidden="true">
+                        <span className="switch-thumb" />
+                      </span>
+                      <span className="switch-text">Require password reset</span>
+                    </label>
+                    <label className="switch-field">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editing.form.is_locked)}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
+                        }
+                      />
+                      <span className="switch-track" aria-hidden="true">
+                        <span className="switch-thumb" />
+                      </span>
+                      <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Areas</h3>
                   <div className="area-check-grid area-check-grid--balanced">
                     {AREA_OPTIONS.map((area) => (
                       <label key={area} className="area-check">
@@ -1064,7 +1094,7 @@ export default function Users() {
                   <button
                     className="ghost"
                     type="button"
-                    onClick={() => handleForceLogout(editing.form.username)}
+                    onClick={() => handleForceLogout(editing.form.username, editing.form.login_username, editing.form.email)}
                   >
                     Force sign out
                   </button>
@@ -1080,52 +1110,64 @@ export default function Users() {
 
             {editing.type === 'contractor' ? (
               <div className="user-edit-card">
-                <div className="user-form-grid">
-                  <label>
-                    Email
-                    <input value={editing.form.email} disabled />
-                  </label>
-                  <label>
-                    Company
-                    <input
-                      value={editing.form.company}
-                      list="shared-party-options"
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, company: event.target.value } })
-                      }
-                      placeholder="Company name"
-                    />
-                  </label>
-                  <label>
-                    New password
-                    <div className="password-input-row">
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Identity</h3>
+                  <div className="user-form-grid">
+                    <label>
+                      Account key
+                      <input value={editing.form.username || editing.form.email} disabled />
+                    </label>
+                    <label>
+                      Email
+                      <input value={editing.form.email} disabled />
+                    </label>
+                    <label className="span-2">
+                      Company
                       <input
-                        type={passwordVisible.contractor ? 'text' : 'password'}
-                        value={editing.form.password}
+                        value={editing.form.company}
+                        list="shared-party-options"
                         onChange={(event) =>
-                          setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                          setEditing({ ...editing, form: { ...editing.form, company: event.target.value } })
                         }
-                        placeholder="Enter new password"
+                        placeholder="Company name"
                       />
-                      <PasswordToggleButton
-                        shown={passwordVisible.contractor}
-                        onClick={() => setPasswordVisible((prev) => ({ ...prev, contractor: !prev.contractor }))}
+                    </label>
+                  </div>
+                </div>
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Security</h3>
+                  <div className="user-form-grid">
+                    <label className="span-2">
+                      New password
+                      <div className="password-input-row">
+                        <input
+                          type={passwordVisible.contractor ? 'text' : 'password'}
+                          value={editing.form.password}
+                          onChange={(event) =>
+                            setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                          }
+                          placeholder="Leave blank to keep current"
+                        />
+                        <PasswordToggleButton
+                          shown={passwordVisible.contractor}
+                          onClick={() => setPasswordVisible((prev) => ({ ...prev, contractor: !prev.contractor }))}
+                        />
+                      </div>
+                    </label>
+                    <label className="switch-field">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editing.form.is_locked)}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
+                        }
                       />
-                    </div>
-                  </label>
-                  <label className="switch-field">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(editing.form.is_locked)}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
-                      }
-                    />
-                    <span className="switch-track" aria-hidden="true">
-                      <span className="switch-thumb" />
-                    </span>
-                    <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
-                  </label>
+                      <span className="switch-track" aria-hidden="true">
+                        <span className="switch-thumb" />
+                      </span>
+                      <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
+                    </label>
+                  </div>
                 </div>
                 <div className="actions">
                   <button className="ghost" type="button" onClick={closeEdit}>
@@ -1134,7 +1176,7 @@ export default function Users() {
                   <button
                     className="ghost"
                     type="button"
-                    onClick={() => handleForceLogout(editing.form.username || editing.form.email)}
+                    onClick={() => handleForceLogout(editing.form.username, editing.form.email)}
                   >
                     Force sign out
                   </button>
@@ -1150,57 +1192,69 @@ export default function Users() {
 
             {editing.type === 'customer' ? (
               <div className="user-edit-card">
-                <div className="user-form-grid">
-                  <label>
-                    Email
-                    <input value={editing.form.email} disabled />
-                  </label>
-                  <label>
-                    New password
-                    <div className="password-input-row">
-                      <input
-                        type={passwordVisible.customer ? 'text' : 'password'}
-                        value={editing.form.password}
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Identity</h3>
+                  <div className="user-form-grid">
+                    <label>
+                      Account key
+                      <input value={editing.form.username || editing.form.email} disabled />
+                    </label>
+                    <label>
+                      Email
+                      <input value={editing.form.email} disabled />
+                    </label>
+                    <label className="span-2">
+                      Linked project
+                      <select
+                        value={editing.form.project_id}
                         onChange={(event) =>
-                          setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                          setEditing({ ...editing, form: { ...editing.form, project_id: event.target.value } })
                         }
-                        placeholder="Leave blank to keep current"
+                      >
+                        <option value="">No project selected</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {projectLabel(project)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div className="user-edit-section">
+                  <h3 className="user-edit-section-title">Security</h3>
+                  <div className="user-form-grid">
+                    <label className="span-2">
+                      New password
+                      <div className="password-input-row">
+                        <input
+                          type={passwordVisible.customer ? 'text' : 'password'}
+                          value={editing.form.password}
+                          onChange={(event) =>
+                            setEditing({ ...editing, form: { ...editing.form, password: event.target.value } })
+                          }
+                          placeholder="Leave blank to keep current"
+                        />
+                        <PasswordToggleButton
+                          shown={passwordVisible.customer}
+                          onClick={() => setPasswordVisible((prev) => ({ ...prev, customer: !prev.customer }))}
+                        />
+                      </div>
+                    </label>
+                    <label className="switch-field span-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editing.form.is_locked)}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
+                        }
                       />
-                      <PasswordToggleButton
-                        shown={passwordVisible.customer}
-                        onClick={() => setPasswordVisible((prev) => ({ ...prev, customer: !prev.customer }))}
-                      />
-                    </div>
-                  </label>
-                  <label className="span-2">
-                    Linked project
-                    <select
-                      value={editing.form.project_id}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, project_id: event.target.value } })
-                      }
-                    >
-                      <option value="">No project selected</option>
-                      {projects.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {projectLabel(project)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="switch-field span-2">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(editing.form.is_locked)}
-                      onChange={(event) =>
-                        setEditing({ ...editing, form: { ...editing.form, is_locked: event.target.checked } })
-                      }
-                    />
-                    <span className="switch-track" aria-hidden="true">
-                      <span className="switch-thumb" />
-                    </span>
-                    <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
-                  </label>
+                      <span className="switch-track" aria-hidden="true">
+                        <span className="switch-thumb" />
+                      </span>
+                      <span className="switch-text">{editing.form.is_locked ? 'Account locked' : 'Account unlocked'}</span>
+                    </label>
+                  </div>
                 </div>
                 <div className="actions">
                   <button className="ghost" type="button" onClick={closeEdit}>
@@ -1209,7 +1263,7 @@ export default function Users() {
                   <button
                     className="ghost"
                     type="button"
-                    onClick={() => handleForceLogout(editing.form.username || editing.form.email)}
+                    onClick={() => handleForceLogout(editing.form.username, editing.form.email)}
                   >
                     Force sign out
                   </button>
