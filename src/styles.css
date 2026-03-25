@@ -3694,6 +3694,9 @@ body::before {
   font-size: 14.667px;
   font-weight: 700;
   color: #111827;
+  max-width: 100%;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .dashboard-intake {
@@ -5159,12 +5162,26 @@ body[data-theme='light'] .compact-card-switch {
 
 .dashboard-split-table th:nth-child(1),
 .dashboard-split-table td:nth-child(1) {
-  width: 60%;
+  width: 52%;
 }
 
 .dashboard-split-table th:nth-child(2),
 .dashboard-split-table td:nth-child(2) {
-  width: 40%;
+  width: 48%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.dashboard-table:not(.area-queue-table) td:nth-child(2) {
+  white-space: normal;
+}
+
+.dashboard-table:not(.area-queue-table) td:nth-child(2) .area-pill {
+  white-space: normal;
+  word-break: break-word;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .project-stage-table .project-table {
