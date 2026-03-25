@@ -325,21 +325,6 @@ export default function TutorialDialog({
               >
                 Back
               </button>
-              {requiresAction ? (
-                <button
-                  className="ghost"
-                  type="button"
-                  onClick={() => {
-                    if (isLast) {
-                      onClose?.();
-                      return;
-                    }
-                    setIndex((value) => Math.min(value + 1, maxIndex));
-                  }}
-                >
-                  Skip
-                </button>
-              ) : null}
               {!requiresAction ? (
                 <button className="primary" type="button" onClick={handleNext}>
                   {isLast ? 'Done' : 'Next'}
