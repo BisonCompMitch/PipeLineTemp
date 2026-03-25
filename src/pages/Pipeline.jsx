@@ -1686,7 +1686,13 @@ export default function Pipeline({
                       </button>
                     )
                   ) : null}
-                  <button className="ghost" type="button" onClick={closeDetails} disabled={saving}>
+                  <button
+                    className="ghost"
+                    type="button"
+                    data-tutorial-id="detail-close-button"
+                    onClick={closeDetails}
+                    disabled={saving}
+                  >
                     Close
                   </button>
                 </div>

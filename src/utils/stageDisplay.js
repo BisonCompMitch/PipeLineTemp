@@ -167,6 +167,8 @@ export function formatStageName(name, stageId = '', options = {}) {
 export function formatMoneyStageGlyph(name, stageId = '', options = {}) {
   const displayName = formatStageName(name, stageId, options);
   const id = normalizeId(stageId);
+  if (id === 'budget') return 'Rough Estimate';
+  if (id === 'money_shipping') return 'Invoice Sent';
   if (MONEY_STAGE_IDS.has(id) || /^money\s*(check\s*)?-\s*/i.test(displayName)) {
     return '$';
   }

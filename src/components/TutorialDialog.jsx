@@ -49,7 +49,7 @@ export default function TutorialDialog({
   const step = normalizedSteps[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === maxIndex;
-  const requiresAction = Boolean(step?.requiredAction && step?.targetSelector);
+  const requiresAction = Boolean(step?.requiredAction);
   const actionEvent = step?.actionEvent === 'dblclick' ? 'dblclick' : 'click';
   const isMobileViewport = viewportMode === 'mobile';
   const isCompactViewport = viewportMode !== 'desktop';

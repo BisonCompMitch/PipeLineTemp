@@ -221,7 +221,18 @@ function buildTutorialSteps({
   });
   const needsNavOpenStep =
     typeof window !== 'undefined' && window.matchMedia('(max-width: 1000px)').matches;
-  let navStepPrepAdded = false;
+  const pushNavStep = (id, title, path, description, actionEvent = 'click') => {
+    if (needsNavOpenStep) {
+      steps.push({
+        id: `open-navigation-${id}`,
+        title: 'Open Navigation',
+        description: 'Click the menu button to open the navigation list.',
+        targetSelector: '[data-tutorial-id="nav-toggle-button"]',
+        requiredAction: true
+      });
+    }
+    steps.push(buildNavStep(id, title, path, description, actionEvent));
+  };
   const steps = [
     {
       id: 'help-entry',
@@ -231,27 +242,12 @@ function buildTutorialSteps({
     }
   ];
 
-  const ensureNavStepPrep = () => {
-    if (!needsNavOpenStep || navStepPrepAdded) return;
-    navStepPrepAdded = true;
-    steps.push({
-      id: 'open-navigation',
-      title: 'Open Navigation',
-      description: 'Click the menu button to open the navigation list.',
-      targetSelector: '[data-tutorial-id="nav-toggle-button"]',
-      requiredAction: true
-    });
-  };
-
   if (canAccessDashboard) {
-    ensureNavStepPrep();
-    steps.push(
-      buildNavStep(
-        'dashboard',
-        'Dashboard',
-        '/pipeline',
-        'Click Dashboard in the left navigation to open the project dashboard.'
-      )
+    pushNavStep(
+      'dashboard',
+      'Dashboard',
+      '/pipeline',
+      'Click Dashboard in the left navigation to open the project dashboard.'
     );
     steps.push(
       buildInfoStep(
@@ -308,17 +304,22 @@ function buildTutorialSteps({
         'The Project tab shows progress first, then stage details and timing, followed by requester, due date, urgency, budget, required docs, and notes. Date fields display date directly, with time shown on hover where available.'
       )
     );
+    steps.push({
+      id: 'dashboard-close-project',
+      title: 'Close Project Window',
+      description:
+        'Click Close in the project window header to return to the main view before moving to the next section.',
+      targetSelector: '[data-tutorial-id="detail-close-button"]',
+      requiredAction: true
+    });
   }
 
   if (hasBison) {
-    ensureNavStepPrep();
-    steps.push(
-      buildNavStep(
-        'areas',
-        'Areas',
-        '/areas',
-        'Click Areas to open the area queues and stage handoff workflow.'
-      )
+    pushNavStep(
+      'areas',
+      'Areas',
+      '/areas',
+      'Click Areas to open the area queues and stage handoff workflow.'
     );
     steps.push(
       buildInfoStep(
@@ -330,14 +331,11 @@ function buildTutorialSteps({
   }
 
   if (hasBison && hasAdminArea) {
-    ensureNavStepPrep();
-    steps.push(
-      buildNavStep(
-        'intake',
-        'Project Intake',
-        '/intake',
-        'Click Project Intake to create a project, mark required docs, and upload files or photos.'
-      )
+    pushNavStep(
+      'intake',
+      'Project Intake',
+      '/intake',
+      'Click Project Intake to create a project, mark required docs, and upload files or photos.'
     );
     steps.push(
       buildInfoStep(
@@ -349,14 +347,11 @@ function buildTutorialSteps({
   }
 
   if (hasContractor || hasAdminArea) {
-    ensureNavStepPrep();
-    steps.push(
-      buildNavStep(
-        'leads',
-        'Leads',
-        '/leads',
-        'Click Leads to manage leads, notes, and lead uploads.'
-      )
+    pushNavStep(
+      'leads',
+      'Leads',
+      '/leads',
+      'Click Leads to manage leads, notes, and lead uploads.'
     );
     steps.push(
       buildInfoStep(
@@ -368,14 +363,11 @@ function buildTutorialSteps({
   }
 
   if (hasBison && hasAdminArea) {
-    ensureNavStepPrep();
-    steps.push(
-      buildNavStep(
-        'users',
-        'Manage Users',
-        '/users',
-        'Click Manage Users to create accounts and maintain roles, areas, and usernames.'
-      )
+    pushNavStep(
+      'users',
+      'Manage Users',
+      '/users',
+      'Click Manage Users to create accounts and maintain roles, areas, and usernames.'
     );
     steps.push(
       buildInfoStep(
@@ -387,14 +379,11 @@ function buildTutorialSteps({
   }
 
   if (hasCustomer) {
-    ensureNavStepPrep();
-    steps.push(
-      buildNavStep(
-        'customer-progress',
-        'Progress',
-        '/customer',
-        'Click Progress to view the active stage and timeline.'
-      )
+    pushNavStep(
+      'customer-progress',
+      'Progress',
+      '/customer',
+      'Click Progress to view the active stage and timeline.'
     );
     steps.push(
       buildInfoStep(
@@ -403,13 +392,11 @@ function buildTutorialSteps({
         'Progress shows project name, current stage, percent complete, and the full stage flow with status colors for complete, in-progress, and pending. Compact stage names expand on hover where needed so users can read each full stage label.'
       )
     );
-    steps.push(
-      buildNavStep(
-        'customer-files',
-        'Files For Review',
-        '/customer/files',
-        'Click Files for Review to open and download shared project files.'
-      )
+    pushNavStep(
+      'customer-files',
+      'Files For Review',
+      '/customer/files',
+      'Click Files for Review to open and download shared project files.'
     );
     steps.push(
       buildInfoStep(
@@ -418,13 +405,11 @@ function buildTutorialSteps({
         'Files for Review lists customer-visible documents as cards with filename, uploaded date, and size. Supported files open in preview, and all files keep direct download actions for review workflows.'
       )
     );
-    steps.push(
-      buildNavStep(
-        'customer-pictures',
-        'Project Pictures',
-        '/customer/pictures',
-        'Click Project Pictures to review customer-visible photos.'
-      )
+    pushNavStep(
+      'customer-pictures',
+      'Project Pictures',
+      '/customer/pictures',
+      'Click Project Pictures to review customer-visible photos.'
     );
     steps.push(
       buildInfoStep(
