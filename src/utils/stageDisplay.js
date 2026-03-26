@@ -6,6 +6,15 @@ function normalizeId(value) {
   return normalizeValue(value).toLowerCase();
 }
 
+function normalizeStageStatus(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isActiveStageStatus(value) {
+  const status = normalizeStageStatus(value);
+  return status === 'in_progress' || status === 'awaiting_approval';
+}
+
 export function coerceSlabWorkFlag(value) {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') {
@@ -209,17 +218,29 @@ export function normalizeProjectStages(stages = [], options = {}) {
   });
 
   const activeStage =
-    rawStages.find((stage) => String(stage?.status || '').toLowerCase() !== 'complete') || rawStages[rawStages.length - 1];
+    rawStages.find((stage) => isActiveStageStatus(stage?.status)) ||
+    rawStages.find((stage) => normalizeStageStatus(stage?.status) !== 'complete') ||
+    rawStages[rawStages.length - 1];
   const activeId = normalizeId(activeStage?.id || activeStage?.stage_id);
   const activeIndex = flow.findIndex((entry) => entry.id === activeId);
 
   const normalized = flow.map((entry, index) => {
     const existing = byId.get(entry.id);
     if (existing) {
+      const existingStatus = normalizeStageStatus(existing?.status);
+      let nextStatus = existingStatus || 'pending';
+      if (activeIndex >= 0) {
+        if (index < activeIndex) {
+          nextStatus = 'complete';
+        } else if (index === activeIndex && nextStatus === 'pending') {
+          nextStatus = 'in_progress';
+        }
+      }
       return {
         ...existing,
         id: entry.id,
-        name: formatStageName(existing.name || entry.name, entry.id, formatOptions)
+        name: formatStageName(existing.name || entry.name, entry.id, formatOptions),
+        status: nextStatus
       };
     }
 
