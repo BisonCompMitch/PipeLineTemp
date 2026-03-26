@@ -20,6 +20,7 @@ import ModalPortal from '../components/ModalPortal.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import {
   coerceSlabWorkFlag,
+  formatMoneyStageGlyph,
   formatStageName,
   getStageBadgeStyle,
   normalizeProjectStages,
@@ -69,6 +70,10 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'money - design': ['money_design'],
   'money design': ['money_design'],
   money_design: ['money_design'],
+  'invoice sent - d&e': ['invoice_design'],
+  'invoice sent - de': ['invoice_design'],
+  'invoice sent - design': ['invoice_design'],
+  invoice_design: ['invoice_design'],
   'money - slab': ['money_slab'],
   'money slab': ['money_slab'],
   money_slab: ['money_slab'],
@@ -82,13 +87,15 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'money - production': ['money_production'],
   'money production': ['money_production'],
   money_production: ['money_production'],
+  'invoice sent - production': ['invoice_production'],
+  invoice_production: ['invoice_production'],
   manufacturing: ['manufacturing'],
   'money - shipping': ['money_shipping'],
   'money shipping': ['money_shipping'],
   money_shipping: ['money_shipping'],
   'manufacturing - invoice sent': ['money_shipping'],
   'manufacturing invoice sent': ['money_shipping'],
-  'invoice sent': ['money_shipping'],
+  'invoice sent': ['invoice_design', 'invoice_production', 'money_shipping'],
   shipping: ['shipping'],
   'collect final payment': ['final_payment'],
   'final payment': ['final_payment'],
@@ -233,6 +240,13 @@ function stageStatusClass(status) {
   if (status === 'in_progress') return 'progress';
   if (status === 'awaiting_approval') return 'warning';
   return 'neutral';
+}
+
+function progressStageStatusClass(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'complete') return 'complete';
+  if (normalized === 'in_progress' || normalized === 'awaiting_approval') return 'in-progress';
+  return 'pending';
 }
 
 function formatDateTime(value) {
@@ -598,6 +612,10 @@ export default function Pipeline({
       ? window.matchMedia('(min-width: 1101px)').matches
       : true
   );
+  const [isDetailTabletView, setIsDetailTabletView] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return window.matchMedia('(max-width: 1100px) and (min-width: 761px)').matches;
+  });
   const [dashboardClockMs, setDashboardClockMs] = useState(() => Date.now());
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
   const externalStageLabels = Boolean(canUploadProjectFiles) && !canEditProjects;
@@ -820,6 +838,13 @@ export default function Pipeline({
     () => completionPercent(detailStages),
     [detailStages]
   );
+  const detailStageRows = useMemo(() => {
+    const rowCount = isDetailTabletView ? 3 : 2;
+    const rowSize = Math.ceil(detailStages.length / rowCount);
+    return Array.from({ length: rowCount }, (_, index) =>
+      detailStages.slice(index * rowSize, (index + 1) * rowSize)
+    ).filter((row) => row.length > 0);
+  }, [detailStages, isDetailTabletView]);
   const stageNoteTooltipByStageId = useMemo(() => {
     const grouped = new Map();
     stageNotesHistory.forEach((entry) => {
@@ -971,6 +996,19 @@ export default function Pipeline({
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
     const media = window.matchMedia('(min-width: 1101px)');
     const onChange = () => setSplitDashboardLayout(media.matches);
+    onChange();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    }
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia('(max-width: 1100px) and (min-width: 761px)');
+    const onChange = () => setIsDetailTabletView(media.matches);
     onChange();
     if (typeof media.addEventListener === 'function') {
       media.addEventListener('change', onChange);
@@ -1720,14 +1758,66 @@ export default function Pipeline({
                 {detailProject ? (
                   <div className="project-detail-grid">
                 {detailTab === 'project' ? (
-                <div className="detail-card">
+                <div className="detail-card pipeline-progress-card">
                   <div className="detail-card-header">
                     <h3>Progress</h3>
-                    <span className="progress-pill">{`${detailProgress}%`}</span>
+                  </div>
+                  <div className="customer-progress-top pipeline-progress-top">
+                    <div className="muted customer-current-stage-label">Your Project Is In</div>
+                    <p className="customer-current-stage">
+                      {detailCurrentStage
+                        ? formatDisplayStageName(detailCurrentStage.name, detailCurrentStage.id)
+                        : 'Waiting for stage assignment.'}
+                    </p>
                   </div>
                   <div className="progress-track">
                     <div className="progress-fill" style={{ width: `${detailProgress}%` }} />
                   </div>
+                  <div className="progress-meta">
+                    <div className="muted">Progress</div>
+                    <div className="progress-pill">{`${detailProgress}%`}</div>
+                  </div>
+                  {detailStages.length ? (
+                    <div className="customer-stage-table-wrap">
+                      <div className="customer-stage-table-scroll">
+                        <div className="customer-stage-grid">
+                          {detailStageRows.map((row, rowIndex) => {
+                            const cells = row.map((item) => {
+                              const fullName = formatDisplayStageName(item?.name, item?.id);
+                              const compactName = formatMoneyStageGlyph(item?.name, item?.id, {
+                                audience: externalStageLabels ? 'external' : 'internal'
+                              });
+                              const isMoneyGlyph = compactName.trim().endsWith('$');
+                              return { item, fullName, compactName, isMoneyGlyph };
+                            });
+                            const columnTemplate = cells
+                              .map((cell) => (cell.isMoneyGlyph ? '0.65fr' : '1fr'))
+                              .join(' ');
+                            return (
+                              <div
+                                key={`detail-stage-row-${rowIndex}`}
+                                className="customer-stage-row"
+                                style={{ gridTemplateColumns: columnTemplate }}
+                              >
+                                {cells.map(({ item, fullName, compactName, isMoneyGlyph }) => (
+                                  <div
+                                    key={item.id}
+                                    className={`customer-stage-cell ${progressStageStatusClass(item.status)}${
+                                      isMoneyGlyph ? ' money-glyph' : ''
+                                    }`}
+                                    title={compactName !== fullName ? fullName : undefined}
+                                  >
+                                    <span className="customer-stage-label-desktop">{compactName}</span>
+                                    <span className="customer-stage-label-mobile">{fullName}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 ) : null}
 

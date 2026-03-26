@@ -136,7 +136,7 @@ export default function Customer() {
                   const cells = row.map((item) => {
                     const fullName = formatStageName(item?.name, item?.id, { audience: 'external' });
                     const compactName = formatMoneyStageGlyph(item?.name, item?.id, { audience: 'external' });
-                    const isMoneyGlyph = compactName === '$';
+                    const isMoneyGlyph = compactName.trim().endsWith('$');
                     return { item, fullName, compactName, isMoneyGlyph };
                   });
                   const columnTemplate = cells
