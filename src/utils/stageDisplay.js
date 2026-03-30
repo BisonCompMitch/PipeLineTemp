@@ -86,11 +86,12 @@ const SLAB_STAGE_IDS = new Set(['money_slab', 'slab_work']);
 const MONEY_STAGE_IDS = new Set(['money_design', 'money_slab', 'money_production', 'money_shipping', 'final_payment']);
 const INVOICE_STAGE_IDS = new Set(['invoice_design', 'invoice_production', 'invoice_shipping']);
 
-const COLOR_PLANS = '#BAE6FD';
+const COLOR_PLANS = '#E5E7EB';
 const COLOR_BUDGET = '#86EFAC';
 const COLOR_MONEY = '#FCA5A5';
-const COLOR_DESIGN = '#C4B5FD';
-const COLOR_ENGINEERING = '#93C5FD';
+const COLOR_INVOICE = '#FDE68A';
+const COLOR_DESIGN = '#BBF7D0';
+const COLOR_ENGINEERING = '#BFDBFE';
 const COLOR_ESTIMATING = '#FDE68A';
 const COLOR_MANUFACTURING = '#FDBA74';
 const COLOR_SHIPPING = '#99F6E4';
@@ -101,17 +102,17 @@ const COLOR_SLAB_WORK = '#FBCFE8';
 export const STAGE_COLORS = {
   plans_received: COLOR_PLANS,
   budget: COLOR_BUDGET,
-  invoice_design: COLOR_MONEY,
+  invoice_design: COLOR_INVOICE,
   money_design: COLOR_MONEY,
   design: COLOR_DESIGN,
   engineering: COLOR_ENGINEERING,
   estimating: COLOR_ESTIMATING,
   money_slab: COLOR_SLAB_MONEY,
   slab_work: COLOR_SLAB_WORK,
-  invoice_production: COLOR_MONEY,
+  invoice_production: COLOR_INVOICE,
   money_production: COLOR_MONEY,
   manufacturing: COLOR_MANUFACTURING,
-  invoice_shipping: COLOR_MONEY,
+  invoice_shipping: COLOR_INVOICE,
   money_shipping: COLOR_MONEY,
   shipping: COLOR_SHIPPING,
   final_payment: COLOR_MONEY,

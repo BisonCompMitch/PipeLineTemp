@@ -322,6 +322,32 @@ function formatStageEstimateTooltip(stage, waitingSince = null, nowMs = Date.now
   return `${stageName}\n${formatDurationMinutes(Math.abs(remainingMinutes))} overdue (${expectedText}h estimate).`;
 }
 
+function stageTimingAlertTone(stage, waitingSince = null, nowMs = Date.now()) {
+  if (!stage) return '';
+  const attentionWindowMs = 48 * 3600000;
+  const expected = Number(stage.expected_hours ?? stage.default_duration_hours ?? 0);
+  const startedAtMs = stage.started_at ? new Date(stage.started_at).getTime() : Number.NaN;
+  if (
+    ['in_progress', 'awaiting_approval'].includes(String(stage.status || '').trim().toLowerCase()) &&
+    Number.isFinite(expected) &&
+    expected > 0 &&
+    !Number.isNaN(startedAtMs)
+  ) {
+    const dueAtMs = startedAtMs + expected * 3600000;
+    const remainingMs = dueAtMs - nowMs;
+    if (remainingMs <= 0) return 'red';
+    if (remainingMs <= attentionWindowMs) return 'yellow';
+    return '';
+  }
+  if (waitingSince) {
+    const waitingSinceMs = new Date(waitingSince).getTime();
+    if (!Number.isNaN(waitingSinceMs) && nowMs - waitingSinceMs >= attentionWindowMs) {
+      return 'yellow';
+    }
+  }
+  return '';
+}
+
 function formatBytes(value) {
   const size = Number(value || 0);
   if (!size) return '-';
@@ -1555,6 +1581,7 @@ export default function Pipeline({
 
   const renderDashboardRow = (row, idx, keyPrefix = 'row') => {
     const areaStyle = getStageBadgeStyle(row.areaId);
+    const timingAlertTone = stageTimingAlertTone(row.stage, row.stageWaitingSince, dashboardClockMs);
     const areaNoteTitle = formatStageEstimateTooltip(
       row.stage,
       row.stageWaitingSince,
@@ -1576,7 +1603,9 @@ export default function Pipeline({
         </td>
         <td>
           <span
-            className={`area-pill${showHoverNotes ? ' dashboard-area-with-notes' : ''}`}
+            className={`area-pill${showHoverNotes ? ' dashboard-area-with-notes' : ''}${
+              timingAlertTone ? ` time-alert-${timingAlertTone}` : ''
+            }`}
             style={areaStyle}
             title={areaNoteTitle}
           >

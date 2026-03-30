@@ -170,27 +170,27 @@ function formatDuration(totalMinutes) {
 
 function countdownForStage(stage, nowMs) {
   if (stage?.id === 'final_payment' && stage.status !== 'complete') {
-    return { label: 'Critical', tone: 'red' };
+    return { label: 'Critical', tone: 'red', pulse: true };
   }
   const expected = Number(stage?.expected_hours ?? stage?.default_duration_hours ?? 0);
   if (!stage || stage.status !== 'in_progress' || !stage.started_at || expected <= 0) {
-    return { label: '-', tone: 'neutral' };
+    return { label: '-', tone: 'neutral', pulse: false };
   }
   const acceptedAtMs = new Date(stage.started_at).getTime();
   if (Number.isNaN(acceptedAtMs)) {
-    return { label: '-', tone: 'neutral' };
+    return { label: '-', tone: 'neutral', pulse: false };
   }
 
   const dueAtMs = acceptedAtMs + expected * 3600000;
   const remainingMs = dueAtMs - nowMs;
   const absMinutes = Math.round(Math.abs(remainingMs) / 60000);
   if (remainingMs < 0) {
-    return { label: `${formatDuration(absMinutes)} overdue`, tone: 'red' };
+    return { label: `${formatDuration(absMinutes)} overdue`, tone: 'red', pulse: true };
   }
-  if (remainingMs <= 4 * 3600000) {
-    return { label: `${formatDuration(absMinutes)} left`, tone: 'yellow' };
+  if (remainingMs <= 48 * 3600000) {
+    return { label: `${formatDuration(absMinutes)} left`, tone: 'yellow', pulse: true };
   }
-  return { label: `${formatDuration(absMinutes)} left`, tone: 'green' };
+  return { label: `${formatDuration(absMinutes)} left`, tone: 'green', pulse: false };
 }
 
 function stageStatusClass(status) {
@@ -968,6 +968,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     [selectedRow?.project?.summary]
   );
   const sortedRows = useMemo(() => [...rows].sort(compareRowsByProjectNumber), [rows]);
+  const selectedRowCountdown = selectedRow ? countdownForStage(selectedRow.stage, nowMs) : null;
   return (
     <>
       <section className="panel">
@@ -1018,7 +1019,9 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                     <td>{STATUS_LABELS[stage.status] || stage.status}</td>
                     <td>{formatAcceptedAt(stage.started_at)}</td>
                     <td>
-                      <span className={`status-pill ${countdown.tone}`}>{countdown.label}</span>
+                      <span className={`status-pill ${countdown.tone}${countdown.pulse ? ' pulse-subtle' : ''}`}>
+                        {countdown.label}
+                      </span>
                     </td>
                     <td>
                       <div className="expected-cell">
@@ -1147,8 +1150,12 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-pill ${countdownForStage(selectedRow.stage, nowMs).tone}`}>
-                          {countdownForStage(selectedRow.stage, nowMs).label}
+                        <span
+                          className={`status-pill ${selectedRowCountdown?.tone || 'neutral'}${
+                            selectedRowCountdown?.pulse ? ' pulse-subtle' : ''
+                          }`}
+                        >
+                          {selectedRowCountdown?.label || '-'}
                         </span>
                       </td>
                     </tr>

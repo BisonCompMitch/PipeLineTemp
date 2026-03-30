@@ -1929,12 +1929,17 @@ body::before {
 }
 
 .pipeline-progress-card {
-  padding: 16px;
-  gap: 10px;
+  padding: 14px 16px;
+  gap: 8px;
+}
+
+.pipeline-progress-card .detail-card-header {
+  margin-bottom: 4px;
 }
 
 .pipeline-progress-card .customer-progress-top {
-  gap: 2px;
+  gap: 4px;
+  margin-top: 0;
 }
 
 .pipeline-progress-card .customer-current-stage-label {
@@ -1953,6 +1958,10 @@ body::before {
 
 .pipeline-progress-card .progress-meta {
   gap: 10px;
+}
+
+.pipeline-progress-card .customer-stage-table-wrap {
+  margin-top: 2px;
 }
 
 .pipeline-progress-card .customer-stage-cell {
@@ -2028,8 +2037,8 @@ body::before {
 }
 
 .status-pill.warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: #e9d5ff;
+  color: #6b21a8;
 }
 
 .status-pill.green {
@@ -2050,6 +2059,38 @@ body::before {
 .status-pill.neutral {
   background: #e2e8f0;
   color: #475569;
+}
+
+@keyframes subtleAttentionPulseYellow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.24);
+    filter: brightness(1.04);
+  }
+}
+
+@keyframes subtleAttentionPulseRed {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.22);
+    filter: brightness(1.04);
+  }
+}
+
+.status-pill.pulse-subtle.yellow {
+  animation: subtleAttentionPulseYellow 2s ease-in-out infinite;
+}
+
+.status-pill.pulse-subtle.red {
+  animation: subtleAttentionPulseRed 2s ease-in-out infinite;
 }
 
 .stage-item {
@@ -3528,6 +3569,11 @@ body::before {
   color: #e2e8f0;
 }
 
+.detail-card h3 {
+  margin: 0;
+  line-height: 1.2;
+}
+
 .detail-title-input {
   width: 100%;
   padding: 10px 14px;
@@ -3734,6 +3780,23 @@ body::before {
   max-width: 100%;
   line-height: 1.2;
   text-align: center;
+}
+
+.area-pill.time-alert-yellow {
+  animation: subtleAttentionPulseYellow 2s ease-in-out infinite;
+}
+
+.area-pill.time-alert-red {
+  animation: subtleAttentionPulseRed 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill.pulse-subtle.yellow,
+  .status-pill.pulse-subtle.red,
+  .area-pill.time-alert-yellow,
+  .area-pill.time-alert-red {
+    animation: none;
+  }
 }
 
 .dashboard-intake {

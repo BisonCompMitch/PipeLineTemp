@@ -55,6 +55,20 @@ function completionPercent(stages = []) {
   return Math.round((done / total) * 100);
 }
 
+function stageTimingAlertTone(stage, nowMs = Date.now()) {
+  if (!stage) return '';
+  const expected = Number(stage.expected_hours ?? stage.default_duration_hours ?? 0);
+  if (!['in_progress', 'awaiting_approval'].includes(stage.status) || !stage.started_at || expected <= 0) {
+    return '';
+  }
+  const startedAtMs = new Date(stage.started_at).getTime();
+  if (Number.isNaN(startedAtMs)) return '';
+  const remainingMs = startedAtMs + expected * 3600000 - nowMs;
+  if (remainingMs <= 0) return 'red';
+  if (remainingMs <= 48 * 3600000) return 'yellow';
+  return '';
+}
+
 export default function Contractor() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +90,7 @@ export default function Contractor() {
             id: project.id,
             projectNumber: project.project_number || '',
             name: project.name || 'Unnamed project',
+            stage,
             areaId: stage?.id || '',
             area: formatStageName(stage?.name, stage?.id, { audience: 'external' }) || 'Pending',
             progress: completionPercent(stages),
@@ -137,12 +152,16 @@ export default function Contractor() {
                 const tone = row.statusTone || 'neutral';
                 const statusLabel = TONE_LABELS[tone] || 'On Time';
                 const statusColor = TONE_COLORS[tone] || TONE_COLORS.neutral;
+                const timingAlertTone = stageTimingAlertTone(row.stage);
                 return (
                   <tr key={row.id}>
                     <td>{row.projectNumber || '-'}</td>
                     <td>{row.name}</td>
                     <td>
-                      <span className="area-pill" style={getStageBadgeStyle(row.areaId)}>
+                      <span
+                        className={`area-pill${timingAlertTone ? ` time-alert-${timingAlertTone}` : ''}`}
+                        style={getStageBadgeStyle(row.areaId)}
+                      >
                         {row.area}
                       </span>
                     </td>
