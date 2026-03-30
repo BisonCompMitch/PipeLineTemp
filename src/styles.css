@@ -2061,36 +2061,40 @@ body::before {
   color: #475569;
 }
 
-@keyframes subtleAttentionPulseYellow {
+@keyframes chipFlashYellow {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    background-color: #fef3c7;
+    color: #92400e;
     filter: brightness(1);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.24);
-    filter: brightness(1.04);
+    background-color: #f59e0b;
+    color: #111827;
+    filter: brightness(1.15);
   }
 }
 
-@keyframes subtleAttentionPulseRed {
+@keyframes chipFlashRed {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    background-color: #fee2e2;
+    color: #991b1b;
     filter: brightness(1);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.22);
-    filter: brightness(1.04);
+    background-color: #ef4444;
+    color: #ffffff;
+    filter: brightness(1.15);
   }
 }
 
 .status-pill.pulse-subtle.yellow {
-  animation: subtleAttentionPulseYellow 2s ease-in-out infinite;
+  animation: chipFlashYellow 1.2s ease-in-out infinite;
 }
 
 .status-pill.pulse-subtle.red {
-  animation: subtleAttentionPulseRed 2s ease-in-out infinite;
+  animation: chipFlashRed 1.2s ease-in-out infinite;
 }
 
 .stage-item {
@@ -3783,11 +3787,11 @@ body::before {
 }
 
 .area-pill.time-alert-yellow {
-  animation: subtleAttentionPulseYellow 2s ease-in-out infinite;
+  animation: chipFlashYellow 1.2s ease-in-out infinite;
 }
 
 .area-pill.time-alert-red {
-  animation: subtleAttentionPulseRed 2s ease-in-out infinite;
+  animation: chipFlashRed 1.2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
