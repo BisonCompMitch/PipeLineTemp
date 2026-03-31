@@ -878,11 +878,19 @@ export default function App() {
                   onComplete={(result) => {
                     const nextUsername = String(result?.login_username || result?.username || '').trim();
                     const nextFullName = String(result?.full_name || '').trim();
+                    const nextAccessToken = String(result?.access_token || '').trim();
+                    const nextRefreshToken = String(result?.refresh_token || '').trim();
                     if (nextUsername) {
                       setStoredUsername(nextUsername);
                     }
                     if (nextFullName) {
                       setDisplayName(nextFullName);
+                    }
+                    if (nextAccessToken) {
+                      setAccessToken(nextAccessToken);
+                    }
+                    if (nextRefreshToken) {
+                      setRefreshToken(nextRefreshToken);
                     }
                     setFirstLoginState(DEFAULT_FIRST_LOGIN_STATE);
                     navigate(defaultRoute, { replace: true });

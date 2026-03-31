@@ -2064,28 +2064,28 @@ body::before {
 @keyframes chipFlashYellow {
   0%,
   100% {
-    background-color: #fef3c7;
-    color: #92400e;
-    filter: brightness(1);
+    filter: brightness(1) saturate(1);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   }
   50% {
-    background-color: #f59e0b;
-    color: #111827;
-    filter: brightness(1.15);
+    filter: brightness(1.32) saturate(1.55) contrast(1.03);
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.22),
+      0 0 16px rgba(250, 204, 21, 0.55);
   }
 }
 
 @keyframes chipFlashRed {
   0%,
   100% {
-    background-color: #fee2e2;
-    color: #991b1b;
-    filter: brightness(1);
+    filter: brightness(1) saturate(1);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   }
   50% {
-    background-color: #ef4444;
-    color: #ffffff;
-    filter: brightness(1.15);
+    filter: brightness(1.28) saturate(1.5) contrast(1.03);
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.2),
+      0 0 16px rgba(248, 113, 113, 0.58);
   }
 }
 
