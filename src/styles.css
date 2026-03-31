@@ -1929,44 +1929,47 @@ body::before {
 }
 
 .pipeline-progress-card {
-  padding: 14px 16px;
-  gap: 8px;
+  padding: 22px 22px 18px;
+  gap: 14px;
 }
 
 .pipeline-progress-card .detail-card-header {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .pipeline-progress-card .customer-progress-top {
-  gap: 4px;
-  margin-top: 0;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .pipeline-progress-card .customer-current-stage-label {
   margin-top: 0;
-  font-size: 14.667px;
+  font-size: 16px;
 }
 
 .pipeline-progress-card .customer-current-stage {
-  font-size: clamp(20px, 2.6vw, 30px);
+  font-size: clamp(24px, 2.5vw, 42px);
+  line-height: 1.15;
 }
 
 .pipeline-progress-card .progress-track {
   max-width: 100%;
-  height: 10px;
-}
-
-.pipeline-progress-card .progress-meta {
-  gap: 10px;
-}
-
-.pipeline-progress-card .customer-stage-table-wrap {
+  height: 11px;
   margin-top: 2px;
 }
 
+.pipeline-progress-card .progress-meta {
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.pipeline-progress-card .customer-stage-table-wrap {
+  margin-top: 10px;
+}
+
 .pipeline-progress-card .customer-stage-cell {
-  min-height: 44px;
-  padding: 6px 10px;
+  min-height: 54px;
+  padding: 10px 12px;
   font-size: 16px;
 }
 
