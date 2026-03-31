@@ -229,6 +229,7 @@ function toEditForm(project) {
     project_number: project?.project_number || '',
     name: project?.name || '',
     requester: project?.requester || '',
+    project_location_state: project?.project_location_state || '',
     due_date: project?.due_date || '',
     urgency: project?.urgency || 'standard',
     budget: project?.budget || '',
@@ -1188,6 +1189,7 @@ export default function Pipeline({
         project_number: trimOrNull(detailForm.project_number),
         name: detailForm.name.trim(),
         requester: detailForm.requester.trim(),
+        project_location_state: trimOrNull(detailForm.project_location_state),
         due_date: trimOrNull(detailForm.due_date),
         urgency: trimOrNull(detailForm.urgency) || 'standard',
         budget: trimOrNull(detailForm.budget),
@@ -1907,6 +1909,22 @@ export default function Pipeline({
                       ) : (
                         <div className={`field-static${detailForm.requester ? '' : ' empty'}`}>
                           {detailForm.requester || '-'}
+                        </div>
+                      )}
+                    </label>
+                    <label>
+                      Project Location (State)
+                      {canEditProjectDetails ? (
+                        <input
+                          value={detailForm.project_location_state}
+                          onChange={(event) =>
+                            setDetailForm({ ...detailForm, project_location_state: event.target.value })
+                          }
+                          placeholder="AZ"
+                        />
+                      ) : (
+                        <div className={`field-static${detailForm.project_location_state ? '' : ' empty'}`}>
+                          {detailForm.project_location_state || '-'}
                         </div>
                       )}
                     </label>

@@ -1195,6 +1195,12 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                   </div>
                 </label>
                 <label>
+                  Project Location (State)
+                  <div className={`field-static${selectedRow.project.project_location_state ? '' : ' empty'}`}>
+                    {selectedRow.project.project_location_state || '-'}
+                  </div>
+                </label>
+                <label>
                   Due date
                   <div className={`field-static${selectedRow.project.due_date ? '' : ' empty'}`}>
                     {selectedRow.project.due_date || '-'}

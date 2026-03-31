@@ -34,6 +34,13 @@ function formatBytes(value) {
   return `${mb.toFixed(1)} MB`;
 }
 
+function formatDateTime(value) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleString();
+}
+
 function getFileTypeLabel(filename) {
   const name = String(filename || '').trim();
   if (!name.includes('.')) return 'FILE';
@@ -67,6 +74,7 @@ export default function Leads({ isAdminView = false }) {
   const [form, setForm] = useState({
     name: '',
     company: '',
+    project_location_state: '',
     email: '',
     phone: '',
     status: 'new',
@@ -174,7 +182,7 @@ export default function Leads({ isAdminView = false }) {
           nextMessage = `Lead added with ${result.uploaded} file${result.uploaded === 1 ? '' : 's'}.`;
         }
       }
-      setForm({ name: '', company: '', email: '', phone: '', status: 'new', notes: '' });
+      setForm({ name: '', company: '', project_location_state: '', email: '', phone: '', status: 'new', notes: '' });
       setQueuedFiles([]);
       setMessage(nextMessage);
       await refresh();
@@ -191,6 +199,7 @@ export default function Leads({ isAdminView = false }) {
       await updateLead(editing.id, {
         name: editing.name,
         company: editing.company,
+        project_location_state: editing.project_location_state,
         email: editing.email,
         phone: editing.phone,
         status: editing.status,
@@ -344,6 +353,14 @@ export default function Leads({ isAdminView = false }) {
             <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
           </label>
           <label>
+            Project Location (State)
+            <input
+              value={form.project_location_state}
+              onChange={(e) => setForm({ ...form, project_location_state: e.target.value })}
+              placeholder="AZ"
+            />
+          </label>
+          <label>
             Email
             <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </label>
@@ -468,6 +485,7 @@ export default function Leads({ isAdminView = false }) {
               <th>Company</th>
               <th>Email</th>
               <th>Phone</th>
+              <th>Created</th>
               <th>Status</th>
               {isAdminView ? <th>Creator company</th> : null}
             </tr>
@@ -480,6 +498,7 @@ export default function Leads({ isAdminView = false }) {
                   <td>{lead.company || '-'}</td>
                   <td>{lead.email || '-'}</td>
                   <td>{lead.phone || '-'}</td>
+                  <td>{formatDateTime(lead.created_at)}</td>
                   <td>
                     <span className={statusClass(lead.status)}>{lead.status}</span>
                   </td>
@@ -488,7 +507,7 @@ export default function Leads({ isAdminView = false }) {
               ))
             ) : (
               <tr className="empty-row">
-                <td colSpan={isAdminView ? 6 : 5}>
+                <td colSpan={isAdminView ? 7 : 6}>
                   {isAdminView && creatorCompanyFilter !== CREATOR_COMPANY_ALL
                     ? 'No leads match that creator company.'
                     : 'No leads yet.'}
@@ -517,6 +536,14 @@ export default function Leads({ isAdminView = false }) {
                   <input value={editing.company || ''} onChange={(e) => setEditing({ ...editing, company: e.target.value })} />
                 </label>
                 <label>
+                  Project Location (State)
+                  <input
+                    value={editing.project_location_state || ''}
+                    onChange={(e) => setEditing({ ...editing, project_location_state: e.target.value })}
+                    placeholder="AZ"
+                  />
+                </label>
+                <label>
                   Email
                   <input value={editing.email || ''} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
                 </label>
@@ -531,6 +558,10 @@ export default function Leads({ isAdminView = false }) {
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
+                </label>
+                <label className="span-2">
+                  Created
+                  <div className="field-static">{formatDateTime(editing.created_at)}</div>
                 </label>
                 <label className="span-2">
                   Notes

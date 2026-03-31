@@ -54,6 +54,7 @@ export default function Intake() {
   const [form, setForm] = useState({
     name: '',
     requester: '',
+    project_location_state: '',
     urgency: 'standard',
     budget: '',
     slab_work: false,
@@ -200,6 +201,7 @@ export default function Intake() {
       const createdProject = await createProject({
         name: form.name.trim(),
         requester,
+        project_location_state: form.project_location_state.trim(),
         due_date: todayLocalIso(),
         urgency: form.urgency,
         budget: form.budget.trim(),
@@ -249,6 +251,7 @@ export default function Intake() {
       setForm({
         name: '',
         requester: '',
+        project_location_state: '',
         urgency: 'standard',
         budget: '',
         slab_work: false,
@@ -303,6 +306,14 @@ export default function Intake() {
               <option value="rush">Rush</option>
               <option value="critical">Critical</option>
             </select>
+          </label>
+          <label>
+            Project Location (State)
+            <input
+              value={form.project_location_state}
+              onChange={updateField('project_location_state')}
+              placeholder="AZ"
+            />
           </label>
           <label className="span-2">
             Budget
