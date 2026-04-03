@@ -458,6 +458,19 @@ export async function updateLead(leadId, payload) {
   return apiJson(`/leads/${leadId}`, { method: 'PATCH', body: payload });
 }
 
+export async function requestLeadQuote(leadId, payload) {
+  return apiJson(`/leads/${encodeURIComponent(leadId)}/request-quote`, {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export async function convertLeadToProject(leadId) {
+  return apiJson(`/leads/${encodeURIComponent(leadId)}/convert-to-project`, {
+    method: 'POST'
+  });
+}
+
 export async function deleteLead(leadId) {
   return apiJson(`/leads/${leadId}`, { method: 'DELETE' });
 }
