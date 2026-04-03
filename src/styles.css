@@ -4387,16 +4387,28 @@ body::before {
   .lead-create-grid {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
+
+  .lead-filters-grid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
 }
 
 @media (max-width: 980px) {
   .lead-create-grid {
     grid-template-columns: 1fr;
   }
+
+  .lead-filters-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .lead-upload-section {
   margin-top: 2px;
+}
+
+.lead-message {
+  margin: 6px 0 2px;
 }
 
 .lead-files-header {
@@ -4418,8 +4430,54 @@ body::before {
   gap: 10px;
 }
 
+.lead-toolbar {
+  gap: 10px;
+}
+
+.lead-filters {
+  margin: 0 0 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.lead-filters h3 {
+  margin: 0 0 10px;
+}
+
+.lead-filters-grid {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.lead-docs-block {
+  grid-column: 1 / -1;
+}
+
+.lead-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.lead-files-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(20, 30, 46, 0.45);
+}
+
+.lead-file-actions-inline {
+  display: flex;
+  gap: 8px;
+}
+
 .lead-table {
-  min-width: 900px;
+  min-width: 1300px;
 }
 
 .lead-status {
