@@ -92,6 +92,27 @@ function formatBytes(value) {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
+function getFileTypeLabel(filename) {
+  const text = String(filename || '').trim();
+  if (!text.includes('.')) return 'FILE';
+  const extension = text.split('.').pop() || '';
+  const cleaned = extension.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  return cleaned ? cleaned.slice(0, 6) : 'FILE';
+}
+
+function summarizeSelection(items, emptyLabel, pluralLabel) {
+  const count = Array.isArray(items) ? items.length : 0;
+  if (!count) return emptyLabel;
+  return count === 1 ? '1 file selected' : `${count} ${pluralLabel} selected`;
+}
+
+function queueFiles(files) {
+  return files.map((file, index) => ({
+    id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    file
+  }));
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -114,19 +135,23 @@ export default function Leads({ isAdminView = false }) {
   const [requestingQuote, setRequestingQuote] = useState(false);
   const [convertingLead, setConvertingLead] = useState(false);
   const [createFiles, setCreateFiles] = useState([]);
+  const [createFileDragActive, setCreateFileDragActive] = useState(false);
   const [editFiles, setEditFiles] = useState([]);
   const [newEditFiles, setNewEditFiles] = useState([]);
   const [editFilesStatus, setEditFilesStatus] = useState('');
-  const [creatorCompanyFilter, setCreatorCompanyFilter] = useState(CREATOR_COMPANY_ALL);
   const [filters, setFilters] = useState({
-    search: '',
-    status: FILTER_ALL,
-    priority: FILTER_ALL,
-    owner: '',
+    name: '',
     company: '',
     project_location_state: '',
     zip_code: '',
-    quote_requested: FILTER_ALL
+    owner: '',
+    priority: FILTER_ALL,
+    status: FILTER_ALL,
+    quote_requested: FILTER_ALL,
+    created: '',
+    email: '',
+    phone: '',
+    creator_company: CREATOR_COMPANY_ALL
   });
   const { alertDialog, confirmDialog, promptDialog, dialogPortal } = useSiteDialog();
 
@@ -161,6 +186,23 @@ export default function Leads({ isAdminView = false }) {
     return { uploaded, failed };
   }, []);
 
+  const handleSelectCreateFiles = useCallback((event) => {
+    const picked = Array.from(event.target.files || []);
+    setCreateFiles(queueFiles(picked));
+  }, []);
+
+  const handleCreateFileDrop = useCallback((event) => {
+    event.preventDefault();
+    setCreateFileDragActive(false);
+    const dropped = Array.from(event.dataTransfer?.files || []);
+    if (!dropped.length) return;
+    setCreateFiles(queueFiles(dropped));
+  }, []);
+
+  const removeQueuedCreateFile = useCallback((fileId) => {
+    setCreateFiles((prev) => prev.filter((item) => item.id !== fileId));
+  }, []);
+
   const loadLeadFiles = useCallback(async (leadId) => {
     if (!leadId) return;
     try {
@@ -184,54 +226,42 @@ export default function Leads({ isAdminView = false }) {
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
   }, [isAdminView, leads]);
 
-  const rows = useMemo(() => {
-    if (!isAdminView || creatorCompanyFilter === CREATOR_COMPANY_ALL) return leads;
-    const selected = creatorCompanyFilter.trim().toLowerCase();
-    return leads.filter(
-      (lead) => String(lead?.created_by_company || '').trim().toLowerCase() === selected
-    );
-  }, [leads, isAdminView, creatorCompanyFilter]);
-
   const filteredRows = useMemo(() => {
-    const search = String(filters.search || '').trim().toLowerCase();
-    return rows.filter((lead) => {
+    return leads.filter((lead) => {
+      const name = String(lead?.name || '').trim();
       const owner = String(lead?.owner || '').trim();
       const company = String(lead?.company || '').trim();
       const state = String(lead?.project_location_state || '').trim();
       const zip = String(lead?.zip_code || '').trim();
+      const email = String(lead?.email || '').trim();
+      const phone = String(lead?.phone || '').trim();
+      const created = formatDateTime(lead?.created_at);
+      const creatorCompany = String(lead?.created_by_company || '').trim();
       const priority = normalizePriority(lead?.priority, 'mid');
       const status = String(lead?.status || '').trim().toLowerCase();
       const hasQuote = Boolean(lead?.quote_requested_at);
-      if (search) {
-        const haystack = [
-          lead?.name,
-          company,
-          lead?.email,
-          lead?.phone,
-          owner,
-          state,
-          zip
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!haystack.includes(search)) return false;
-      }
-      if (filters.status !== FILTER_ALL && status !== String(filters.status).toLowerCase()) return false;
-      if (filters.priority !== FILTER_ALL && priority !== String(filters.priority).toLowerCase()) return false;
-      if (filters.owner && !owner.toLowerCase().includes(filters.owner.toLowerCase())) return false;
+      if (filters.name && !name.toLowerCase().includes(filters.name.toLowerCase())) return false;
       if (filters.company && !company.toLowerCase().includes(filters.company.toLowerCase())) return false;
-      if (
-        filters.project_location_state &&
-        !state.toLowerCase().includes(filters.project_location_state.toLowerCase())
-      )
+      if (filters.project_location_state && !state.toLowerCase().includes(filters.project_location_state.toLowerCase()))
         return false;
       if (filters.zip_code && !zip.toLowerCase().includes(filters.zip_code.toLowerCase())) return false;
+      if (filters.owner && !owner.toLowerCase().includes(filters.owner.toLowerCase())) return false;
+      if (filters.email && !email.toLowerCase().includes(filters.email.toLowerCase())) return false;
+      if (filters.phone && !phone.toLowerCase().includes(filters.phone.toLowerCase())) return false;
+      if (filters.created && !created.toLowerCase().includes(filters.created.toLowerCase())) return false;
+      if (filters.status !== FILTER_ALL && status !== String(filters.status).toLowerCase()) return false;
+      if (filters.priority !== FILTER_ALL && priority !== String(filters.priority).toLowerCase()) return false;
       if (filters.quote_requested === 'requested' && !hasQuote) return false;
       if (filters.quote_requested === 'pending' && hasQuote) return false;
+      if (
+        isAdminView &&
+        filters.creator_company !== CREATOR_COMPANY_ALL &&
+        creatorCompany.toLowerCase() !== String(filters.creator_company).toLowerCase()
+      )
+        return false;
       return true;
     });
-  }, [rows, filters]);
+  }, [leads, filters, isAdminView]);
 
   const handleCreateLead = async (event) => {
     event.preventDefault();
@@ -248,7 +278,10 @@ export default function Leads({ isAdminView = false }) {
         required_docs: normalizeRequiredDocs(form.required_docs)
       });
       if (createFiles.length) {
-        await uploadFilesToLead(created.id, createFiles);
+        await uploadFilesToLead(
+          created.id,
+          createFiles.map((item) => item.file)
+        );
       }
       setForm(buildLeadFormState());
       setCreateFiles([]);
@@ -372,7 +405,7 @@ export default function Leads({ isAdminView = false }) {
     }
   };
 
-  const tableColCount = isAdminView ? 11 : 10;
+  const tableColCount = isAdminView ? 12 : 11;
 
   return (
     <>
@@ -383,21 +416,14 @@ export default function Leads({ isAdminView = false }) {
             <p className="muted">Track contractor leads.</p>
           </div>
           <div className="detail-header-actions lead-toolbar">
-            {isAdminView ? (
-              <label className="pipeline-area-select">
-                <span className="muted">Creator company</span>
-                <select value={creatorCompanyFilter} onChange={(event) => setCreatorCompanyFilter(event.target.value)}>
-                  <option value={CREATOR_COMPANY_ALL}>All</option>
-                  {creatorCompanyOptions.map((company) => (
-                    <option key={company} value={company}>
-                      {company}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <button className="ghost" type="button" onClick={() => setFormOpen((prev) => !prev)}>
-              {formOpen ? 'Hide lead intake' : 'Show lead intake'}
+            <button
+              className="ghost lead-intake-toggle"
+              type="button"
+              aria-expanded={formOpen}
+              onClick={() => setFormOpen((prev) => !prev)}
+            >
+              <span className="lead-intake-toggle-arrow">{formOpen ? '^' : 'v'}</span>
+              <span>{formOpen ? 'Lead intake' : 'Lead intake'}</span>
             </button>
           </div>
         </div>
@@ -501,17 +527,83 @@ export default function Leads({ isAdminView = false }) {
                   ))}
                 </div>
               </div>
-              <label className="span-2">
-                Files
-                <input
-                  type="file"
-                  multiple
-                  onChange={(event) => setCreateFiles(Array.from(event.target.files || []))}
-                />
-                <span className="muted">
-                  {createFiles.length ? `${createFiles.length} file(s) selected` : 'No files selected'}
-                </span>
-              </label>
+              <div className="intake-upload-section span-2">
+                <div className="intake-docs-title">Files</div>
+                <div className="file-upload-form">
+                  <div
+                    className={`file-upload-row${createFileDragActive ? ' drag-active' : ''}`}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'copy';
+                    }}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      setCreateFileDragActive(true);
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      setCreateFileDragActive(false);
+                    }}
+                    onDrop={handleCreateFileDrop}
+                  >
+                    <div className="file-drop-hint">
+                      <span className="file-drop-icon" aria-hidden="true">
+                        +
+                      </span>
+                      <span>{createFileDragActive ? 'Drop files to upload' : 'Drag and drop files here'}</span>
+                    </div>
+                    <span className="file-upload-name">
+                      {summarizeSelection(createFiles, 'No files selected', 'files')}
+                    </span>
+                  </div>
+                  <div className="file-upload-actions">
+                    <div className="file-upload-controls">
+                      <input
+                        id="lead-intake-file-upload"
+                        className="file-upload-input"
+                        type="file"
+                        multiple
+                        onChange={handleSelectCreateFiles}
+                      />
+                      <label htmlFor="lead-intake-file-upload" className="ghost file-upload-button">
+                        Choose files
+                      </label>
+                    </div>
+                    <span className="file-upload-selected">
+                      {summarizeSelection(createFiles, 'No files selected', 'files')}
+                    </span>
+                  </div>
+                </div>
+                <div className="photo-gallery-panel">
+                  {createFiles.length ? (
+                    <div className="photo-gallery upload-card-gallery">
+                      {createFiles.map((item) => (
+                        <div key={item.id} className="photo-card file-card compact-upload-card">
+                          <div className="photo-thumb-wrap file-thumb-wrap">
+                            <div className="file-thumb-placeholder">
+                              <span className="file-thumb-type">{getFileTypeLabel(item.file.name)}</span>
+                            </div>
+                          </div>
+                          <div className="photo-meta">
+                            <div className="photo-name" title={item.file.name}>
+                              {item.file.name}
+                            </div>
+                            <div className="photo-sub muted">
+                              <span>{new Date(item.file.lastModified).toLocaleString()}</span>
+                              <span>{formatBytes(item.file.size)}</span>
+                            </div>
+                          </div>
+                          <button className="ghost tiny-button" type="button" onClick={() => removeQueuedCreateFile(item.id)}>
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">No files selected yet.</p>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="lead-actions">
               <button className="primary" type="submit" disabled={saving}>
@@ -521,71 +613,6 @@ export default function Leads({ isAdminView = false }) {
           </form>
         ) : null}
 
-        <div className="lead-filters">
-          <h3>Filters</h3>
-          <div className="form-grid lead-filters-grid">
-            <label>
-              Search
-              <input value={filters.search} onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))} />
-            </label>
-            <label>
-              Status
-              <select value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
-                <option value={FILTER_ALL}>All</option>
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Priority
-              <select
-                value={filters.priority}
-                onChange={(event) => setFilters((prev) => ({ ...prev, priority: event.target.value }))}
-              >
-                <option value={FILTER_ALL}>All</option>
-                {PRIORITY_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {formatPriority(option)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Owner
-              <input value={filters.owner} onChange={(event) => setFilters((prev) => ({ ...prev, owner: event.target.value }))} />
-            </label>
-            <label>
-              Company
-              <input value={filters.company} onChange={(event) => setFilters((prev) => ({ ...prev, company: event.target.value }))} />
-            </label>
-            <label>
-              State
-              <input
-                value={filters.project_location_state}
-                onChange={(event) => setFilters((prev) => ({ ...prev, project_location_state: event.target.value }))}
-              />
-            </label>
-            <label>
-              Zip code
-              <input value={filters.zip_code} onChange={(event) => setFilters((prev) => ({ ...prev, zip_code: event.target.value }))} />
-            </label>
-            <label>
-              Quote requested
-              <select
-                value={filters.quote_requested}
-                onChange={(event) => setFilters((prev) => ({ ...prev, quote_requested: event.target.value }))}
-              >
-                <option value={FILTER_ALL}>All</option>
-                <option value="requested">Requested</option>
-                <option value="pending">Not requested</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
         {loading ? <p className="muted">Loading leads...</p> : null}
         <div className="table-scroll">
           <table className="project-table lead-table">
@@ -594,6 +621,7 @@ export default function Leads({ isAdminView = false }) {
                 <th>Name</th>
                 <th>Company</th>
                 <th>State</th>
+                <th>Zip</th>
                 <th>Owner</th>
                 <th>Priority</th>
                 <th>Status</th>
@@ -602,6 +630,127 @@ export default function Leads({ isAdminView = false }) {
                 <th>Email</th>
                 <th>Phone</th>
                 {isAdminView ? <th>Creator company</th> : null}
+              </tr>
+              <tr className="lead-filter-row">
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.name}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, name: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.company}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, company: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.project_location_state}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, project_location_state: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.zip_code}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, zip_code: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.owner}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, owner: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <select
+                    className="lead-filter-control"
+                    value={filters.priority}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, priority: event.target.value }))}
+                  >
+                    <option value={FILTER_ALL}>All</option>
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {formatPriority(option)}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th>
+                  <select
+                    className="lead-filter-control"
+                    value={filters.status}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
+                  >
+                    <option value={FILTER_ALL}>All</option>
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th>
+                  <select
+                    className="lead-filter-control"
+                    value={filters.quote_requested}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, quote_requested: event.target.value }))}
+                  >
+                    <option value={FILTER_ALL}>All</option>
+                    <option value="requested">Requested</option>
+                    <option value="pending">Not requested</option>
+                  </select>
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.created}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, created: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.email}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, email: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.phone}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, phone: event.target.value }))}
+                  />
+                </th>
+                {isAdminView ? (
+                  <th>
+                    <select
+                      className="lead-filter-control"
+                      value={filters.creator_company}
+                      onChange={(event) => setFilters((prev) => ({ ...prev, creator_company: event.target.value }))}
+                    >
+                      <option value={CREATOR_COMPANY_ALL}>All</option>
+                      {creatorCompanyOptions.map((company) => (
+                        <option key={company} value={company}>
+                          {company}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -618,6 +767,7 @@ export default function Leads({ isAdminView = false }) {
                     <td>{lead.name}</td>
                     <td>{lead.company || '-'}</td>
                     <td>{lead.project_location_state || '-'}</td>
+                    <td>{lead.zip_code || '-'}</td>
                     <td>{lead.owner || '-'}</td>
                     <td>{formatPriority(lead.priority)}</td>
                     <td>

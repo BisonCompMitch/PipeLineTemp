@@ -4434,21 +4434,44 @@ body::before {
   gap: 10px;
 }
 
-.lead-filters {
-  margin: 0 0 14px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
+.lead-intake-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-intake-toggle-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lead-table thead .lead-filter-row th {
   background: var(--panel-2);
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
-.lead-filters h3 {
-  margin: 0 0 10px;
+.lead-filter-control {
+  width: 100%;
+  min-width: 110px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 10px;
+  font-size: 14.667px;
 }
 
-.lead-filters-grid {
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
-  gap: 12px;
+.lead-filter-control::placeholder {
+  color: var(--muted);
 }
 
 .lead-docs-block {
