@@ -37,6 +37,7 @@ import NotFound from './pages/NotFound.jsx';
 
 const ROUTE_TITLES = {
   '/pipeline': 'Dashboard',
+  '/money-status': 'Money Status',
   '/areas': 'Areas',
   '/intake': 'Project Intake',
   '/leads': 'Leads',
@@ -768,6 +769,9 @@ export default function App() {
     if (canAccessDashboard) {
       items.push({ label: 'Dashboard', path: '/pipeline' });
     }
+    if (hasContractor || hasAdminArea) {
+      items.push({ label: 'Money Status', path: '/money-status' });
+    }
     if (hasBison) {
       items.push({ label: 'Areas', path: '/areas' });
     }
@@ -919,7 +923,44 @@ export default function App() {
                   <Pipeline
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
-                    canUploadProjectFiles={hasContractor && !hasBison}
+                    canUploadProjectFiles={canAccessDashboard}
+                    applyAreaFilter={false}
+                    allowedAreas={effectiveAreas}
+                    canViewAllAreas={true}
+                    showHoverNotes={true}
+                    showRequesterFilter={!hasContractor || hasBison}
+                    showArchivedFilter={!hasContractor || hasBison}
+                  />
+                </PageShell>
+              </Protected>
+            }
+          />
+          <Route
+            path="/money-status"
+            element={
+              <Protected
+                authed={authed}
+                allowed={!firstLoginRequired && (hasContractor || hasAdminArea)}
+                fallback={fallbackRoute}
+                loading={accessLoading}
+              >
+                <PageShell
+                  title={pageTitle}
+                  displayName={topBarDisplayName}
+                  onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
+                  theme={theme}
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                  <Pipeline
+                    canEditProjects={canEditProjects}
+                    canEditProjectDetails={canEditProjectDetails}
+                    canUploadProjectFiles={canAccessDashboard}
+                    dashboardMode="money"
                     applyAreaFilter={false}
                     allowedAreas={effectiveAreas}
                     canViewAllAreas={true}

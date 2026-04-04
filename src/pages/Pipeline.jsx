@@ -52,6 +52,16 @@ const DETAIL_TABS = [
 ];
 
 const DASHBOARD_FILTER_ALL = '__all__';
+const MONEY_STATUS_STAGE_IDS = new Set([
+  'invoice_design',
+  'money_design',
+  'money_slab',
+  'invoice_production',
+  'money_production',
+  'invoice_shipping',
+  'money_shipping',
+  'final_payment'
+]);
 
 const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
 
@@ -583,6 +593,7 @@ export default function Pipeline({
   canEditProjects = false,
   canEditProjectDetails = false,
   canUploadProjectFiles = false,
+  dashboardMode = 'all',
   applyAreaFilter = false,
   allowedAreas = [],
   canViewAllAreas = false,
@@ -826,8 +837,12 @@ export default function Pipeline({
     if (!selected) return rows;
     return rows.filter((row) => String(row?.project?.requester || '').trim().toLowerCase() === selected);
   }, [rows, dashboardRequesterFilter, showRequesterFilter]);
+  const scopedDashboardRows = useMemo(() => {
+    if (dashboardMode !== 'money') return visibleRows;
+    return visibleRows.filter((row) => MONEY_STATUS_STAGE_IDS.has(String(row?.areaId || '').trim().toLowerCase()));
+  }, [visibleRows, dashboardMode]);
   const dashboardRows = useMemo(() => {
-    const ordered = [...visibleRows].sort(sortByProjectNumber);
+    const ordered = [...scopedDashboardRows].sort(sortByProjectNumber);
     const active = [];
     const completed = [];
     ordered.forEach((row) => {
@@ -838,7 +853,7 @@ export default function Pipeline({
       }
     });
     return [...active, ...completed];
-  }, [visibleRows]);
+  }, [scopedDashboardRows]);
   const dashboardColumns = useMemo(() => {
     if (!dashboardRows.length) return [[], []];
     const splitIndex = Math.ceil(dashboardRows.length / 2);
@@ -1623,8 +1638,12 @@ export default function Pipeline({
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Dashboard</h2>
-            <p className="muted">Double-click a project row to view details.</p>
+            <h2>{dashboardMode === 'money' ? 'Money Status' : 'Dashboard'}</h2>
+            <p className="muted">
+              {dashboardMode === 'money'
+                ? 'Double-click a project row to view details.'
+                : 'Double-click a project row to view details.'}
+            </p>
           </div>
           <div className="detail-header-actions">
             {showRequesterFilter ? (
@@ -1705,7 +1724,9 @@ export default function Pipeline({
               <tbody>
                 <tr className="empty-row">
                   <td colSpan={2}>
-                    {showRequesterFilter && dashboardRequesterFilter !== DASHBOARD_FILTER_ALL
+                    {dashboardMode === 'money'
+                      ? 'No projects currently require payment.'
+                      : showRequesterFilter && dashboardRequesterFilter !== DASHBOARD_FILTER_ALL
                       ? 'No projects match that requester/contractor.'
                       : applyAreaFilter && !canViewAllAreas
                       ? 'No projects in your assigned areas.'
