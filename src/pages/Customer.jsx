@@ -50,7 +50,8 @@ export default function Customer() {
           return;
         }
         const normalizedStages = normalizeProjectStages(item.stages || [], {
-          hasSlabWork: coerceSlabWorkFlag(item?.slab_work)
+          hasSlabWork: coerceSlabWorkFlag(item?.slab_work),
+          hasScottsdaleReadyFiles: item?.scottsdale_ready_files === true
         });
         setProject(item);
         setProgress(completionPercent(normalizedStages));
@@ -92,9 +93,10 @@ export default function Customer() {
   const stages = useMemo(
     () =>
       normalizeProjectStages(project?.stages || [], {
-        hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+        hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
+        hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
       }),
-    [project?.stages, project?.slab_work]
+    [project?.stages, project?.slab_work, project?.scottsdale_ready_files]
   );
   const stage = currentStage(stages);
   const stageRows = useMemo(() => {

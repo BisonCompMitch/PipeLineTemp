@@ -80,10 +80,50 @@ export const SLAB_STAGE_FLOW = [
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
 
-export const STAGE_FLOW = SLAB_STAGE_FLOW;
+export const SCOTTSDALE_READY_STAGE_FLOW = [
+  { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
+  {
+    id: 'budget',
+    name: 'Budgetary Number/ Sales Tax Certificate',
+    owner: 'CFS',
+    default_duration_hours: 24
+  },
+  { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
+  { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
+  { id: 'acceptance', name: 'Acceptance', owner: 'Admin', default_duration_hours: 24 },
+  { id: 'misc_money', name: 'Misc Money', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
+];
+
+function mergeFlows(...flows) {
+  const merged = [];
+  const seen = new Set();
+  flows.forEach((flow) => {
+    flow.forEach((stage) => {
+      if (!stage?.id || seen.has(stage.id)) return;
+      seen.add(stage.id);
+      merged.push(stage);
+    });
+  });
+  return merged;
+}
+
+export const STAGE_FLOW = mergeFlows(BASE_STAGE_FLOW, SLAB_STAGE_FLOW, SCOTTSDALE_READY_STAGE_FLOW);
 
 const SLAB_STAGE_IDS = new Set(['money_slab', 'slab_work']);
-const MONEY_STAGE_IDS = new Set(['money_design', 'money_slab', 'money_production', 'money_shipping', 'final_payment']);
+const SCOTTSDALE_STAGE_IDS = new Set(['acceptance', 'misc_money']);
+const MONEY_STAGE_IDS = new Set([
+  'money_design',
+  'money_slab',
+  'money_production',
+  'money_shipping',
+  'misc_money',
+  'final_payment'
+]);
 const INVOICE_STAGE_IDS = new Set(['invoice_design', 'invoice_production', 'invoice_shipping']);
 
 const COLOR_PLANS = '#E5E7EB';
@@ -98,6 +138,8 @@ const COLOR_SHIPPING = '#99F6E4';
 const COLOR_COMPLETED = '#CBD5E1';
 const COLOR_SLAB_MONEY = COLOR_MONEY;
 const COLOR_SLAB_WORK = '#FBCFE8';
+const COLOR_ACCEPTANCE = '#C7D2FE';
+const COLOR_MISC_MONEY = COLOR_MONEY;
 
 export const STAGE_COLORS = {
   plans_received: COLOR_PLANS,
@@ -114,15 +156,33 @@ export const STAGE_COLORS = {
   manufacturing: COLOR_MANUFACTURING,
   invoice_shipping: COLOR_INVOICE,
   money_shipping: COLOR_MONEY,
+  acceptance: COLOR_ACCEPTANCE,
+  misc_money: COLOR_MISC_MONEY,
   shipping: COLOR_SHIPPING,
   final_payment: COLOR_MONEY,
   completed: COLOR_COMPLETED
 };
 
 function resolveFlow(rawStages, options = {}) {
-  const explicit = coerceSlabWorkFlag(options?.hasSlabWork);
-  if (typeof explicit === 'boolean') {
-    return explicit ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
+  const explicitScottsdale = coerceSlabWorkFlag(options?.hasScottsdaleReadyFiles);
+  if (explicitScottsdale === true) {
+    return SCOTTSDALE_READY_STAGE_FLOW;
+  }
+  const explicitSlab = coerceSlabWorkFlag(options?.hasSlabWork);
+  if (typeof explicitSlab === 'boolean') {
+    return explicitSlab ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
+  }
+  const hasScottsdaleStage = (rawStages || []).some((stage) => {
+    const id = normalizeId(stage?.id || stage?.stage_id);
+    if (SCOTTSDALE_STAGE_IDS.has(id)) return true;
+    const name = normalizeValue(stage?.name).toLowerCase();
+    return (
+      name.includes('budgetary number') ||
+      name.includes('final invoice sent')
+    );
+  });
+  if (hasScottsdaleStage) {
+    return SCOTTSDALE_READY_STAGE_FLOW;
   }
   const hasSlabStage = (rawStages || []).some((stage) => {
     const id = normalizeId(stage?.id || stage?.stage_id);
@@ -145,16 +205,25 @@ export function formatStageName(name, stageId = '', options = {}) {
   const rawName = normalizeValue(name);
   const id = normalizeId(stageId);
   const audience = options?.audience === 'external' ? 'external' : 'internal';
+  const hasScottsdaleFlow = coerceSlabWorkFlag(options?.hasScottsdaleReadyFiles) === true;
 
   if (id === 'plans_received') return 'Plans Received';
   if (/^plans\s+recieved$/i.test(rawName)) return 'Plans Received';
   if (/^plans\s+revieved$/i.test(rawName)) return 'Plans Received';
   if (/^plans\s+received$/i.test(rawName)) return 'Plans Received';
 
-  if (id === 'budget') return 'Rough Estimate / Sales Tax Certificate';
+  if (id === 'budget') {
+    if (hasScottsdaleFlow || /^budgetary\s+number\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) {
+      return 'Budgetary Number/ Sales Tax Certificate';
+    }
+    return 'Rough Estimate / Sales Tax Certificate';
+  }
   if (/^cfs\s+budget$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
   if (/^rough\s+estimate$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
   if (/^rough\s+estimate\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
+  if (/^budgetary\s+number\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) {
+    return 'Budgetary Number/ Sales Tax Certificate';
+  }
 
   if (id === 'money_design') return 'Money - D&E';
   if (/^money\s*(check\s*)?-\s*(design|d&e|de)$/i.test(rawName)) return 'Money - D&E';
@@ -172,13 +241,25 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (/^invoice\s*sent\s*-\s*production$/i.test(rawName)) return 'Invoice Sent - Production';
   if (/^invoice\s*sent\s*production$/i.test(rawName)) return 'Invoice Sent - Production';
 
-  if (id === 'invoice_shipping') return 'Manufacturing - Invoice Sent';
+  if (id === 'invoice_shipping') {
+    if (hasScottsdaleFlow || /^manufacturing\s*-\s*final\s+invoice\s*sent$/i.test(rawName)) {
+      return 'Manufacturing - Final Invoice Sent';
+    }
+    return 'Manufacturing - Invoice Sent';
+  }
   if (/^manufacturing\s*-\s*invoice\s*sent$/i.test(rawName)) return 'Manufacturing - Invoice Sent';
   if (/^manufacturing\s*invoice\s*sent$/i.test(rawName)) return 'Manufacturing - Invoice Sent';
+  if (/^manufacturing\s*-\s*final\s+invoice\s*sent$/i.test(rawName)) return 'Manufacturing - Final Invoice Sent';
+  if (/^manufacturing\s+final\s+invoice\s*sent$/i.test(rawName)) return 'Manufacturing - Final Invoice Sent';
 
   if (id === 'money_shipping') return 'Money - Shipping';
   if (/^money\s*(check\s*)?-\s*shipping$/i.test(rawName)) return 'Money - Shipping';
   if (/^money\s*shipping$/i.test(rawName)) return 'Money - Shipping';
+
+  if (id === 'acceptance') return 'Acceptance';
+  if (/^acceptance$/i.test(rawName)) return 'Acceptance';
+  if (id === 'misc_money') return 'Misc Money';
+  if (/^misc\s*money$/i.test(rawName)) return 'Misc Money';
 
   if (id === 'slab_work') return 'Slab Work';
   if (/^slab\s*work$/i.test(rawName)) return 'Slab Work';
@@ -210,7 +291,10 @@ export function normalizeProjectStages(stages = [], options = {}) {
   if (!rawStages.length) return [];
 
   const flow = resolveFlow(rawStages, options);
-  const formatOptions = options?.formatOptions || undefined;
+  const formatOptions = {
+    ...(options?.formatOptions || {}),
+    hasScottsdaleReadyFiles: options?.hasScottsdaleReadyFiles
+  };
   const byId = new Map();
   rawStages.forEach((stage) => {
     const id = normalizeId(stage?.id || stage?.stage_id);

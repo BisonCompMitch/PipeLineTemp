@@ -83,7 +83,8 @@ export default function Contractor() {
         if (!active) return;
         const mapped = (projects || []).map((project) => {
           const stages = normalizeProjectStages(project.stages || [], {
-            hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+            hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
+            hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
           });
           const stage = currentStage(stages);
           return {

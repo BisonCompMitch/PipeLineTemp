@@ -58,6 +58,7 @@ export default function Intake() {
     urgency: 'standard',
     budget: '',
     slab_work: false,
+    scottsdale_ready_files: false,
     summary: '',
     required_docs: emptyRequiredDocs
   });
@@ -206,6 +207,7 @@ export default function Intake() {
         urgency: form.urgency,
         budget: form.budget.trim(),
         slab_work: Boolean(form.slab_work),
+        scottsdale_ready_files: Boolean(form.scottsdale_ready_files),
         summary: buildProjectSummary(form.required_docs, form.summary)
       });
       const projectId = String(createdProject?.id || '').trim();
@@ -255,6 +257,7 @@ export default function Intake() {
         urgency: 'standard',
         budget: '',
         slab_work: false,
+        scottsdale_ready_files: false,
         summary: '',
         required_docs: emptyRequiredDocs
       });
@@ -326,11 +329,27 @@ export default function Intake() {
               onChange={(event) =>
                 setForm((prev) => ({
                   ...prev,
-                  slab_work: event.target.checked
+                  slab_work: event.target.checked,
+                  scottsdale_ready_files: event.target.checked ? false : prev.scottsdale_ready_files
+                }))
+              }
+              disabled={Boolean(form.scottsdale_ready_files)}
+            />
+            <span>Slab work required</span>
+          </label>
+          <label className="span-2 intake-slab-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(form.scottsdale_ready_files)}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  scottsdale_ready_files: event.target.checked,
+                  slab_work: event.target.checked ? false : prev.slab_work
                 }))
               }
             />
-            <span>Slab work required</span>
+            <span>Scottsdale Ready Files</span>
           </label>
           <div className="intake-docs span-2" role="group" aria-labelledby="required-docs-title">
             <div id="required-docs-title" className="intake-docs-title">

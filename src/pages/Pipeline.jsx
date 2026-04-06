@@ -60,6 +60,7 @@ const MONEY_STATUS_STAGE_IDS = new Set([
   'money_production',
   'invoice_shipping',
   'money_shipping',
+  'misc_money',
   'final_payment'
 ]);
 
@@ -74,6 +75,9 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'cfs budget': ['budget'],
   'rough estimate': ['budget'],
   'rough estimate / sales tax certificate': ['budget'],
+  'budgetary number / sales tax certificate': ['budget'],
+  'budgetary number/ sales tax certificate': ['budget'],
+  'budgetary number': ['budget'],
   rough_estimate: ['budget'],
   'money - d&e': ['money_design'],
   'money - de': ['money_design'],
@@ -104,11 +108,16 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'invoice sent shipping': ['invoice_shipping'],
   invoice_shipping: ['invoice_shipping'],
   'manufacturing - invoice sent': ['invoice_shipping'],
+  'manufacturing - final invoice sent': ['invoice_shipping'],
+  'manufacturing final invoice sent': ['invoice_shipping'],
   'manufacturing invoice sent': ['invoice_shipping'],
   'money - shipping': ['money_shipping'],
   'money shipping': ['money_shipping'],
   money_shipping: ['money_shipping'],
   'invoice sent': ['invoice_design', 'invoice_production', 'invoice_shipping'],
+  acceptance: ['acceptance'],
+  'misc money': ['misc_money'],
+  misc_money: ['misc_money'],
   shipping: ['shipping'],
   'collect final payment': ['final_payment'],
   'final payment': ['final_payment'],
@@ -211,7 +220,8 @@ function resolveStageWaitingSince(stages = [], stage = null, projectCreatedAt = 
 
 function toRow(project, formatStageNameFn = formatStageName) {
   const normalizedStages = normalizeProjectStages(project.stages || [], {
-    hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+    hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
+    hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
   });
   const stage = currentStage(normalizedStages);
   const waitingSince = resolveStageWaitingSince(normalizedStages, stage, project?.created_at || null);
@@ -865,9 +875,10 @@ export default function Pipeline({
   const detailStages = useMemo(
     () =>
       normalizeProjectStages(detailProject?.stages || [], {
-        hasSlabWork: coerceSlabWorkFlag(detailProject?.slab_work)
+        hasSlabWork: coerceSlabWorkFlag(detailProject?.slab_work),
+        hasScottsdaleReadyFiles: detailProject?.scottsdale_ready_files === true
       }),
-    [detailProject?.stages, detailProject?.slab_work]
+    [detailProject?.stages, detailProject?.slab_work, detailProject?.scottsdale_ready_files]
   );
   const canUploadInFilesTab = canEditProjects || canUploadProjectFiles;
   const projectIsComplete = useMemo(() => {

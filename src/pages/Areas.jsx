@@ -27,6 +27,9 @@ const AREA_STAGE_MAP = {
   'cfs budget': ['budget'],
   'rough estimate': ['budget'],
   'rough estimate / sales tax certificate': ['budget'],
+  'budgetary number / sales tax certificate': ['budget'],
+  'budgetary number/ sales tax certificate': ['budget'],
+  'budgetary number': ['budget'],
   rough_estimate: ['budget'],
   'money - d&e': ['money_design'],
   'money - de': ['money_design'],
@@ -57,11 +60,16 @@ const AREA_STAGE_MAP = {
   'invoice sent shipping': ['invoice_shipping'],
   invoice_shipping: ['invoice_shipping'],
   'manufacturing - invoice sent': ['invoice_shipping'],
+  'manufacturing - final invoice sent': ['invoice_shipping'],
+  'manufacturing final invoice sent': ['invoice_shipping'],
   'manufacturing invoice sent': ['invoice_shipping'],
   'money - shipping': ['money_shipping'],
   'money shipping': ['money_shipping'],
   money_shipping: ['money_shipping'],
   'invoice sent': ['invoice_design', 'invoice_production', 'invoice_shipping'],
+  acceptance: ['acceptance'],
+  'misc money': ['misc_money'],
+  misc_money: ['misc_money'],
   shipping: ['shipping'],
   'collect final payment': ['final_payment'],
   'final payment': ['final_payment'],
@@ -221,7 +229,8 @@ function currentProjectStage(stages = []) {
 
 function normalizeStagesForProject(project) {
   return normalizeProjectStages(project?.stages || [], {
-    hasSlabWork: coerceSlabWorkFlag(project?.slab_work)
+    hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
+    hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
   });
 }
 
