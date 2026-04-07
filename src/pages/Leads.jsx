@@ -12,6 +12,7 @@ import {
   updateLead,
   uploadLeadFile
 } from '../api.js';
+import ModalPortal from '../components/ModalPortal.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { REQUIRED_DOC_OPTIONS, buildEmptyRequiredDocs } from '../utils/requiredDocs.js';
 
@@ -37,6 +38,10 @@ const SCOTTSDALE_READINESS_OPTIONS = [
 ];
 const LEAD_DETAILS_START = '[Lead details]';
 const LEAD_DETAILS_END = '[/Lead details]';
+const LEAD_DETAIL_TABS = [
+  { id: 'lead', label: 'Lead' },
+  { id: 'files', label: 'Files' }
+];
 
 function normalizePriority(value, fallback = 'mid') {
   const normalized = String(value || '')
@@ -262,6 +267,7 @@ export default function Leads({ isAdminView = false }) {
   const [formOpen, setFormOpen] = useState(true);
   const [form, setForm] = useState(() => buildLeadFormState());
   const [editing, setEditing] = useState(null);
+  const [editingTab, setEditingTab] = useState('lead');
   const [saving, setSaving] = useState(false);
   const [requestingQuote, setRequestingQuote] = useState(false);
   const [convertingLead, setConvertingLead] = useState(false);
@@ -1037,6 +1043,7 @@ export default function Leads({ isAdminView = false }) {
                     onDoubleClick={async () => {
                       const next = normalizeLeadForEdit(lead);
                       setEditing(next);
+                      setEditingTab('lead');
                       await loadLeadFiles(lead.id);
                     }}
                   >
@@ -1066,24 +1073,46 @@ export default function Leads({ isAdminView = false }) {
         </div>
 
         {editing ? (
-          <div className="modal-backdrop" onClick={() => setEditing(null)}>
-            <div className="modal lead-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="modal-header">
-                <div className="modal-title">Edit lead</div>
-                <button className="ghost" type="button" onClick={() => setEditing(null)}>
-                  Close
-                </button>
-              </div>
-              <div className="lead-edit-card">
-                <div className="lead-modal-actions">
-                  <button className="primary" type="button" onClick={handleRequestQuote} disabled={requestingQuote}>
-                    {requestingQuote ? 'Requesting...' : 'Request project quote'}
-                  </button>
-                  <button className="ghost" type="button" onClick={handleConvertLead} disabled={convertingLead}>
-                    {convertingLead ? 'Converting...' : 'Convert to project'}
-                  </button>
+          <ModalPortal>
+            <div className="modal-backdrop preview-backdrop pipeline-detail-backdrop" onClick={() => setEditing(null)}>
+              <div className="modal pipeline-detail-modal lead-detail-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="detail-card-header pipeline-detail-header">
+                  <div className="pipeline-detail-title">
+                    {editing?.name || 'Lead details'}
+                  </div>
+                  <div className="detail-header-actions">
+                    <button className="ghost" type="button" onClick={() => setEditing(null)}>
+                      Close
+                    </button>
+                  </div>
+                  <div className="stage-tabs detail-tabs pipeline-detail-tabs-wrap" role="tablist" aria-label="Lead detail sections">
+                    {LEAD_DETAIL_TABS.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={editingTab === tab.id}
+                        className={`stage-tab${editingTab === tab.id ? ' active' : ''}`}
+                        onClick={() => setEditingTab(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="form-grid">
+                <div className="pipeline-detail-body">
+                  <div className="lead-edit-card lead-detail-card">
+                    {editingTab === 'lead' ? (
+                      <>
+                        <div className="lead-modal-actions">
+                          <button className="primary" type="button" onClick={handleRequestQuote} disabled={requestingQuote}>
+                            {requestingQuote ? 'Requesting...' : 'Request project quote'}
+                          </button>
+                          <button className="ghost" type="button" onClick={handleConvertLead} disabled={convertingLead}>
+                            {convertingLead ? 'Converting...' : 'Convert to project'}
+                          </button>
+                        </div>
+                        <div className="form-grid">
                   <label>
                     Project Name
                     <input value={editing.name} onChange={(event) => setEditing((prev) => ({ ...prev, name: event.target.value }))} />
@@ -1230,122 +1259,126 @@ export default function Leads({ isAdminView = false }) {
                     Notes
                     <textarea value={editing.notes || ''} rows={4} onChange={(event) => setEditing((prev) => ({ ...prev, notes: event.target.value }))} />
                   </label>
-                </div>
+                        </div>
 
-                <div className="intake-docs lead-docs-block">
-                  <div className="intake-docs-title">Required docs</div>
-                  <div className="intake-docs-grid">
-                    {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
-                      <label key={option.id} className="intake-doc-option">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(editing.required_docs?.[option.id])}
-                          onChange={(event) =>
-                            setEditing((prev) => ({
-                              ...prev,
-                              required_docs: { ...prev.required_docs, [option.id]: event.target.checked }
-                            }))
-                          }
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="intake-docs lead-docs-block">
-                  <div className="intake-docs-title">Scottsdale readiness checklist</div>
-                  <div className="intake-docs-grid">
-                    {SCOTTSDALE_READINESS_OPTIONS.map((option) => (
-                      <label key={option.id} className="intake-doc-option">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(editing.scottsdale_readiness?.[option.id])}
-                          onChange={(event) =>
-                            setEditing((prev) => ({
-                              ...prev,
-                              scottsdale_readiness: {
-                                ...(prev.scottsdale_readiness || {}),
-                                [option.id]: event.target.checked
-                              }
-                            }))
-                          }
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lead-files-panel">
-                  <label>
-                    Upload lead files
-                    <input type="file" multiple onChange={(event) => setNewEditFiles(Array.from(event.target.files || []))} />
-                  </label>
-                  <div className="muted">
-                    {newEditFiles.length ? `${newEditFiles.length} file(s) selected` : 'No files selected'}
-                  </div>
-                  {editFilesStatus ? <p className="muted">{editFilesStatus}</p> : null}
-                  <div className="table-scroll">
-                    <table className="project-table">
-                      <thead>
-                        <tr>
-                          <th>File</th>
-                          <th>Uploaded</th>
-                          <th>Size</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editFiles.length ? (
-                          editFiles.map((file) => (
-                            <tr key={file.id}>
-                              <td>{file.filename}</td>
-                              <td>{formatDateTime(file.created_at)}</td>
-                              <td>{formatBytes(file.size_bytes)}</td>
-                              <td>
-                                <div className="lead-file-actions-inline">
-                                  <button
-                                    className="ghost tiny-button"
-                                    type="button"
-                                    onClick={async () => {
-                                      try {
-                                        const blob = await downloadLeadFile(editing.id, file.id);
-                                        downloadBlob(blob, file.filename);
-                                      } catch (_error) {
-                                        await alertDialog('Unable to download lead file.', { title: 'Lead files' });
+                        <div className="intake-docs lead-docs-block">
+                          <div className="intake-docs-title">Required docs</div>
+                          <div className="intake-docs-grid">
+                            {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
+                              <label key={option.id} className="intake-doc-option">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(editing.required_docs?.[option.id])}
+                                  onChange={(event) =>
+                                    setEditing((prev) => ({
+                                      ...prev,
+                                      required_docs: { ...prev.required_docs, [option.id]: event.target.checked }
+                                    }))
+                                  }
+                                />
+                                <span>{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="intake-docs lead-docs-block">
+                          <div className="intake-docs-title">Scottsdale readiness checklist</div>
+                          <div className="intake-docs-grid">
+                            {SCOTTSDALE_READINESS_OPTIONS.map((option) => (
+                              <label key={option.id} className="intake-doc-option">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(editing.scottsdale_readiness?.[option.id])}
+                                  onChange={(event) =>
+                                    setEditing((prev) => ({
+                                      ...prev,
+                                      scottsdale_readiness: {
+                                        ...(prev.scottsdale_readiness || {}),
+                                        [option.id]: event.target.checked
                                       }
-                                    }}
-                                  >
-                                    Download
-                                  </button>
-                                  <button
-                                    className="ghost tiny-button"
-                                    type="button"
-                                    onClick={async () => {
-                                      const ok = await confirmDialog('Delete this file?', {
-                                        title: 'Delete file',
-                                        confirmText: 'Delete'
-                                      });
-                                      if (!ok) return;
-                                      await deleteLeadFile(editing.id, file.id);
-                                      await loadLeadFiles(editing.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr className="empty-row">
-                            <td colSpan={4}>No files uploaded yet.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                                    }))
+                                  }
+                                />
+                                <span>{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {editingTab === 'files' ? (
+                      <div className="lead-files-panel">
+                        <label>
+                          Upload lead files
+                          <input type="file" multiple onChange={(event) => setNewEditFiles(Array.from(event.target.files || []))} />
+                        </label>
+                        <div className="muted">
+                          {newEditFiles.length ? `${newEditFiles.length} file(s) selected` : 'No files selected'}
+                        </div>
+                        {editFilesStatus ? <p className="muted">{editFilesStatus}</p> : null}
+                        <div className="table-scroll">
+                          <table className="project-table">
+                            <thead>
+                              <tr>
+                                <th>File</th>
+                                <th>Uploaded</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {editFiles.length ? (
+                                editFiles.map((file) => (
+                                  <tr key={file.id}>
+                                    <td>{file.filename}</td>
+                                    <td>{formatDateTime(file.created_at)}</td>
+                                    <td>{formatBytes(file.size_bytes)}</td>
+                                    <td>
+                                      <div className="lead-file-actions-inline">
+                                        <button
+                                          className="ghost tiny-button"
+                                          type="button"
+                                          onClick={async () => {
+                                            try {
+                                              const blob = await downloadLeadFile(editing.id, file.id);
+                                              downloadBlob(blob, file.filename);
+                                            } catch (_error) {
+                                              await alertDialog('Unable to download lead file.', { title: 'Lead files' });
+                                            }
+                                          }}
+                                        >
+                                          Download
+                                        </button>
+                                        <button
+                                          className="ghost tiny-button"
+                                          type="button"
+                                          onClick={async () => {
+                                            const ok = await confirmDialog('Delete this file?', {
+                                              title: 'Delete file',
+                                              confirmText: 'Delete'
+                                            });
+                                            if (!ok) return;
+                                            await deleteLeadFile(editing.id, file.id);
+                                            await loadLeadFiles(editing.id);
+                                          }}
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr className="empty-row">
+                                  <td colSpan={4}>No files uploaded yet.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : null}
 
                 <div className="actions">
                   <button className="ghost" type="button" onClick={() => setEditing(null)}>
@@ -1358,9 +1391,11 @@ export default function Leads({ isAdminView = false }) {
                     Save
                   </button>
                 </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         ) : null}
       </section>
       {dialogPortal}
