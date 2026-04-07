@@ -449,6 +449,34 @@ export default function Intake() {
                 Budget
                 <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
               </label>
+              <div className="intake-toggle-grid span-2">
+                <label className="intake-slab-toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.slab_work)}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        slab_work: event.target.checked
+                      }))
+                    }
+                  />
+                  <span>Slab work required</span>
+                </label>
+                <label className="intake-slab-toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.scottsdale_ready_files)}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        scottsdale_ready_files: event.target.checked
+                      }))
+                    }
+                  />
+                  <span>Scottsdale Ready Files workflow</span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -579,34 +607,6 @@ export default function Intake() {
                   <span>{option.label}</span>
                 </label>
               ))}
-            </div>
-            <div className="intake-toggle-grid">
-              <label className="intake-slab-toggle">
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.slab_work)}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      slab_work: event.target.checked
-                    }))
-                  }
-                />
-                <span>Slab work required</span>
-              </label>
-              <label className="intake-slab-toggle">
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.scottsdale_ready_files)}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      scottsdale_ready_files: event.target.checked
-                    }))
-                  }
-                />
-                <span>Scottsdale Ready Files workflow</span>
-              </label>
             </div>
           </div>
 
