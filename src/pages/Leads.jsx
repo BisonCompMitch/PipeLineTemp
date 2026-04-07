@@ -19,6 +19,24 @@ const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'proposal', 'won', 'los
 const PRIORITY_OPTIONS = ['high', 'mid', 'low'];
 const FILTER_ALL = '__all__';
 const CREATOR_COMPANY_ALL = '__all__';
+const ARCHITECTURAL_PLAN_OPTIONS = [
+  { id: 'building_elevations', label: 'Elevations (4 minimum)' },
+  { id: 'framing_plans', label: 'Framing Plans' },
+  { id: 'dimensioned_floor_plans', label: 'Dimensioned Floor Plans' },
+  { id: 'roof_plans', label: 'Roof Plans' },
+  { id: 'building_sections', label: 'Building Sections' },
+  { id: 'foundation_plans', label: 'Foundation Plans & Details' },
+  { id: 'hvac_layouts', label: 'Intended HVAC System' },
+  { id: 'soils_report', label: 'Soils Report' }
+];
+const SCOTTSDALE_READINESS_OPTIONS = [
+  { id: 'sdp_file', label: 'SDP File' },
+  { id: 'ifc_issued', label: 'IFC (Issued for Construction)' },
+  { id: 'production_files', label: 'Production Files' },
+  { id: 'engineering_complete', label: 'Engineering Complete' }
+];
+const LEAD_DETAILS_START = '[Lead details]';
+const LEAD_DETAILS_END = '[/Lead details]';
 
 function normalizePriority(value, fallback = 'mid') {
   const normalized = String(value || '')
@@ -43,6 +61,28 @@ function statusClass(status) {
   return `lead-status status-${status || 'new'}`;
 }
 
+function buildEmptyScottsdaleReadiness() {
+  return SCOTTSDALE_READINESS_OPTIONS.reduce((acc, option) => {
+    acc[option.id] = false;
+    return acc;
+  }, {});
+}
+
+function buildLeadDetailState() {
+  return {
+    project_type: '',
+    project_location_address: '',
+    gps_coordinates: '',
+    owner_name: '',
+    primary_contact_name: '',
+    contact_address: '',
+    delivery_address: '',
+    delivery_contact_name: '',
+    delivery_contact_info: '',
+    scottsdale_readiness: buildEmptyScottsdaleReadiness()
+  };
+}
+
 function buildLeadFormState() {
   return {
     name: '',
@@ -57,8 +97,96 @@ function buildLeadFormState() {
     square_footage: '',
     estimated_value: '',
     required_docs: buildEmptyRequiredDocs(),
+    ...buildLeadDetailState(),
     notes: ''
   };
+}
+
+function serializeLeadDetails(form) {
+  const readinessSelected = SCOTTSDALE_READINESS_OPTIONS.filter((option) =>
+    Boolean(form.scottsdale_readiness?.[option.id])
+  ).map((option) => option.id);
+  const lines = [
+    `Project Type: ${String(form.project_type || '').trim()}`,
+    `Project Location (Address): ${String(form.project_location_address || '').trim()}`,
+    `GPS Coordinates: ${String(form.gps_coordinates || '').trim()}`,
+    `Owner Name: ${String(form.owner_name || '').trim()}`,
+    `Primary Contact Name: ${String(form.primary_contact_name || '').trim()}`,
+    `Contact Address: ${String(form.contact_address || '').trim()}`,
+    `Delivery Address: ${String(form.delivery_address || '').trim()}`,
+    `Delivery Contact Name: ${String(form.delivery_contact_name || '').trim()}`,
+    `Delivery Contact Phone/Email: ${String(form.delivery_contact_info || '').trim()}`,
+    `Scottsdale Readiness: ${readinessSelected.join(',')}`
+  ];
+  return `${LEAD_DETAILS_START}\n${lines.join('\n')}\n${LEAD_DETAILS_END}`;
+}
+
+function parseLeadDetails(notesValue) {
+  const defaults = buildLeadDetailState();
+  const notesText = String(notesValue || '').replace(/\r\n/g, '\n');
+  const match = notesText.match(/\[Lead details\]\n([\s\S]*?)\n\[\/Lead details\]/);
+  if (!match) {
+    return { details: defaults, notes: notesText.trim() };
+  }
+  const parsed = { ...defaults };
+  match[1].split('\n').forEach((rawLine) => {
+    const line = String(rawLine || '').trim();
+    if (!line) return;
+    const [label, ...rest] = line.split(':');
+    const value = rest.join(':').trim();
+    if (!label) return;
+    switch (label.trim().toLowerCase()) {
+      case 'project type':
+        parsed.project_type = value;
+        break;
+      case 'project location (address)':
+        parsed.project_location_address = value;
+        break;
+      case 'gps coordinates':
+        parsed.gps_coordinates = value;
+        break;
+      case 'owner name':
+        parsed.owner_name = value;
+        break;
+      case 'primary contact name':
+        parsed.primary_contact_name = value;
+        break;
+      case 'contact address':
+        parsed.contact_address = value;
+        break;
+      case 'delivery address':
+        parsed.delivery_address = value;
+        break;
+      case 'delivery contact name':
+        parsed.delivery_contact_name = value;
+        break;
+      case 'delivery contact phone/email':
+        parsed.delivery_contact_info = value;
+        break;
+      case 'scottsdale readiness': {
+        const selected = value
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+        parsed.scottsdale_readiness = SCOTTSDALE_READINESS_OPTIONS.reduce((acc, option) => {
+          acc[option.id] = selected.includes(option.id);
+          return acc;
+        }, {});
+        break;
+      }
+      default:
+        break;
+    }
+  });
+  const cleanedNotes = notesText.replace(match[0], '').trim();
+  return { details: parsed, notes: cleanedNotes };
+}
+
+function buildLeadNotesPayload(form) {
+  const detailsBlock = serializeLeadDetails(form);
+  const additionalNotes = String(form.notes || '').trim();
+  if (!additionalNotes) return detailsBlock;
+  return `${detailsBlock}\n\n${additionalNotes}`;
 }
 
 function normalizeRequiredDocs(value) {
@@ -71,6 +199,7 @@ function normalizeRequiredDocs(value) {
 }
 
 function normalizeLeadForEdit(lead) {
+  const parsed = parseLeadDetails(lead?.notes);
   return {
     ...lead,
     owner: lead?.owner || '',
@@ -79,7 +208,9 @@ function normalizeLeadForEdit(lead) {
     estimated_value: lead?.estimated_value || '',
     zip_code: lead?.zip_code || '',
     project_location_state: lead?.project_location_state || '',
-    required_docs: normalizeRequiredDocs(lead?.required_docs)
+    required_docs: normalizeRequiredDocs(lead?.required_docs),
+    ...parsed.details,
+    notes: parsed.notes
   };
 }
 
@@ -266,16 +397,25 @@ export default function Leads({ isAdminView = false }) {
   const handleCreateLead = async (event) => {
     event.preventDefault();
     if (!form.name.trim()) {
-      setMessage('Lead name is required.');
+      setMessage('Project name is required.');
       return;
     }
     setSaving(true);
     try {
       const created = await createLead({
-        ...form,
         name: form.name.trim(),
+        company: String(form.company || '').trim(),
+        project_location_state: String(form.project_location_state || '').trim(),
+        zip_code: String(form.zip_code || '').trim(),
+        email: String(form.email || '').trim(),
+        phone: String(form.phone || '').trim(),
+        owner: String(form.owner || '').trim(),
+        status: form.status,
+        square_footage: form.square_footage,
+        estimated_value: form.estimated_value,
         priority: normalizePriority(form.priority, 'mid'),
-        required_docs: normalizeRequiredDocs(form.required_docs)
+        required_docs: normalizeRequiredDocs(form.required_docs),
+        notes: buildLeadNotesPayload(form)
       });
       if (createFiles.length) {
         await uploadFilesToLead(
@@ -310,7 +450,7 @@ export default function Leads({ isAdminView = false }) {
         square_footage: editing.square_footage,
         estimated_value: editing.estimated_value,
         required_docs: normalizeRequiredDocs(editing.required_docs),
-        notes: editing.notes
+        notes: buildLeadNotesPayload(editing)
       });
       if (newEditFiles.length) {
         await uploadFilesToLead(editing.id, newEditFiles);
@@ -433,84 +573,74 @@ export default function Leads({ isAdminView = false }) {
         {formOpen ? (
           <form className="lead-form" onSubmit={handleCreateLead}>
             <div className="form-grid lead-create-grid">
-              <label>
-                Lead name
-                <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
-              </label>
-              <label>
-                Company
-                <input value={form.company} onChange={(event) => setForm((prev) => ({ ...prev, company: event.target.value }))} />
-              </label>
-              <label>
-                Project Location (State)
-                <input
-                  value={form.project_location_state}
-                  placeholder="AZ"
-                  onChange={(event) => setForm((prev) => ({ ...prev, project_location_state: event.target.value }))}
-                />
-              </label>
-              <label>
-                Zip code
-                <input
-                  value={form.zip_code}
-                  placeholder="85260"
-                  onChange={(event) => setForm((prev) => ({ ...prev, zip_code: event.target.value }))}
-                />
-              </label>
-              <label>
-                Email
-                <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} />
-              </label>
-              <label>
-                Phone
-                <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
-              </label>
-              <label>
-                Lead owner
-                <input value={form.owner} onChange={(event) => setForm((prev) => ({ ...prev, owner: event.target.value }))} />
-              </label>
-              <label>
-                Priority
-                <select value={form.priority} onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value }))}>
-                  {PRIORITY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {formatPriority(option)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Status
-                <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}>
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Sqr footage
-                <input
-                  value={form.square_footage}
-                  onChange={(event) => setForm((prev) => ({ ...prev, square_footage: event.target.value }))}
-                />
-              </label>
-              <label>
-                Estimated value
-                <input
-                  value={form.estimated_value}
-                  onChange={(event) => setForm((prev) => ({ ...prev, estimated_value: event.target.value }))}
-                />
-              </label>
-              <label className="lead-notes-field">
-                Notes
-                <textarea value={form.notes} rows={5} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} />
-              </label>
-              <div className="intake-docs lead-docs-block">
-                <div className="intake-docs-title">Required docs</div>
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">1. Project Overview</div>
+                <div className="intake-section-grid">
+                  <label>
+                    Project Name
+                    <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+                  </label>
+                  <label>
+                    Project Type
+                    <input
+                      value={form.project_type}
+                      onChange={(event) => setForm((prev) => ({ ...prev, project_type: event.target.value }))}
+                    />
+                  </label>
+                  <label className="span-2">
+                    Project Location (Address)
+                    <input
+                      value={form.project_location_address}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, project_location_address: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Project Location (State)
+                    <input
+                      value={form.project_location_state}
+                      placeholder="AZ"
+                      onChange={(event) => setForm((prev) => ({ ...prev, project_location_state: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    ZIP Code
+                    <input
+                      value={form.zip_code}
+                      placeholder="85260"
+                      onChange={(event) => setForm((prev) => ({ ...prev, zip_code: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    GPS Coordinates
+                    <input
+                      value={form.gps_coordinates}
+                      onChange={(event) => setForm((prev) => ({ ...prev, gps_coordinates: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Sqr footage
+                    <input
+                      value={form.square_footage}
+                      onChange={(event) => setForm((prev) => ({ ...prev, square_footage: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Estimated value
+                    <input
+                      value={form.estimated_value}
+                      onChange={(event) => setForm((prev) => ({ ...prev, estimated_value: event.target.value }))}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">2. Architectural &amp; Technical Plans</div>
+                <p className="muted intake-section-intro">Please attach or confirm availability of the following:</p>
                 <div className="intake-docs-grid">
-                  {REQUIRED_DOC_OPTIONS.map((option) => (
+                  {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
                     <label key={option.id} className="intake-doc-option">
                       <input
                         type="checkbox"
@@ -527,6 +657,145 @@ export default function Leads({ isAdminView = false }) {
                   ))}
                 </div>
               </div>
+
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">3. Project Stakeholders</div>
+                <div className="intake-section-grid">
+                  <label>
+                    Contractor Name
+                    <input value={form.company} onChange={(event) => setForm((prev) => ({ ...prev, company: event.target.value }))} />
+                  </label>
+                  <label>
+                    Owner Name
+                    <input
+                      value={form.owner_name}
+                      onChange={(event) => setForm((prev) => ({ ...prev, owner_name: event.target.value }))}
+                    />
+                  </label>
+                  <label className="span-2">
+                    Lead ownership
+                    <input value={form.owner} onChange={(event) => setForm((prev) => ({ ...prev, owner: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">4. Contact Information</div>
+                <div className="intake-section-grid">
+                  <label>
+                    Primary Contact Name
+                    <input
+                      value={form.primary_contact_name}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, primary_contact_name: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Address
+                    <input
+                      value={form.contact_address}
+                      onChange={(event) => setForm((prev) => ({ ...prev, contact_address: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Phone
+                    <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
+                  </label>
+                  <label>
+                    Email
+                    <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">5. Delivery Information</div>
+                <div className="intake-section-grid">
+                  <label className="span-2">
+                    Delivery Address
+                    <input
+                      value={form.delivery_address}
+                      onChange={(event) => setForm((prev) => ({ ...prev, delivery_address: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Delivery Contact Name
+                    <input
+                      value={form.delivery_contact_name}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, delivery_contact_name: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Delivery Contact Phone/Email
+                    <input
+                      value={form.delivery_contact_info}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, delivery_contact_info: event.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">6. Scottsdale Readiness Checklist</div>
+                <p className="muted intake-section-intro">(For internal/project readiness tracking)</p>
+                <div className="intake-docs-grid">
+                  {SCOTTSDALE_READINESS_OPTIONS.map((option) => (
+                    <label key={option.id} className="intake-doc-option">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.scottsdale_readiness?.[option.id])}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            scottsdale_readiness: {
+                              ...(prev.scottsdale_readiness || {}),
+                              [option.id]: event.target.checked
+                            }
+                          }))
+                        }
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="intake-section lead-section-span-full">
+                <div className="intake-section-title">Lead Workflow</div>
+                <div className="intake-section-grid">
+                  <label>
+                    Priority
+                    <select value={form.priority} onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value }))}>
+                      {PRIORITY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {formatPriority(option)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Status
+                    <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}>
+                      {STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <label className="lead-notes-field">
+                7. Notes / Additional Requirements
+                <textarea value={form.notes} rows={5} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} />
+              </label>
+
               <div className="intake-upload-section lead-upload-section">
                 <div className="intake-docs-title">Files</div>
                 <div className="file-upload-form">
@@ -809,12 +1078,28 @@ export default function Leads({ isAdminView = false }) {
                 </div>
                 <div className="form-grid">
                   <label>
-                    Lead name
+                    Project Name
                     <input value={editing.name} onChange={(event) => setEditing((prev) => ({ ...prev, name: event.target.value }))} />
                   </label>
                   <label>
-                    Company
+                    Contractor Name
                     <input value={editing.company || ''} onChange={(event) => setEditing((prev) => ({ ...prev, company: event.target.value }))} />
+                  </label>
+                  <label>
+                    Project Type
+                    <input
+                      value={editing.project_type || ''}
+                      onChange={(event) => setEditing((prev) => ({ ...prev, project_type: event.target.value }))}
+                    />
+                  </label>
+                  <label className="span-2">
+                    Project Location (Address)
+                    <input
+                      value={editing.project_location_address || ''}
+                      onChange={(event) =>
+                        setEditing((prev) => ({ ...prev, project_location_address: event.target.value }))
+                      }
+                    />
                   </label>
                   <label>
                     Project Location (State)
@@ -824,8 +1109,38 @@ export default function Leads({ isAdminView = false }) {
                     />
                   </label>
                   <label>
-                    Zip code
+                    ZIP Code
                     <input value={editing.zip_code || ''} onChange={(event) => setEditing((prev) => ({ ...prev, zip_code: event.target.value }))} />
+                  </label>
+                  <label>
+                    GPS Coordinates
+                    <input
+                      value={editing.gps_coordinates || ''}
+                      onChange={(event) => setEditing((prev) => ({ ...prev, gps_coordinates: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Owner Name
+                    <input
+                      value={editing.owner_name || ''}
+                      onChange={(event) => setEditing((prev) => ({ ...prev, owner_name: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Primary Contact Name
+                    <input
+                      value={editing.primary_contact_name || ''}
+                      onChange={(event) =>
+                        setEditing((prev) => ({ ...prev, primary_contact_name: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Contact Address
+                    <input
+                      value={editing.contact_address || ''}
+                      onChange={(event) => setEditing((prev) => ({ ...prev, contact_address: event.target.value }))}
+                    />
                   </label>
                   <label>
                     Email
@@ -835,8 +1150,33 @@ export default function Leads({ isAdminView = false }) {
                     Phone
                     <input value={editing.phone || ''} onChange={(event) => setEditing((prev) => ({ ...prev, phone: event.target.value }))} />
                   </label>
+                  <label className="span-2">
+                    Delivery Address
+                    <input
+                      value={editing.delivery_address || ''}
+                      onChange={(event) => setEditing((prev) => ({ ...prev, delivery_address: event.target.value }))}
+                    />
+                  </label>
                   <label>
-                    Lead owner
+                    Delivery Contact Name
+                    <input
+                      value={editing.delivery_contact_name || ''}
+                      onChange={(event) =>
+                        setEditing((prev) => ({ ...prev, delivery_contact_name: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Delivery Contact Phone/Email
+                    <input
+                      value={editing.delivery_contact_info || ''}
+                      onChange={(event) =>
+                        setEditing((prev) => ({ ...prev, delivery_contact_info: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Lead ownership
                     <input value={editing.owner || ''} onChange={(event) => setEditing((prev) => ({ ...prev, owner: event.target.value }))} />
                   </label>
                   <label>
@@ -888,7 +1228,7 @@ export default function Leads({ isAdminView = false }) {
                 <div className="intake-docs lead-docs-block">
                   <div className="intake-docs-title">Required docs</div>
                   <div className="intake-docs-grid">
-                    {REQUIRED_DOC_OPTIONS.map((option) => (
+                    {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
                       <label key={option.id} className="intake-doc-option">
                         <input
                           type="checkbox"
@@ -897,6 +1237,29 @@ export default function Leads({ isAdminView = false }) {
                             setEditing((prev) => ({
                               ...prev,
                               required_docs: { ...prev.required_docs, [option.id]: event.target.checked }
+                            }))
+                          }
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="intake-docs lead-docs-block">
+                  <div className="intake-docs-title">Scottsdale readiness checklist</div>
+                  <div className="intake-docs-grid">
+                    {SCOTTSDALE_READINESS_OPTIONS.map((option) => (
+                      <label key={option.id} className="intake-doc-option">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editing.scottsdale_readiness?.[option.id])}
+                          onChange={(event) =>
+                            setEditing((prev) => ({
+                              ...prev,
+                              scottsdale_readiness: {
+                                ...(prev.scottsdale_readiness || {}),
+                                [option.id]: event.target.checked
+                              }
                             }))
                           }
                         />

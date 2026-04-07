@@ -99,6 +99,27 @@ export const SCOTTSDALE_READY_STAGE_FLOW = [
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
 
+export const SCOTTSDALE_READY_SLAB_STAGE_FLOW = [
+  { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_slab', name: 'Money - Slab', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
+  {
+    id: 'budget',
+    name: 'Budgetary Number/ Sales Tax Certificate',
+    owner: 'CFS',
+    default_duration_hours: 24
+  },
+  { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
+  { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
+  { id: 'acceptance', name: 'Acceptance', owner: 'Admin', default_duration_hours: 24 },
+  { id: 'misc_money', name: 'Misc Money', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
+];
+
 function mergeFlows(...flows) {
   const merged = [];
   const seen = new Set();
@@ -112,7 +133,12 @@ function mergeFlows(...flows) {
   return merged;
 }
 
-export const STAGE_FLOW = mergeFlows(BASE_STAGE_FLOW, SLAB_STAGE_FLOW, SCOTTSDALE_READY_STAGE_FLOW);
+export const STAGE_FLOW = mergeFlows(
+  BASE_STAGE_FLOW,
+  SLAB_STAGE_FLOW,
+  SCOTTSDALE_READY_STAGE_FLOW,
+  SCOTTSDALE_READY_SLAB_STAGE_FLOW
+);
 
 const SLAB_STAGE_IDS = new Set(['money_slab', 'slab_work']);
 const SCOTTSDALE_STAGE_IDS = new Set(['acceptance', 'misc_money']);
@@ -165,10 +191,11 @@ export const STAGE_COLORS = {
 
 function resolveFlow(rawStages, options = {}) {
   const explicitScottsdale = coerceSlabWorkFlag(options?.hasScottsdaleReadyFiles);
+  const explicitSlab = coerceSlabWorkFlag(options?.hasSlabWork);
   if (explicitScottsdale === true) {
+    if (explicitSlab === true) return SCOTTSDALE_READY_SLAB_STAGE_FLOW;
     return SCOTTSDALE_READY_STAGE_FLOW;
   }
-  const explicitSlab = coerceSlabWorkFlag(options?.hasSlabWork);
   if (typeof explicitSlab === 'boolean') {
     return explicitSlab ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
   }
@@ -182,7 +209,11 @@ function resolveFlow(rawStages, options = {}) {
     );
   });
   if (hasScottsdaleStage) {
-    return SCOTTSDALE_READY_STAGE_FLOW;
+    const hasSlabStage = (rawStages || []).some((stage) => {
+      const id = normalizeId(stage?.id || stage?.stage_id);
+      return SLAB_STAGE_IDS.has(id);
+    });
+    return hasSlabStage ? SCOTTSDALE_READY_SLAB_STAGE_FLOW : SCOTTSDALE_READY_STAGE_FLOW;
   }
   const hasSlabStage = (rawStages || []).some((stage) => {
     const id = normalizeId(stage?.id || stage?.stage_id);

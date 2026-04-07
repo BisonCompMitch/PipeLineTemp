@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createProject, listContractors, listProjects, uploadProjectFile } from '../api.js';
-import { REQUIRED_DOC_OPTIONS, buildEmptyRequiredDocs, buildProjectSummary } from '../utils/requiredDocs.js';
+import { buildEmptyRequiredDocs, buildProjectSummary } from '../utils/requiredDocs.js';
 
 function todayLocalIso() {
   const now = new Date();
@@ -9,6 +9,22 @@ function todayLocalIso() {
 }
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'];
+const ARCHITECTURAL_PLAN_OPTIONS = [
+  { id: 'building_elevations', label: 'Elevations (4 minimum)' },
+  { id: 'framing_plans', label: 'Framing Plans' },
+  { id: 'dimensioned_floor_plans', label: 'Dimensioned Floor Plans' },
+  { id: 'roof_plans', label: 'Roof Plans' },
+  { id: 'building_sections', label: 'Building Sections' },
+  { id: 'foundation_plans', label: 'Foundation Plans & Details' },
+  { id: 'hvac_layouts', label: 'Intended HVAC System' },
+  { id: 'soils_report', label: 'Soils Report' }
+];
+const SCOTTSDALE_READINESS_OPTIONS = [
+  { id: 'sdp_file', label: 'SDP File' },
+  { id: 'ifc_issued', label: 'IFC (Issued for Construction)' },
+  { id: 'production_files', label: 'Production Files' },
+  { id: 'engineering_complete', label: 'Engineering Complete' }
+];
 
 function isImageUploadFile(file) {
   if (!file) return false;
@@ -49,18 +65,87 @@ function toUploadItems(fileList) {
   }));
 }
 
+function buildEmptyScottsdaleReadiness() {
+  return SCOTTSDALE_READINESS_OPTIONS.reduce((acc, option) => {
+    acc[option.id] = false;
+    return acc;
+  }, {});
+}
+
+function buildAdditionalRequirements(form) {
+  const lines = [];
+  const add = (label, value) => {
+    const text = String(value || '').trim();
+    if (text) lines.push(`${label}: ${text}`);
+  };
+  add('Project Type', form.project_type);
+  add('Project Location (Address)', form.project_location_address);
+  add('Project Location (State)', form.project_location_state);
+  add('ZIP Code', form.project_location_zip);
+  add('GPS Coordinates', form.gps_coordinates);
+  add('Contractor Name', form.contractor_name);
+  add('Owner Name', form.owner_name);
+  add('Primary Contact Name', form.primary_contact_name);
+  add('Contact Address', form.contact_address);
+  add('Contact Phone', form.contact_phone);
+  add('Contact Email', form.contact_email);
+  add('Delivery Address', form.delivery_address);
+  add('Delivery Contact Name', form.delivery_contact_name);
+  add('Delivery Contact Phone/Email', form.delivery_contact_info);
+  const readinessProvided = SCOTTSDALE_READINESS_OPTIONS.filter((option) =>
+    Boolean(form.scottsdale_readiness?.[option.id])
+  ).map((option) => option.label);
+  const readinessMissing = SCOTTSDALE_READINESS_OPTIONS.filter(
+    (option) => !Boolean(form.scottsdale_readiness?.[option.id])
+  ).map((option) => option.label);
+  const blocks = [];
+  if (lines.length) {
+    blocks.push(`Project details:\n${lines.map((line) => `- ${line}`).join('\n')}`);
+  }
+  blocks.push(
+    `Scottsdale readiness checklist:\n${
+      readinessProvided.length
+        ? `- Ready:\n  - ${readinessProvided.join('\n  - ')}`
+        : '- Ready:\n  - None listed'
+    }\n${
+      readinessMissing.length
+        ? `- Pending:\n  - ${readinessMissing.join('\n  - ')}`
+        : '- Pending:\n  - None'
+    }`
+  );
+  const freeNotes = String(form.summary || '').trim();
+  if (freeNotes) {
+    blocks.push(freeNotes);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 export default function Intake() {
   const emptyRequiredDocs = useMemo(() => buildEmptyRequiredDocs(), []);
+  const emptyScottsdaleReadiness = useMemo(() => buildEmptyScottsdaleReadiness(), []);
   const [form, setForm] = useState({
     name: '',
-    requester: '',
+    project_type: '',
+    project_location_address: '',
     project_location_state: '',
+    project_location_zip: '',
+    gps_coordinates: '',
+    contractor_name: '',
+    owner_name: '',
+    primary_contact_name: '',
+    contact_address: '',
+    contact_phone: '',
+    contact_email: '',
+    delivery_address: '',
+    delivery_contact_name: '',
+    delivery_contact_info: '',
     urgency: 'standard',
     budget: '',
     slab_work: false,
     scottsdale_ready_files: false,
+    scottsdale_readiness: { ...emptyScottsdaleReadiness },
     summary: '',
-    required_docs: emptyRequiredDocs
+    required_docs: { ...emptyRequiredDocs }
   });
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
@@ -83,6 +168,14 @@ export default function Intake() {
     setForm((prev) => ({
       ...prev,
       required_docs: { ...(prev.required_docs || {}), [id]: checked }
+    }));
+  };
+
+  const toggleScottsdaleReadiness = (id) => (event) => {
+    const checked = Boolean(event.target.checked);
+    setForm((prev) => ({
+      ...prev,
+      scottsdale_readiness: { ...(prev.scottsdale_readiness || {}), [id]: checked }
     }));
   };
 
@@ -191,9 +284,9 @@ export default function Intake() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const requester = form.requester.trim();
-    if (!form.name.trim() || !requester) {
-      setStatus('Project name and requester are required.');
+    const contractorName = form.contractor_name.trim();
+    if (!form.name.trim() || !contractorName) {
+      setStatus('Project name and contractor name are required.');
       return;
     }
     setSaving(true);
@@ -201,14 +294,14 @@ export default function Intake() {
     try {
       const createdProject = await createProject({
         name: form.name.trim(),
-        requester,
+        requester: contractorName,
         project_location_state: form.project_location_state.trim(),
         due_date: todayLocalIso(),
         urgency: form.urgency,
         budget: form.budget.trim(),
         slab_work: Boolean(form.slab_work),
         scottsdale_ready_files: Boolean(form.scottsdale_ready_files),
-        summary: buildProjectSummary(form.required_docs, form.summary)
+        summary: buildProjectSummary(form.required_docs, buildAdditionalRequirements(form))
       });
       const projectId = String(createdProject?.id || '').trim();
       const pendingFiles = [...uploadFiles];
@@ -246,20 +339,33 @@ export default function Intake() {
         setStatus('Project request submitted.');
       }
       setPartyOptions((prev) => {
-        const exists = prev.some((item) => item.toLowerCase() === requester.toLowerCase());
+        const exists = prev.some((item) => item.toLowerCase() === contractorName.toLowerCase());
         if (exists) return prev;
-        return [...prev, requester].sort((a, b) => a.localeCompare(b));
+        return [...prev, contractorName].sort((a, b) => a.localeCompare(b));
       });
       setForm({
         name: '',
-        requester: '',
+        project_type: '',
+        project_location_address: '',
         project_location_state: '',
+        project_location_zip: '',
+        gps_coordinates: '',
+        contractor_name: '',
+        owner_name: '',
+        primary_contact_name: '',
+        contact_address: '',
+        contact_phone: '',
+        contact_email: '',
+        delivery_address: '',
+        delivery_contact_name: '',
+        delivery_contact_info: '',
         urgency: 'standard',
         budget: '',
         slab_work: false,
         scottsdale_ready_files: false,
+        scottsdale_readiness: { ...emptyScottsdaleReadiness },
         summary: '',
-        required_docs: emptyRequiredDocs
+        required_docs: { ...emptyRequiredDocs }
       });
       setUploadFiles([]);
       setPhotoUploads([]);
@@ -284,79 +390,73 @@ export default function Intake() {
       </div>
       <form className="intake-form" onSubmit={handleSubmit}>
         <div className="intake-fields form-grid">
-          <label>
-            Project name
-            <input value={form.name} onChange={updateField('name')} placeholder="Project name" />
-          </label>
-          <label>
-            Requester
-            <input
-              value={form.requester}
-              onChange={updateField('requester')}
-              placeholder="Requester"
-              list={requesterListId}
-            />
-            <datalist id={requesterListId}>
-              {partyOptions.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </label>
-          <label>
-            Urgency
-            <select value={form.urgency} onChange={updateField('urgency')}>
-              <option value="standard">Standard</option>
-              <option value="rush">Rush</option>
-              <option value="critical">Critical</option>
-            </select>
-          </label>
-          <label>
-            Project Location (State)
-            <input
-              value={form.project_location_state}
-              onChange={updateField('project_location_state')}
-              placeholder="AZ"
-            />
-          </label>
-          <label className="span-2">
-            Budget
-            <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
-          </label>
-          <label className="span-2 intake-slab-toggle">
-            <input
-              type="checkbox"
-              checked={Boolean(form.slab_work)}
-              onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  slab_work: event.target.checked,
-                  scottsdale_ready_files: event.target.checked ? false : prev.scottsdale_ready_files
-                }))
-              }
-              disabled={Boolean(form.scottsdale_ready_files)}
-            />
-            <span>Slab work required</span>
-          </label>
-          <label className="span-2 intake-slab-toggle">
-            <input
-              type="checkbox"
-              checked={Boolean(form.scottsdale_ready_files)}
-              onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  scottsdale_ready_files: event.target.checked,
-                  slab_work: event.target.checked ? false : prev.slab_work
-                }))
-              }
-            />
-            <span>Scottsdale Ready Files</span>
-          </label>
-          <div className="intake-docs span-2" role="group" aria-labelledby="required-docs-title">
-            <div id="required-docs-title" className="intake-docs-title">
-              Required docs
+          <div className="intake-section span-2">
+            <div className="intake-section-title">1. Project Overview</div>
+            <div className="intake-section-grid">
+              <label>
+                Project Name
+                <input value={form.name} onChange={updateField('name')} placeholder="Project name" />
+              </label>
+              <label>
+                Project Type
+                <input
+                  value={form.project_type}
+                  onChange={updateField('project_type')}
+                  placeholder="Type"
+                />
+              </label>
+              <label className="span-2">
+                Project Location (Address)
+                <input
+                  value={form.project_location_address}
+                  onChange={updateField('project_location_address')}
+                  placeholder="Address"
+                />
+              </label>
+              <label>
+                Project Location (State)
+                <input
+                  value={form.project_location_state}
+                  onChange={updateField('project_location_state')}
+                  placeholder="AZ"
+                />
+              </label>
+              <label>
+                ZIP Code
+                <input
+                  value={form.project_location_zip}
+                  onChange={updateField('project_location_zip')}
+                  placeholder="85260"
+                />
+              </label>
+              <label>
+                GPS Coordinates
+                <input
+                  value={form.gps_coordinates}
+                  onChange={updateField('gps_coordinates')}
+                  placeholder="33.4942, -111.9261"
+                />
+              </label>
+              <label>
+                Urgency
+                <select value={form.urgency} onChange={updateField('urgency')}>
+                  <option value="standard">Standard</option>
+                  <option value="rush">Rush</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+              <label className="span-2">
+                Budget
+                <input value={form.budget} onChange={updateField('budget')} placeholder="Budget target" />
+              </label>
             </div>
+          </div>
+
+          <div className="intake-section span-2">
+            <div className="intake-section-title">2. Architectural &amp; Technical Plans</div>
+            <p className="muted intake-section-intro">Please attach or confirm availability of the following:</p>
             <div className="intake-docs-grid">
-              {REQUIRED_DOC_OPTIONS.map((option) => (
+              {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
                 <label key={option.id} className="intake-doc-option">
                   <input
                     type="checkbox"
@@ -368,6 +468,152 @@ export default function Intake() {
               ))}
             </div>
           </div>
+
+          <div className="intake-section span-2">
+            <div className="intake-section-title">3. Project Stakeholders</div>
+            <div className="intake-section-grid">
+              <label>
+                Contractor Name
+                <input
+                  value={form.contractor_name}
+                  onChange={updateField('contractor_name')}
+                  placeholder="Contractor"
+                  list={requesterListId}
+                />
+                <datalist id={requesterListId}>
+                  {partyOptions.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </label>
+              <label>
+                Owner Name
+                <input
+                  value={form.owner_name}
+                  onChange={updateField('owner_name')}
+                  placeholder="Owner"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="intake-section span-2">
+            <div className="intake-section-title">4. Contact Information</div>
+            <div className="intake-section-grid">
+              <label>
+                Primary Contact Name
+                <input
+                  value={form.primary_contact_name}
+                  onChange={updateField('primary_contact_name')}
+                  placeholder="Primary contact"
+                />
+              </label>
+              <label>
+                Address
+                <input
+                  value={form.contact_address}
+                  onChange={updateField('contact_address')}
+                  placeholder="Address"
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  value={form.contact_phone}
+                  onChange={updateField('contact_phone')}
+                  placeholder="Phone"
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  value={form.contact_email}
+                  onChange={updateField('contact_email')}
+                  placeholder="Email"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="intake-section span-2">
+            <div className="intake-section-title">5. Delivery Information</div>
+            <div className="intake-section-grid">
+              <label className="span-2">
+                Delivery Address
+                <input
+                  value={form.delivery_address}
+                  onChange={updateField('delivery_address')}
+                  placeholder="Delivery address"
+                />
+              </label>
+              <label>
+                Delivery Contact Name
+                <input
+                  value={form.delivery_contact_name}
+                  onChange={updateField('delivery_contact_name')}
+                  placeholder="Delivery contact"
+                />
+              </label>
+              <label>
+                Delivery Contact Phone/Email
+                <input
+                  value={form.delivery_contact_info}
+                  onChange={updateField('delivery_contact_info')}
+                  placeholder="Phone or email"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="intake-section span-2">
+            <div className="intake-section-title">6. Scottsdale Readiness Checklist</div>
+            <p className="muted intake-section-intro">(For internal/project readiness tracking)</p>
+            <div className="intake-docs-grid">
+              {SCOTTSDALE_READINESS_OPTIONS.map((option) => (
+                <label key={option.id} className="intake-doc-option">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.scottsdale_readiness?.[option.id])}
+                    onChange={toggleScottsdaleReadiness(option.id)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="intake-toggle-grid">
+              <label className="intake-slab-toggle">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.slab_work)}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      slab_work: event.target.checked
+                    }))
+                  }
+                />
+                <span>Slab work required</span>
+              </label>
+              <label className="intake-slab-toggle">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.scottsdale_ready_files)}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      scottsdale_ready_files: event.target.checked
+                    }))
+                  }
+                />
+                <span>Scottsdale Ready Files workflow</span>
+              </label>
+            </div>
+          </div>
+
+          <label className="span-2">
+            7. Notes / Additional Requirements
+            <textarea value={form.summary} onChange={updateField('summary')} placeholder="Notes" rows={3} />
+          </label>
           <div className="intake-upload-section span-2">
             <div className="intake-docs-title">Files</div>
             <div className="file-upload-form">
@@ -552,10 +798,6 @@ export default function Intake() {
               )}
             </div>
           </div>
-          <label className="span-2">
-            Notes
-            <textarea value={form.summary} onChange={updateField('summary')} placeholder="Notes" rows={3} />
-          </label>
         </div>
         <div className="intake-actions">
           <span className="muted">{status}</span>
