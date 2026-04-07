@@ -497,6 +497,11 @@ export default function Leads({ isAdminView = false }) {
       confirmText: 'Continue'
     });
     if (note === null) return;
+    const acknowledgeCharges = await confirmDialog(
+      'Disclaimer: incomplete document packages may incur additional charges. Continue and request this quote?',
+      { title: 'Quote request disclaimer', confirmText: 'I Understand' }
+    );
+    if (!acknowledgeCharges) return;
     setRequestingQuote(true);
     try {
       const updated = await requestLeadQuote(editing.id, {
@@ -553,7 +558,7 @@ export default function Leads({ isAdminView = false }) {
         <div className="panel-header">
           <div>
             <h2>Leads</h2>
-            <p className="muted">Track contractor leads.</p>
+            <p className="muted">Track client leads.</p>
           </div>
           <div className="detail-header-actions lead-toolbar">
             <button
@@ -638,7 +643,9 @@ export default function Leads({ isAdminView = false }) {
 
               <div className="intake-section lead-section-span-full">
                 <div className="intake-section-title">2. Architectural &amp; Technical Plans</div>
-                <p className="muted intake-section-intro">Please attach or confirm availability of the following:</p>
+                <p className="muted intake-section-intro">
+                  Docs required for each check or the project may be charged for incomplete packages.
+                </p>
                 <div className="intake-docs-grid">
                   {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
                     <label key={option.id} className="intake-doc-option">
@@ -662,7 +669,7 @@ export default function Leads({ isAdminView = false }) {
                 <div className="intake-section-title">3. Project Stakeholders</div>
                 <div className="intake-section-grid">
                   <label>
-                    Contractor Name
+                    Client
                     <input value={form.company} onChange={(event) => setForm((prev) => ({ ...prev, company: event.target.value }))} />
                   </label>
                   <label>
@@ -1082,7 +1089,7 @@ export default function Leads({ isAdminView = false }) {
                     <input value={editing.name} onChange={(event) => setEditing((prev) => ({ ...prev, name: event.target.value }))} />
                   </label>
                   <label>
-                    Contractor Name
+                    Client
                     <input value={editing.company || ''} onChange={(event) => setEditing((prev) => ({ ...prev, company: event.target.value }))} />
                   </label>
                   <label>

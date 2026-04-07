@@ -44,7 +44,12 @@ function textColorForHex(color) {
 
 export const BASE_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'budget', name: 'Rough Estimate / Sales Tax Certificate', owner: 'CFS', default_duration_hours: 24 },
+  {
+    id: 'budget',
+    name: 'Budgetary Number / Sales Tax Certificate',
+    owner: 'CFS',
+    default_duration_hours: 24
+  },
   { id: 'invoice_design', name: 'Invoice Sent - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
@@ -53,18 +58,25 @@ export const BASE_STAGE_FLOW = [
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
-  { id: 'invoice_shipping', name: 'Manufacturing - Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
   { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
-  { id: 'final_payment', name: 'Collect Final Payment', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'acceptance', name: 'Acceptance - Proof of Delivery', owner: 'Admin', default_duration_hours: 24 },
+  { id: 'misc_money', name: 'Misc Money', owner: 'Admin', default_duration_hours: 1 },
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
 
 export const SLAB_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'invoice_slab', name: 'Invoice Sent - Slab', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_slab', name: 'Money - Slab', owner: 'Admin', default_duration_hours: 1 },
   { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
-  { id: 'budget', name: 'Rough Estimate / Sales Tax Certificate', owner: 'CFS', default_duration_hours: 24 },
+  {
+    id: 'budget',
+    name: 'Budgetary Number / Sales Tax Certificate',
+    owner: 'CFS',
+    default_duration_hours: 24
+  },
   { id: 'invoice_design', name: 'Invoice Sent - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
@@ -73,10 +85,11 @@ export const SLAB_STAGE_FLOW = [
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
-  { id: 'invoice_shipping', name: 'Manufacturing - Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
   { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
-  { id: 'final_payment', name: 'Collect Final Payment', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'acceptance', name: 'Acceptance - Proof of Delivery', owner: 'Admin', default_duration_hours: 24 },
+  { id: 'misc_money', name: 'Misc Money', owner: 'Admin', default_duration_hours: 1 },
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
 
@@ -84,7 +97,7 @@ export const SCOTTSDALE_READY_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
   {
     id: 'budget',
-    name: 'Budgetary Number/ Sales Tax Certificate',
+    name: 'Budgetary Number / Sales Tax Certificate',
     owner: 'CFS',
     default_duration_hours: 24
   },
@@ -94,18 +107,19 @@ export const SCOTTSDALE_READY_STAGE_FLOW = [
   { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
   { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
-  { id: 'acceptance', name: 'Acceptance', owner: 'Admin', default_duration_hours: 24 },
+  { id: 'acceptance', name: 'Acceptance - Proof of Delivery', owner: 'Admin', default_duration_hours: 24 },
   { id: 'misc_money', name: 'Misc Money', owner: 'Admin', default_duration_hours: 1 },
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
 
 export const SCOTTSDALE_READY_SLAB_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'invoice_slab', name: 'Invoice Sent - Slab', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_slab', name: 'Money - Slab', owner: 'Admin', default_duration_hours: 1 },
   { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   {
     id: 'budget',
-    name: 'Budgetary Number/ Sales Tax Certificate',
+    name: 'Budgetary Number / Sales Tax Certificate',
     owner: 'CFS',
     default_duration_hours: 24
   },
@@ -115,7 +129,7 @@ export const SCOTTSDALE_READY_SLAB_STAGE_FLOW = [
   { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
   { id: 'shipping', name: 'Shipping', owner: 'Shipping Lead', default_duration_hours: 24 },
-  { id: 'acceptance', name: 'Acceptance', owner: 'Admin', default_duration_hours: 24 },
+  { id: 'acceptance', name: 'Acceptance - Proof of Delivery', owner: 'Admin', default_duration_hours: 24 },
   { id: 'misc_money', name: 'Misc Money', owner: 'Admin', default_duration_hours: 1 },
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
@@ -140,8 +154,8 @@ export const STAGE_FLOW = mergeFlows(
   SCOTTSDALE_READY_SLAB_STAGE_FLOW
 );
 
-const SLAB_STAGE_IDS = new Set(['money_slab', 'slab_work']);
-const SCOTTSDALE_STAGE_IDS = new Set(['acceptance', 'misc_money']);
+const SLAB_STAGE_IDS = new Set(['invoice_slab', 'money_slab', 'slab_work']);
+const DESIGN_FAMILY_STAGE_IDS = new Set(['invoice_design', 'money_design', 'design', 'engineering', 'estimating']);
 const MONEY_STAGE_IDS = new Set([
   'money_design',
   'money_slab',
@@ -150,27 +164,28 @@ const MONEY_STAGE_IDS = new Set([
   'misc_money',
   'final_payment'
 ]);
-const INVOICE_STAGE_IDS = new Set(['invoice_design', 'invoice_production', 'invoice_shipping']);
+const INVOICE_STAGE_IDS = new Set(['invoice_design', 'invoice_slab', 'invoice_production', 'invoice_shipping']);
 
-const COLOR_PLANS = '#E5E7EB';
+const COLOR_PLANS = '#DBEAFE';
 const COLOR_BUDGET = '#86EFAC';
 const COLOR_MONEY = '#FCA5A5';
-const COLOR_INVOICE = '#FDE68A';
-const COLOR_DESIGN = '#BBF7D0';
-const COLOR_ENGINEERING = '#BFDBFE';
+const COLOR_INVOICE = '#FCA5A5';
+const COLOR_DESIGN = '#C4B5FD';
+const COLOR_ENGINEERING = '#93C5FD';
 const COLOR_ESTIMATING = '#FDE68A';
 const COLOR_MANUFACTURING = '#FDBA74';
-const COLOR_SHIPPING = '#99F6E4';
+const COLOR_SHIPPING = '#5EEAD4';
 const COLOR_COMPLETED = '#CBD5E1';
 const COLOR_SLAB_MONEY = COLOR_MONEY;
-const COLOR_SLAB_WORK = '#FBCFE8';
-const COLOR_ACCEPTANCE = '#C7D2FE';
+const COLOR_SLAB_WORK = '#F9A8D4';
+const COLOR_ACCEPTANCE = '#DDD6FE';
 const COLOR_MISC_MONEY = COLOR_MONEY;
 
 export const STAGE_COLORS = {
   plans_received: COLOR_PLANS,
   budget: COLOR_BUDGET,
   invoice_design: COLOR_INVOICE,
+  invoice_slab: COLOR_INVOICE,
   money_design: COLOR_MONEY,
   design: COLOR_DESIGN,
   engineering: COLOR_ENGINEERING,
@@ -199,27 +214,18 @@ function resolveFlow(rawStages, options = {}) {
   if (typeof explicitSlab === 'boolean') {
     return explicitSlab ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
   }
-  const hasScottsdaleStage = (rawStages || []).some((stage) => {
-    const id = normalizeId(stage?.id || stage?.stage_id);
-    if (SCOTTSDALE_STAGE_IDS.has(id)) return true;
-    const name = normalizeValue(stage?.name).toLowerCase();
-    return (
-      name.includes('budgetary number') ||
-      name.includes('final invoice sent')
-    );
-  });
-  if (hasScottsdaleStage) {
-    const hasSlabStage = (rawStages || []).some((stage) => {
-      const id = normalizeId(stage?.id || stage?.stage_id);
-      return SLAB_STAGE_IDS.has(id);
-    });
-    return hasSlabStage ? SCOTTSDALE_READY_SLAB_STAGE_FLOW : SCOTTSDALE_READY_STAGE_FLOW;
-  }
   const hasSlabStage = (rawStages || []).some((stage) => {
     const id = normalizeId(stage?.id || stage?.stage_id);
     return SLAB_STAGE_IDS.has(id);
   });
-  return hasSlabStage ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
+  const hasDesignFamilyStage = (rawStages || []).some((stage) => {
+    const id = normalizeId(stage?.id || stage?.stage_id);
+    return DESIGN_FAMILY_STAGE_IDS.has(id);
+  });
+  if (hasDesignFamilyStage) {
+    return hasSlabStage ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
+  }
+  return hasSlabStage ? SCOTTSDALE_READY_SLAB_STAGE_FLOW : SCOTTSDALE_READY_STAGE_FLOW;
 }
 
 export function getStageColor(stageId = '') {
@@ -245,15 +251,15 @@ export function formatStageName(name, stageId = '', options = {}) {
 
   if (id === 'budget') {
     if (hasScottsdaleFlow || /^budgetary\s+number\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) {
-      return 'Budgetary Number/ Sales Tax Certificate';
+      return 'Budgetary Number / Sales Tax Certificate';
     }
-    return 'Rough Estimate / Sales Tax Certificate';
+    return 'Budgetary Number / Sales Tax Certificate';
   }
-  if (/^cfs\s+budget$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
-  if (/^rough\s+estimate$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
-  if (/^rough\s+estimate\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) return 'Rough Estimate / Sales Tax Certificate';
+  if (/^cfs\s+budget$/i.test(rawName)) return 'Budgetary Number / Sales Tax Certificate';
+  if (/^rough\s+estimate$/i.test(rawName)) return 'Budgetary Number / Sales Tax Certificate';
+  if (/^rough\s+estimate\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) return 'Budgetary Number / Sales Tax Certificate';
   if (/^budgetary\s+number\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) {
-    return 'Budgetary Number/ Sales Tax Certificate';
+    return 'Budgetary Number / Sales Tax Certificate';
   }
 
   if (id === 'money_design') return 'Money - D&E';
@@ -267,6 +273,10 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (id === 'money_slab') return 'Money - Slab';
   if (/^money\s*(check\s*)?-\s*slab$/i.test(rawName)) return 'Money - Slab';
   if (/^money\s*slab$/i.test(rawName)) return 'Money - Slab';
+
+  if (id === 'invoice_slab') return 'Invoice Sent - Slab';
+  if (/^invoice\s*sent\s*-\s*slab$/i.test(rawName)) return 'Invoice Sent - Slab';
+  if (/^invoice\s*sent\s*slab$/i.test(rawName)) return 'Invoice Sent - Slab';
 
   if (id === 'invoice_production') return 'Invoice Sent - Production';
   if (/^invoice\s*sent\s*-\s*production$/i.test(rawName)) return 'Invoice Sent - Production';
@@ -287,8 +297,10 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (/^money\s*(check\s*)?-\s*shipping$/i.test(rawName)) return 'Money - Shipping';
   if (/^money\s*shipping$/i.test(rawName)) return 'Money - Shipping';
 
-  if (id === 'acceptance') return 'Acceptance';
-  if (/^acceptance$/i.test(rawName)) return 'Acceptance';
+  if (id === 'acceptance') return 'Acceptance - Proof of Delivery';
+  if (/^acceptance$/i.test(rawName)) return 'Acceptance - Proof of Delivery';
+  if (/^acceptance\s*-\s*proof\s+of\s+delivery$/i.test(rawName)) return 'Acceptance - Proof of Delivery';
+  if (/^proof\s+of\s+delivery$/i.test(rawName)) return 'Acceptance - Proof of Delivery';
   if (id === 'misc_money') return 'Misc Money';
   if (/^misc\s*money$/i.test(rawName)) return 'Misc Money';
 

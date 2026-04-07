@@ -83,7 +83,7 @@ function buildAdditionalRequirements(form) {
   add('Project Location (State)', form.project_location_state);
   add('ZIP Code', form.project_location_zip);
   add('GPS Coordinates', form.gps_coordinates);
-  add('Contractor Name', form.contractor_name);
+  add('Client Name', form.contractor_name);
   add('Owner Name', form.owner_name);
   add('Primary Contact Name', form.primary_contact_name);
   add('Contact Address', form.contact_address);
@@ -286,7 +286,7 @@ export default function Intake() {
     event.preventDefault();
     const contractorName = form.contractor_name.trim();
     if (!form.name.trim() || !contractorName) {
-      setStatus('Project name and contractor name are required.');
+      setStatus('Project name and client name are required.');
       return;
     }
     setSaving(true);
@@ -482,7 +482,9 @@ export default function Intake() {
 
           <div className="intake-section span-2">
             <div className="intake-section-title">2. Architectural &amp; Technical Plans</div>
-            <p className="muted intake-section-intro">Please attach or confirm availability of the following:</p>
+            <p className="muted intake-section-intro">
+              Docs required for each check or the project may be charged for incomplete packages.
+            </p>
             <div className="intake-docs-grid">
               {ARCHITECTURAL_PLAN_OPTIONS.map((option) => (
                 <label key={option.id} className="intake-doc-option">
@@ -501,11 +503,11 @@ export default function Intake() {
             <div className="intake-section-title">3. Project Stakeholders</div>
             <div className="intake-section-grid">
               <label>
-                Contractor Name
+                Client
                 <input
                   value={form.contractor_name}
                   onChange={updateField('contractor_name')}
-                  placeholder="Contractor"
+                  placeholder="Client"
                   list={requesterListId}
                 />
                 <datalist id={requesterListId}>
