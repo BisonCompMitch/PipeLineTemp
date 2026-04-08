@@ -6,6 +6,20 @@ function normalizeId(value) {
   return normalizeValue(value).toLowerCase();
 }
 
+const LEGACY_STAGE_ID_MAP = Object.freeze({
+  cfs_budget: 'budget',
+  final_payment: ''
+});
+
+function normalizeStageId(value) {
+  const normalized = normalizeId(value);
+  if (!normalized) return '';
+  if (Object.prototype.hasOwnProperty.call(LEGACY_STAGE_ID_MAP, normalized)) {
+    return LEGACY_STAGE_ID_MAP[normalized];
+  }
+  return normalized;
+}
+
 function normalizeStageStatus(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -229,7 +243,7 @@ function resolveFlow(rawStages, options = {}) {
 }
 
 export function getStageColor(stageId = '') {
-  const id = normalizeId(stageId);
+  const id = normalizeStageId(stageId);
   return STAGE_COLORS[id] || 'rgba(148, 163, 184, 0.25)';
 }
 
@@ -240,7 +254,7 @@ export function getStageBadgeStyle(stageId = '') {
 
 export function formatStageName(name, stageId = '', options = {}) {
   const rawName = normalizeValue(name);
-  const id = normalizeId(stageId);
+  const id = normalizeStageId(stageId);
   const audience = options?.audience === 'external' ? 'external' : 'internal';
   const hasScottsdaleFlow = coerceSlabWorkFlag(options?.hasScottsdaleReadyFiles) === true;
 
@@ -320,7 +334,7 @@ export function formatStageName(name, stageId = '', options = {}) {
 
 export function formatMoneyStageGlyph(name, stageId = '', options = {}) {
   const displayName = formatStageName(name, stageId, options);
-  const id = normalizeId(stageId);
+  const id = normalizeStageId(stageId);
   if (id === 'budget') return 'Rough Estimate';
   if (INVOICE_STAGE_IDS.has(id)) return 'Invoice Sent';
   if (MONEY_STAGE_IDS.has(id) || /^money\s*(check\s*)?-\s*/i.test(displayName)) {
@@ -340,16 +354,18 @@ export function normalizeProjectStages(stages = [], options = {}) {
   };
   const byId = new Map();
   rawStages.forEach((stage) => {
-    const id = normalizeId(stage?.id || stage?.stage_id);
+    const id = normalizeStageId(stage?.id || stage?.stage_id);
     if (!id) return;
-    byId.set(id, stage);
+    if (!byId.has(id)) {
+      byId.set(id, stage);
+    }
   });
 
   const activeStage =
     rawStages.find((stage) => isActiveStageStatus(stage?.status)) ||
     rawStages.find((stage) => normalizeStageStatus(stage?.status) !== 'complete') ||
     rawStages[rawStages.length - 1];
-  const activeId = normalizeId(activeStage?.id || activeStage?.stage_id);
+  const activeId = normalizeStageId(activeStage?.id || activeStage?.stage_id);
   const activeIndex = flow.findIndex((entry) => entry.id === activeId);
 
   const normalized = flow.map((entry, index) => {
@@ -393,7 +409,7 @@ export function normalizeProjectStages(stages = [], options = {}) {
 
   const known = new Set(flow.map((entry) => entry.id));
   rawStages.forEach((stage) => {
-    const id = normalizeId(stage?.id || stage?.stage_id);
+    const id = normalizeStageId(stage?.id || stage?.stage_id);
     if (!id || known.has(id)) return;
     normalized.push({
       ...stage,
