@@ -5339,6 +5339,10 @@ body[data-theme='light'] .compact-card-switch {
   min-width: max(900px, 100%);
 }
 
+.money-status-table.project-table {
+  min-width: max(1100px, 100%);
+}
+
 .dashboard-table-scroll {
   max-height: none;
 }
@@ -5423,7 +5427,27 @@ body[data-theme='light'] .compact-card-switch {
   text-overflow: clip;
 }
 
+.dashboard-split-table.money-status-table th:nth-child(1),
+.dashboard-split-table.money-status-table td:nth-child(1) {
+  width: 42%;
+}
+
+.dashboard-split-table.money-status-table th:nth-child(2),
+.dashboard-split-table.money-status-table td:nth-child(2) {
+  width: 33%;
+}
+
+.dashboard-split-table.money-status-table th:nth-child(3),
+.dashboard-split-table.money-status-table td:nth-child(3) {
+  width: 25%;
+  white-space: normal;
+}
+
 .dashboard-table:not(.area-queue-table) td:nth-child(2) {
+  white-space: normal;
+}
+
+.dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(3) {
   white-space: normal;
 }
 
@@ -5434,8 +5458,48 @@ body[data-theme='light'] .compact-card-switch {
   padding-bottom: 6px;
 }
 
+.dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(3) .status-pill {
+  white-space: normal;
+}
+
 .project-stage-table .project-table {
   min-width: max(980px, 100%);
+}
+
+.detail-money-substage-card {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  display: grid;
+  gap: 12px;
+}
+
+.detail-money-substage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-money-substage-title {
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.detail-money-substage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.money-substage-button.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
 .lead-table {
@@ -6055,6 +6119,28 @@ body[data-theme='light'] .progress-meta .muted {
     min-width: 320px;
   }
 
+  .dashboard-table.money-status-table.project-table:not(.area-queue-table) {
+    min-width: 980px !important;
+  }
+
+  .dashboard-table.money-status-table:not(.area-queue-table) th:nth-child(1),
+  .dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(1) {
+    width: 360px;
+    min-width: 360px;
+  }
+
+  .dashboard-table.money-status-table:not(.area-queue-table) th:nth-child(2),
+  .dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(2) {
+    width: 280px;
+    min-width: 280px;
+  }
+
+  .dashboard-table.money-status-table:not(.area-queue-table) th:nth-child(3),
+  .dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(3) {
+    width: 240px;
+    min-width: 240px;
+  }
+
   .dashboard-table-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -6062,6 +6148,13 @@ body[data-theme='light'] .progress-meta .muted {
 
   .dashboard-table:not(.area-queue-table) td:nth-child(2) {
     white-space: nowrap;
+  }
+
+  .dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(2),
+  .dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(3),
+  .dashboard-table.money-status-table .area-pill,
+  .dashboard-table.money-status-table .status-pill {
+    white-space: normal;
   }
 
   .dashboard-table .area-pill {

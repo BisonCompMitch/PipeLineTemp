@@ -170,7 +170,7 @@ export const STAGE_FLOW = mergeFlows(
 
 const SLAB_STAGE_IDS = new Set(['invoice_slab', 'money_slab', 'slab_work']);
 const DESIGN_FAMILY_STAGE_IDS = new Set(['invoice_design', 'money_design', 'design', 'engineering', 'estimating']);
-const MONEY_STAGE_IDS = new Set([
+export const MONEY_STAGE_IDS = new Set([
   'money_design',
   'money_slab',
   'money_production',
@@ -179,6 +179,17 @@ const MONEY_STAGE_IDS = new Set([
   'final_payment'
 ]);
 const INVOICE_STAGE_IDS = new Set(['invoice_design', 'invoice_slab', 'invoice_production', 'invoice_shipping']);
+export const MONEY_SUBSTAGE_OPTIONS = [
+  { id: 'money_ordered', label: 'Money Ordered' },
+  { id: 'client_paid', label: 'Client Paid' },
+  { id: 'payment_sent_to_bison', label: 'Payment Sent to Bison' }
+];
+const MONEY_SUBSTAGE_LABELS = Object.freeze(
+  MONEY_SUBSTAGE_OPTIONS.reduce((acc, option) => {
+    acc[option.id] = option.label;
+    return acc;
+  }, {})
+);
 
 const COLOR_PLANS = '#DBEAFE';
 const COLOR_BUDGET = '#86EFAC';
@@ -250,6 +261,40 @@ export function getStageColor(stageId = '') {
 export function getStageBadgeStyle(stageId = '') {
   const backgroundColor = getStageColor(stageId);
   return { backgroundColor, color: textColorForHex(backgroundColor) };
+}
+
+export function isMoneyTrackingStage(stageId = '') {
+  return MONEY_STAGE_IDS.has(normalizeStageId(stageId));
+}
+
+export function normalizeMoneySubstageValue(value) {
+  const normalized = normalizeValue(value).toLowerCase().replace(/-/g, '_').replace(/\s+/g, '_');
+  if (!normalized) return '';
+  if (normalized === 'money_ordered' || normalized === 'ordered') return 'money_ordered';
+  if (normalized === 'client_paid' || normalized === 'paid') return 'client_paid';
+  if (
+    normalized === 'payment_sent_to_bison' ||
+    normalized === 'paymentsenttobison' ||
+    normalized === 'sent_to_bison'
+  ) {
+    return 'payment_sent_to_bison';
+  }
+  return '';
+}
+
+export function getMoneySubstageLabel(value) {
+  const normalized = normalizeMoneySubstageValue(value);
+  return normalized ? MONEY_SUBSTAGE_LABELS[normalized] || normalized : '';
+}
+
+export function getEffectiveMoneySubstage(stage) {
+  if (!stage || !isMoneyTrackingStage(stage.id || stage.stage_id)) return '';
+  const explicit = normalizeMoneySubstageValue(stage.money_substage);
+  if (explicit) return explicit;
+  const status = normalizeStageStatus(stage.status);
+  if (status === 'complete') return 'payment_sent_to_bison';
+  if (status === 'in_progress' || status === 'awaiting_approval') return 'money_ordered';
+  return '';
 }
 
 export function formatStageName(name, stageId = '', options = {}) {

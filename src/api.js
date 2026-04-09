@@ -442,6 +442,13 @@ export async function updateStage(projectId, stageId, payload) {
   });
 }
 
+export async function updateMoneySubstage(projectId, stageId, payload) {
+  return apiJson(`/projects/${projectId}/stages/${stageId}/money-substage`, {
+    method: 'PATCH',
+    body: payload
+  });
+}
+
 export async function handoffStage(projectId, stageId) {
   return apiJson(`/projects/${projectId}/handoff/${stageId}`, { method: 'POST' });
 }

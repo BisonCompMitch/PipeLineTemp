@@ -13,6 +13,7 @@ import {
   restoreProject,
   setProjectFileVisibility,
   updateStage,
+  updateMoneySubstage,
   updateProject,
   uploadProjectFile
 } from '../api.js';
@@ -22,7 +23,11 @@ import {
   coerceSlabWorkFlag,
   formatMoneyStageGlyph,
   formatStageName,
+  getEffectiveMoneySubstage,
+  getMoneySubstageLabel,
   getStageBadgeStyle,
+  isMoneyTrackingStage,
+  MONEY_SUBSTAGE_OPTIONS,
   normalizeProjectStages,
   STAGE_FLOW
 } from '../utils/stageDisplay.js';
@@ -236,11 +241,14 @@ function toRow(project, formatStageNameFn = formatStageName) {
     projectNumber: project.project_number || '',
     name: project.name || 'Unnamed project',
     area: formatStageNameFn(stage?.name, stage?.id) || 'Pending',
+    moneyStageName: formatStageName(stage?.name, stage?.id, { audience: 'internal' }) || 'Pending',
     areaId: stage?.id || '',
     areaNote: String(stage?.area_note || '').trim(),
     areaNoteUpdatedBy: String(stage?.area_note_updated_by || '').trim(),
     areaNoteUpdatedAt: stage?.area_note_updated_at || null,
     stage,
+    moneySubstage: getEffectiveMoneySubstage(stage),
+    moneySubstageLabel: getMoneySubstageLabel(getEffectiveMoneySubstage(stage)) || '',
     stageWaitingSince: waitingSince,
     progress: completionPercent(normalizedStages),
     statusTone: stageNoticeTone(stage),
@@ -605,10 +613,24 @@ function formatDashboardProjectNotesTooltip(summaryText) {
   return blocks.join('\n\n');
 }
 
+function moneySubstageToneClass(value) {
+  switch (String(value || '').trim()) {
+    case 'money_ordered':
+      return 'yellow';
+    case 'client_paid':
+      return 'progress';
+    case 'payment_sent_to_bison':
+      return 'complete';
+    default:
+      return 'neutral';
+  }
+}
+
 export default function Pipeline({
   canEditProjects = false,
   canEditProjectDetails = false,
   canUploadProjectFiles = false,
+  canEditMoneySubstages = false,
   dashboardMode = 'all',
   applyAreaFilter = false,
   allowedAreas = [],
@@ -628,6 +650,7 @@ export default function Pipeline({
   const [detailProject, setDetailProject] = useState(null);
   const [detailTab, setDetailTab] = useState('project');
   const [projectActionBusy, setProjectActionBusy] = useState('');
+  const [moneySubstageBusy, setMoneySubstageBusy] = useState(false);
   const [detailForm, setDetailForm] = useState(toEditForm(null));
   const [detailStageNoteDraft, setDetailStageNoteDraft] = useState('');
   const [detailStageNoteSaving, setDetailStageNoteSaving] = useState(false);
@@ -679,6 +702,10 @@ export default function Pipeline({
   const formatDisplayStageName = useCallback(
     (name, stageId) => formatStageName(name, stageId, { audience: externalStageLabels ? 'external' : 'internal' }),
     [externalStageLabels]
+  );
+  const formatMoneyStageName = useCallback(
+    (name, stageId) => formatStageName(name, stageId, { audience: 'internal' }),
+    []
   );
 
   const closePreview = useCallback(() => {
@@ -895,6 +922,20 @@ export default function Pipeline({
   const detailCurrentStage = useMemo(
     () => currentStage(detailStages),
     [detailStages]
+  );
+  const detailCurrentStageDisplayName = useMemo(() => {
+    if (!detailCurrentStage) return '';
+    return dashboardMode === 'money'
+      ? formatMoneyStageName(detailCurrentStage.name, detailCurrentStage.id)
+      : formatDisplayStageName(detailCurrentStage.name, detailCurrentStage.id);
+  }, [dashboardMode, detailCurrentStage, formatDisplayStageName, formatMoneyStageName]);
+  const detailCurrentMoneySubstage = useMemo(
+    () => getEffectiveMoneySubstage(detailCurrentStage),
+    [detailCurrentStage]
+  );
+  const detailCurrentMoneySubstageLabel = useMemo(
+    () => getMoneySubstageLabel(detailCurrentMoneySubstage) || 'Not started',
+    [detailCurrentMoneySubstage]
   );
   const detailProgress = useMemo(
     () => completionPercent(detailStages),
@@ -1185,6 +1226,7 @@ export default function Pipeline({
     setDetailError('');
     setDetailStatus('');
     setProjectActionBusy('');
+    setMoneySubstageBusy(false);
     setDetailProject(null);
     setDetailStageNoteDraft('');
     setDetailStageNoteSaving(false);
@@ -1463,6 +1505,37 @@ export default function Pipeline({
     }
   };
 
+  const handleMoneySubstageChange = async (nextValue) => {
+    if (!detailProject?.id || !detailCurrentStage?.id || !canEditMoneySubstages) return;
+    if (!isMoneyTrackingStage(detailCurrentStage.id)) return;
+    if (nextValue === detailCurrentMoneySubstage) return;
+    setMoneySubstageBusy(true);
+    setDetailError('');
+    setDetailStatus('');
+    try {
+      const updatedStage = await updateMoneySubstage(detailProject.id, detailCurrentStage.id, {
+        money_substage: nextValue
+      });
+      const nextProject = {
+        ...detailProject,
+        stages: (detailProject.stages || []).map((stage) =>
+          stage.id === detailCurrentStage.id ? { ...stage, ...(updatedStage || {}) } : stage
+        )
+      };
+      setDetailProject(nextProject);
+      setRows((prev) =>
+        prev.map((item) =>
+          item.id === nextProject.id ? toRow(nextProject, formatDisplayStageName) : item
+        )
+      );
+      setDetailStatus('Payment status updated.');
+    } catch (_err) {
+      setDetailError('Unable to update payment status.');
+    } finally {
+      setMoneySubstageBusy(false);
+    }
+  };
+
   const toggleDetailRequiredDoc = (docId) => (event) => {
     const checked = Boolean(event.target.checked);
     setDetailForm((prev) => ({
@@ -1616,15 +1689,19 @@ export default function Pipeline({
   const renderDashboardRow = (row, idx, keyPrefix = 'row') => {
     const areaStyle = getStageBadgeStyle(row.areaId);
     const timingAlertTone = stageTimingAlertTone(row.stage, row.stageWaitingSince, dashboardClockMs);
+    const stageNameFormatter = dashboardMode === 'money' ? formatMoneyStageName : formatDisplayStageName;
     const areaNoteTitle = formatStageEstimateTooltip(
       row.stage,
       row.stageWaitingSince,
       dashboardClockMs,
-      formatDisplayStageName
+      stageNameFormatter
     );
     const projectNotesTitle = showHoverNotes
       ? formatDashboardProjectNotesTooltip(row.project?.summary || '')
       : undefined;
+    const stageLabel = dashboardMode === 'money' ? row.moneyStageName : row.area;
+    const paymentStatusLabel = row.moneySubstageLabel || 'Awaiting update';
+    const paymentStatusTone = moneySubstageToneClass(row.moneySubstage);
     return (
       <tr
         key={row.id || `${row.name}-${keyPrefix}-${idx}`}
@@ -1643,9 +1720,14 @@ export default function Pipeline({
             style={areaStyle}
             title={areaNoteTitle}
           >
-            {row.area}
+            {stageLabel}
           </span>
         </td>
+        {dashboardMode === 'money' ? (
+          <td>
+            <span className={`status-pill ${paymentStatusTone}`}>{paymentStatusLabel}</span>
+          </td>
+        ) : null}
       </tr>
     );
   };
@@ -1700,11 +1782,16 @@ export default function Pipeline({
           <div className="dashboard-columns">
             {dashboardColumns.map((columnRows, columnIdx) => (
               <div className="table-scroll dashboard-table-scroll dashboard-split-scroll" key={`dashboard-col-${columnIdx}`}>
-                <table className="project-table dashboard-table dashboard-split-table">
+                <table
+                  className={`project-table dashboard-table dashboard-split-table${
+                    dashboardMode === 'money' ? ' money-status-table' : ''
+                  }`}
+                >
                   <thead>
                     <tr>
                       <th>Project</th>
                       <th>Current Stage</th>
+                      {dashboardMode === 'money' ? <th>Payment Status</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -1716,11 +1803,12 @@ export default function Pipeline({
           </div>
           ) : (
             <div className="table-scroll dashboard-table-scroll">
-              <table className="project-table dashboard-table">
+              <table className={`project-table dashboard-table${dashboardMode === 'money' ? ' money-status-table' : ''}`}>
                 <thead>
                   <tr>
                     <th>Project</th>
                     <th>Current Stage</th>
+                    {dashboardMode === 'money' ? <th>Payment Status</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -1731,18 +1819,19 @@ export default function Pipeline({
           )
         ) : (
           <div className="table-scroll dashboard-table-scroll">
-            <table className="project-table dashboard-table">
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Current Stage</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="empty-row">
-                  <td colSpan={2}>
-                    {dashboardMode === 'money'
-                      ? 'No projects currently require payment.'
+            <table className={`project-table dashboard-table${dashboardMode === 'money' ? ' money-status-table' : ''}`}>
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Current Stage</th>
+                    {dashboardMode === 'money' ? <th>Payment Status</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="empty-row">
+                    <td colSpan={dashboardMode === 'money' ? 3 : 2}>
+                      {dashboardMode === 'money'
+                        ? 'No projects currently require payment.'
                       : showRequesterFilter && dashboardRequesterFilter !== DASHBOARD_FILTER_ALL
                       ? 'No projects match that requester/contractor.'
                       : applyAreaFilter && !canViewAllAreas
@@ -1834,12 +1923,10 @@ export default function Pipeline({
                   <div className="detail-card-header">
                     <h3>Progress</h3>
                   </div>
-                  <div className="customer-progress-top pipeline-progress-top">
-                    <div className="muted customer-current-stage-label">Your Project Is In</div>
-                    <p className="customer-current-stage">
-                      {detailCurrentStage
-                        ? formatDisplayStageName(detailCurrentStage.name, detailCurrentStage.id)
-                        : 'Waiting for stage assignment.'}
+                    <div className="customer-progress-top pipeline-progress-top">
+                      <div className="muted customer-current-stage-label">Your Project Is In</div>
+                      <p className="customer-current-stage">
+                      {detailCurrentStageDisplayName || 'Waiting for stage assignment.'}
                     </p>
                   </div>
                   <div className="progress-track">
@@ -2023,10 +2110,42 @@ export default function Pipeline({
                         </select>
                       ) : (
                         <div className="field-static">
-                          {formatDisplayStageName(detailCurrentStage?.name, detailCurrentStage?.id) || '-'}
+                          {detailCurrentStageDisplayName || '-'}
                         </div>
                       )}
                     </label>
+                    {dashboardMode === 'money' && detailCurrentStage && isMoneyTrackingStage(detailCurrentStage.id) ? (
+                      <div className="span-2 detail-money-substage-card">
+                        <div className="detail-money-substage-head">
+                          <div>
+                            <div className="detail-money-substage-title">Payment status</div>
+                            <div className="muted">
+                              Current money stage: {formatMoneyStageName(detailCurrentStage.name, detailCurrentStage.id)}
+                            </div>
+                          </div>
+                          <span className={`status-pill ${moneySubstageToneClass(detailCurrentMoneySubstage)}`}>
+                            {detailCurrentMoneySubstageLabel}
+                          </span>
+                        </div>
+                        {canEditMoneySubstages ? (
+                          <div className="detail-money-substage-actions">
+                            {MONEY_SUBSTAGE_OPTIONS.map((option) => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className={`ghost money-substage-button${
+                                  detailCurrentMoneySubstage === option.id ? ' active' : ''
+                                }`}
+                                onClick={() => handleMoneySubstageChange(option.id)}
+                                disabled={moneySubstageBusy || saving}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {canEditProjectDetails ? (
                       <label className="span-2 intake-slab-toggle detail-slab-toggle">
                         <input
