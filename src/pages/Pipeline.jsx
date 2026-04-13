@@ -55,7 +55,8 @@ const TONE_LABELS = {
 };
 const DETAIL_TABS = [
   { id: 'project', label: 'Project' },
-  { id: 'files', label: 'Files & Photos' }
+  { id: 'files', label: 'Files & Photos' },
+  { id: 'actions', label: 'Actions' }
 ];
 
 const DASHBOARD_FILTER_ALL = '__all__';
@@ -289,6 +290,7 @@ function toEditForm(project) {
     urgency: project?.urgency || 'standard',
     budget: project?.budget || '',
     slab_work: Boolean(project?.slab_work),
+    scottsdale_ready_files: Boolean(project?.scottsdale_ready_files),
     summary: parsedSummary.notes,
     required_docs: parsedSummary.requiredDocs || buildEmptyRequiredDocs()
   };
@@ -1265,6 +1267,18 @@ export default function Pipeline({
     setAreaSelection('');
   };
 
+  const syncDetailProjectState = useCallback(
+    (updatedProject) => {
+      if (!updatedProject) return;
+      setDetailProject(updatedProject);
+      setDetailForm(toEditForm(updatedProject));
+      setRows((prev) =>
+        prev.map((item) => (item.id === updatedProject.id ? toRow(updatedProject, formatDisplayStageName) : item))
+      );
+    },
+    [formatDisplayStageName]
+  );
+
   const handleSave = async () => {
     if (!detailProject?.id || !canEditProjectDetails) return;
     if (!detailForm.name.trim() || !detailForm.requester.trim()) {
@@ -1289,19 +1303,13 @@ export default function Pipeline({
         urgency: trimOrNull(detailForm.urgency) || 'standard',
         budget: trimOrNull(detailForm.budget),
         slab_work: Boolean(detailForm.slab_work),
+        scottsdale_ready_files: Boolean(detailForm.scottsdale_ready_files),
         summary: trimOrNull(buildProjectSummary(detailForm.required_docs, detailForm.summary)),
         stage_id: requestedStageId && requestedStageId !== currentStageId ? requestedStageId : undefined
       };
       const updated = await updateProject(detailProject.id, payload);
       const areaChanged = Boolean(payload.stage_id);
-
-      setDetailProject(updated);
-      setDetailForm(toEditForm(updated));
-      setRows((prev) =>
-        prev.map((item) =>
-          item.id === updated.id ? toRow(updated, formatDisplayStageName) : item
-        )
-      );
+      syncDetailProjectState(updated);
       await loadStageNotesHistory(detailProject.id);
       setDetailStatus(areaChanged ? 'Project updated. Current area updated.' : 'Project updated.');
     } catch (_err) {
@@ -1585,13 +1593,37 @@ export default function Pipeline({
         missing_docs_before_stage_id: missingDocsDialog.stage.id,
         missing_doc_ids: selectedDocIds
       });
-      setDetailProject(updated);
-      setDetailForm(toEditForm(updated));
-      setRows((prev) => prev.map((item) => (item.id === updated.id ? toRow(updated, formatDisplayStageName) : item)));
+      syncDetailProjectState(updated);
       setMissingDocsDialog({ open: false, project: null, stage: null });
       setDetailStatus('Invoice Needed added and admins notified.');
     } catch (_err) {
       setDetailError('Unable to add missing-document stages.');
+    } finally {
+      setProjectActionBusy('');
+    }
+  };
+
+  const handleProjectActionToggle = async (field, nextValue, busyId, successMessage) => {
+    if (!detailProject?.id || !canEditProjectDetails) return;
+    const previousForm = detailForm;
+    setDetailError('');
+    setDetailStatus('');
+    setProjectActionBusy(busyId);
+    setDetailForm((prev) => ({
+      ...prev,
+      [field]: nextValue
+    }));
+    try {
+      const updated = await updateProject(detailProject.id, {
+        [field]: nextValue
+      });
+      syncDetailProjectState(updated);
+      if (successMessage) {
+        setDetailStatus(successMessage);
+      }
+    } catch (_err) {
+      setDetailForm(previousForm);
+      setDetailError('Unable to update project action.');
     } finally {
       setProjectActionBusy('');
     }
@@ -2207,29 +2239,6 @@ export default function Pipeline({
                         ) : null}
                       </div>
                     ) : null}
-                    {canEditProjectDetails ? (
-                      <label className="span-2 intake-slab-toggle detail-slab-toggle">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(detailForm.slab_work)}
-                          onChange={(event) =>
-                            setDetailForm({ ...detailForm, slab_work: event.target.checked })
-                          }
-                        />
-                        <span>
-                          {detailForm.slab_work
-                            ? 'Slab work required'
-                            : 'Enable slab work'}
-                        </span>
-                      </label>
-                    ) : (
-                      <label className="span-2">
-                        Slab work
-                        <div className="field-static">
-                          {detailForm.slab_work ? 'Required' : 'Not required'}
-                        </div>
-                      </label>
-                    )}
                     <div className="intake-docs span-2" role="group" aria-labelledby="detail-required-docs-title">
                       <div id="detail-required-docs-title" className="intake-docs-title">
                         Required docs
@@ -2377,32 +2386,6 @@ export default function Pipeline({
                               </td>
                             ))}
                           </tr>
-                          <tr>
-                            <th className="stage-matrix-label">Actions</th>
-                            {detailStages.map((stage) => {
-                              const actionBusyId = `missing_docs:${stage.id}`;
-                              return (
-                                <td key={`${stage.id}-actions`}>
-                                  {canEditProjectDetails && detailHasMissingDocs && !detailHasMissingDocFlow ? (
-                                    <button
-                                      type="button"
-                                      className="ghost tiny-button"
-                                      title={`Insert missing-document stages before ${formatDisplayStageName(
-                                        stage.name,
-                                        stage.id
-                                      )}`}
-                                      onClick={() => openMissingDocsDialog(detailProject, stage)}
-                                      disabled={Boolean(projectActionBusy) || saving}
-                                    >
-                                      {projectActionBusy === actionBusyId ? 'Adding...' : 'Missing Required Documents'}
-                                    </button>
-                                  ) : (
-                                    '-'
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
                         </tbody>
                       </table>
                     ) : (
@@ -2415,6 +2398,93 @@ export default function Pipeline({
                       </table>
                     )}
                   </div>
+                </div>
+                ) : null}
+
+                {detailTab === 'actions' ? (
+                <div className="detail-card detail-actions-card">
+                  <div className="detail-card-header">
+                    <h3>Actions</h3>
+                    <span className="muted">Workflow flags and invoice actions for this project.</span>
+                  </div>
+                  {canEditProjectDetails ? (
+                    <div className="detail-actions-stack">
+                      <label className="intake-slab-toggle detail-action-toggle">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(detailForm.slab_work)}
+                          onChange={(event) =>
+                            handleProjectActionToggle(
+                              'slab_work',
+                              event.target.checked,
+                              'toggle:slab_work',
+                              event.target.checked ? 'Slab work enabled.' : 'Slab work disabled.'
+                            )
+                          }
+                          disabled={Boolean(projectActionBusy) || saving}
+                        />
+                        <span>{detailForm.slab_work ? 'Slab work required' : 'Enable slab work'}</span>
+                      </label>
+                      <label className="intake-slab-toggle detail-action-toggle">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(detailForm.scottsdale_ready_files)}
+                          onChange={(event) =>
+                            handleProjectActionToggle(
+                              'scottsdale_ready_files',
+                              event.target.checked,
+                              'toggle:scottsdale_ready_files',
+                              event.target.checked
+                                ? 'D&E stages skipped for this project.'
+                                : 'D&E stages restored for this project.'
+                            )
+                          }
+                          disabled={Boolean(projectActionBusy) || saving}
+                        />
+                        <span>{detailForm.scottsdale_ready_files ? 'Skip D&E stages' : 'Enable D&E stages'}</span>
+                      </label>
+                      <div className="detail-action-notice">
+                        <div className="detail-action-notice-title">Missing required docs</div>
+                        <p className="muted">
+                          Adds Invoice Needed before the current stage and sends the admin notice for missing documents.
+                        </p>
+                        <button
+                          type="button"
+                          className="primary"
+                          onClick={() => openMissingDocsDialog(detailProject, detailCurrentStage)}
+                          disabled={
+                            Boolean(projectActionBusy) ||
+                            saving ||
+                            !detailCurrentStage?.id ||
+                            !detailHasMissingDocs ||
+                            detailHasMissingDocFlow
+                          }
+                        >
+                          {projectActionBusy === `missing_docs:${detailCurrentStage?.id || ''}`
+                            ? 'Adding...'
+                            : 'Missing Required Documents'}
+                        </button>
+                        {!detailHasMissingDocs ? (
+                          <div className="muted detail-action-hint">No missing documents were found in the project summary.</div>
+                        ) : null}
+                        {detailHasMissingDocFlow ? (
+                          <div className="muted detail-action-hint">Missing-document stages are already active.</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="detail-actions-stack detail-actions-readonly">
+                      <div className="field-static">
+                        Slab work: {detailForm.slab_work ? 'Required' : 'Not required'}
+                      </div>
+                      <div className="field-static">
+                        D&E workflow: {detailForm.scottsdale_ready_files ? 'Skipped' : 'Enabled'}
+                      </div>
+                      <p className="muted">
+                        Missing-document actions are available to project editors.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 ) : null}
 

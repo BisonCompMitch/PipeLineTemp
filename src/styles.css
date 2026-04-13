@@ -1929,17 +1929,17 @@ body::before {
 }
 
 .pipeline-progress-card {
-  padding: 22px 22px 18px;
-  gap: 14px;
+  padding: 26px 26px 22px;
+  gap: 26px;
 }
 
 .pipeline-progress-card .detail-card-header {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .pipeline-progress-card .customer-progress-top {
-  gap: 8px;
-  margin-top: 2px;
+  gap: 18px;
+  margin-top: 10px;
 }
 
 .pipeline-progress-card .customer-current-stage-label {
@@ -1950,27 +1950,71 @@ body::before {
 .pipeline-progress-card .customer-current-stage {
   font-size: clamp(24px, 2.5vw, 42px);
   line-height: 1.15;
+  margin-bottom: 2px;
 }
 
 .pipeline-progress-card .progress-track {
   max-width: 100%;
   height: 11px;
-  margin-top: 2px;
+  margin-top: 18px;
 }
 
 .pipeline-progress-card .progress-meta {
-  gap: 14px;
-  margin-top: 2px;
+  gap: 20px;
+  margin-top: 14px;
 }
 
 .pipeline-progress-card .customer-stage-table-wrap {
-  margin-top: 10px;
+  margin-top: 18px;
 }
 
 .pipeline-progress-card .customer-stage-cell {
   min-height: 54px;
   padding: 10px 12px;
   font-size: 16px;
+}
+
+.detail-actions-card {
+  display: grid;
+  gap: 16px;
+}
+
+.detail-actions-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-action-toggle {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.detail-action-toggle span {
+  white-space: normal;
+}
+
+.detail-action-notice {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-2);
+}
+
+.detail-action-notice-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.detail-action-hint {
+  margin: 0;
+}
+
+.detail-actions-readonly {
+  display: grid;
+  gap: 10px;
+  align-items: start;
 }
 
 .primary {
