@@ -12,6 +12,7 @@ import {
   listProjects,
   listUserActivity,
   listUsers,
+  resetUserPasswords,
   updateContractor,
   updateCustomer,
   updateUser
@@ -101,6 +102,7 @@ export default function Users() {
   const [editStatus, setEditStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [bulkResetLoading, setBulkResetLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState({
     bison: false,
     contractor: false,
@@ -294,6 +296,13 @@ export default function Users() {
         normalize(a.login_username || a.username).localeCompare(normalize(b.login_username || b.username))
       ),
     [bisonUsers]
+  );
+  const assignedBisonUsers = useMemo(
+    () =>
+      sortedBison.filter((user) =>
+        Array.isArray(user?.areas) && user.areas.some((area) => String(area || '').trim())
+      ),
+    [sortedBison]
   );
   const sortedContractors = useMemo(
     () => [...contractors].sort((a, b) => normalize(a.email).localeCompare(normalize(b.email))),
@@ -529,6 +538,75 @@ export default function Users() {
     }
   };
 
+  const handleResetAssignedPasswords = async () => {
+    if (bulkResetLoading || !assignedBisonUsers.length) return;
+    const targetUsernames = assignedBisonUsers.map((user) => String(user?.username || '').trim()).filter(Boolean);
+    if (!targetUsernames.length) {
+      await alertDialog('No assigned Bison users were found.', {
+        title: 'Action unavailable',
+        confirmText: 'OK'
+      });
+      return;
+    }
+    const shouldReset = await confirmDialog(
+      `Send temporary password emails to ${targetUsernames.length} assigned Bison user${
+        targetUsernames.length === 1 ? '' : 's'
+      }? They will be required to reset their password on next sign in.`,
+      {
+        title: 'Reset passwords',
+        confirmText: 'Send resets'
+      }
+    );
+    if (!shouldReset) return;
+
+    setBulkResetLoading(true);
+    try {
+      const result = await resetUserPasswords({ usernames: targetUsernames });
+      const sent = Array.isArray(result?.sent) ? result.sent : [];
+      const failed = Array.isArray(result?.failed) ? result.failed : [];
+      const sentSet = new Set(sent.map((value) => normalize(value)));
+      if (sentSet.size) {
+        setAllUsers((prev) =>
+          prev.map((user) => (sentSet.has(normalize(user.username)) ? { ...user, must_reset_password: true } : user))
+        );
+        setBisonUsers((prev) =>
+          prev.map((user) => (sentSet.has(normalize(user.username)) ? { ...user, must_reset_password: true } : user))
+        );
+        setEditing((prev) =>
+          prev && prev.type === 'bison' && sentSet.has(normalize(prev.form?.username))
+            ? { ...prev, form: { ...prev.form, must_reset_password: true } }
+            : prev
+        );
+      }
+      const messageParts = [];
+      if (sent.length) {
+        messageParts.push(
+          `Password reset emails sent to ${sent.length} assigned Bison user${sent.length === 1 ? '' : 's'}.`
+        );
+      }
+      if (failed.length) {
+        const preview = failed.slice(0, 5).join(', ');
+        messageParts.push(
+          `Could not reset ${failed.length} user${failed.length === 1 ? '' : 's'}${preview ? `: ${preview}` : ''}.`
+        );
+      }
+      if (!messageParts.length) {
+        messageParts.push('No password resets were sent.');
+      }
+      await alertDialog(messageParts.join(' '), {
+        title: failed.length ? 'Reset partially completed' : 'Passwords reset',
+        confirmText: 'OK'
+      });
+    } catch (err) {
+      await alertDialog(err?.message || 'Unable to reset passwords.', {
+        title: 'Reset failed',
+        confirmText: 'OK'
+      });
+    } finally {
+      setBulkResetLoading(false);
+    }
+  };
+
   const handleCreateContractor = async (event) => {
     event.preventDefault();
     if (!createContractorForm.email.trim()) {
@@ -693,6 +771,19 @@ export default function Users() {
             <h2>Bison</h2>
             <p className="muted">Internal team accounts.</p>
           </div>
+          <button
+            className="ghost"
+            type="button"
+            onClick={handleResetAssignedPasswords}
+            disabled={!assignedBisonUsers.length || bulkResetLoading}
+            title={
+              assignedBisonUsers.length
+                ? 'Send temporary password emails to all assigned Bison users'
+                : 'No assigned users available'
+            }
+          >
+            {bulkResetLoading ? 'Resetting...' : 'Reset assigned passwords'}
+          </button>
         </div>
         <form className="form-grid user-create-form user-create-form--bison" onSubmit={handleCreateBison}>
           <label className="span-2">

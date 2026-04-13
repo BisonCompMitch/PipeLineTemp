@@ -51,7 +51,8 @@ export default function Customer() {
         }
         const normalizedStages = normalizeProjectStages(item.stages || [], {
           hasSlabWork: coerceSlabWorkFlag(item?.slab_work),
-          hasScottsdaleReadyFiles: item?.scottsdale_ready_files === true
+          hasScottsdaleReadyFiles: item?.scottsdale_ready_files === true,
+          missingDocsBeforeStageId: item?.missing_docs_before_stage_id || ''
         });
         setProject(item);
         setProgress(completionPercent(normalizedStages));
@@ -94,9 +95,10 @@ export default function Customer() {
     () =>
       normalizeProjectStages(project?.stages || [], {
         hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
-        hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
+        hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true,
+        missingDocsBeforeStageId: project?.missing_docs_before_stage_id || ''
       }),
-    [project?.stages, project?.slab_work, project?.scottsdale_ready_files]
+    [project?.stages, project?.slab_work, project?.scottsdale_ready_files, project?.missing_docs_before_stage_id]
   );
   const stage = currentStage(stages);
   const stageRows = useMemo(() => {

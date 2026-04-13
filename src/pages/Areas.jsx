@@ -7,16 +7,24 @@ import {
   listProjectFiles,
   listProjects,
   setProjectFileVisibility,
+  updateProject,
   updateStage,
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import MissingDocsDialog from '../components/MissingDocsDialog.jsx';
 import BlockingOverlay from '../components/BlockingOverlay.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
-import { coerceSlabWorkFlag, formatStageName, normalizeProjectStages, STAGE_FLOW } from '../utils/stageDisplay.js';
+import {
+  MISSING_DOC_STAGE_IDS,
+  coerceSlabWorkFlag,
+  formatStageName,
+  normalizeProjectStages,
+  STAGE_FLOW
+} from '../utils/stageDisplay.js';
 import { REQUIRED_DOC_OPTIONS, parseProjectSummary } from '../utils/requiredDocs.js';
 
-const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
+const ALL_AREA_STAGE_IDS = [...STAGE_FLOW.map((stage) => stage.id), ...MISSING_DOC_STAGE_IDS];
 
 const AREA_STAGE_MAP = {
   'plans recieved': ['plans_received'],
@@ -62,6 +70,8 @@ const AREA_STAGE_MAP = {
   'invoice sent - shipping': ['invoice_shipping'],
   'invoice sent shipping': ['invoice_shipping'],
   invoice_shipping: ['invoice_shipping'],
+  'invoice needed': ['invoice_needed'],
+  invoice_needed: ['invoice_needed'],
   'manufacturing - invoice sent': ['invoice_shipping'],
   'manufacturing - final invoice sent': ['invoice_shipping'],
   'manufacturing final invoice sent': ['invoice_shipping'],
@@ -235,8 +245,21 @@ function currentProjectStage(stages = []) {
 function normalizeStagesForProject(project) {
   return normalizeProjectStages(project?.stages || [], {
     hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
-    hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
+    hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true,
+    missingDocsBeforeStageId: project?.missing_docs_before_stage_id || ''
   });
+}
+
+function projectHasMissingDocs(project) {
+  const parsedSummary = parseProjectSummary(project?.summary || '');
+  if (!parsedSummary.hasDocsSection) return false;
+  return REQUIRED_DOC_OPTIONS.some((option) => !Boolean(parsedSummary.requiredDocs?.[option.id]));
+}
+
+function projectHasMissingDocFlow(project) {
+  if (!project) return false;
+  if (Boolean(project.missing_docs_before_stage_id)) return true;
+  return (project.stages || []).some((stage) => MISSING_DOC_STAGE_IDS.has(stage?.id || stage?.stage_id));
 }
 
 function triggerBrowserDownload(blob, filename) {
@@ -327,6 +350,11 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   const [cardPreviewUrls, setCardPreviewUrls] = useState({});
   const [cardPreviewStatus, setCardPreviewStatus] = useState({});
   const [stageMoveLoading, setStageMoveLoading] = useState(false);
+  const [missingDocsDialog, setMissingDocsDialog] = useState({
+    open: false,
+    project: null,
+    stage: null
+  });
   const [preview, setPreview] = useState({
     open: false,
     url: '',
@@ -676,6 +704,60 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     }
   };
 
+  const openMissingDocsDialog = (project, stage) => {
+    if (!project?.id || !stage?.id) return;
+    if (!projectHasMissingDocs(project)) {
+      void alertDialog('No missing documents were found in the project summary.', {
+        title: 'Action unavailable',
+        confirmText: 'OK'
+      });
+      return;
+    }
+    if (projectHasMissingDocFlow(project)) {
+      void alertDialog('Missing-document stages are already added.', {
+        title: 'Action unavailable',
+        confirmText: 'OK'
+      });
+      return;
+    }
+    setMissingDocsDialog({ open: true, project, stage });
+  };
+
+  const closeMissingDocsDialog = () => {
+    if (stageMoveLoading) return;
+    setMissingDocsDialog({ open: false, project: null, stage: null });
+  };
+
+  const handleMissingDocsConfirm = async (selectedDocIds) => {
+    if (!missingDocsDialog.project?.id || !missingDocsDialog.stage?.id) return;
+    let updated = false;
+    setStageMoveLoading(true);
+    try {
+      await updateProject(missingDocsDialog.project.id, {
+        missing_docs_before_stage_id: missingDocsDialog.stage.id,
+        missing_doc_ids: selectedDocIds
+      });
+      await loadProjects();
+      setSelectedRow(null);
+      setDetailTab('details');
+      setMissingDocsDialog({ open: false, project: null, stage: null });
+      updated = true;
+    } catch (_err) {
+      await alertDialog('Unable to add the missing-doc stages.', {
+        title: 'Action failed',
+        confirmText: 'OK'
+      });
+    } finally {
+      setStageMoveLoading(false);
+    }
+    if (updated) {
+      await alertDialog('Invoice Needed added and admins notified.', {
+        title: 'Stages added',
+        confirmText: 'OK'
+      });
+    }
+  };
+
   const handleSaveAreaNote = async () => {
     if (!selectedRow?.project?.id || !selectedRow?.stage?.id) return;
     const noteText = areaNoteDraft.trim();
@@ -946,23 +1028,33 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
     }
   };
 
-  const getRowAction = (project, stage) => {
-    if (!stage) return null;
+  const getRowActions = (project, stage) => {
+    if (!stage) return [];
+    const actions = [];
+    const missingDocs = projectHasMissingDocs(project);
+    const missingDocFlowAlreadyAdded = projectHasMissingDocFlow(project);
     if (stage.status === 'awaiting_approval') {
-      return {
+      actions.push({
         label: 'Accept',
         className: 'primary',
         onClick: () => handleAccept(project.id, stage.id)
-      };
+      });
     }
     if (stage.status === 'in_progress') {
-      return {
+      actions.push({
         label: 'Send to next step',
         className: 'ghost',
         onClick: () => handleComplete(project.id, stage.id)
-      };
+      });
     }
-    return null;
+    if (missingDocs && !missingDocFlowAlreadyAdded) {
+      actions.push({
+        label: 'Missing Required Documents',
+        className: 'ghost',
+        onClick: () => openMissingDocsDialog(project, stage)
+      });
+    }
+    return actions;
   };
 
   const notesHistoryText = areaNoteHistory.length
@@ -1018,7 +1110,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
             {sortedRows.length ? (
               sortedRows.map(({ project, stage }) => {
                 const countdown = countdownForStage(stage, nowMs);
-                const action = getRowAction(project, stage);
+                const actions = getRowActions(project, stage);
 
                 return (
                   <tr
@@ -1053,11 +1145,13 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                       </div>
                     </td>
                     <td>
-                      {action ? (
+                      {actions.length ? (
                         <div className="actions-grid">
-                          <button type="button" className={action.className} onClick={action.onClick}>
-                            {action.label}
-                          </button>
+                          {actions.map((action) => (
+                            <button type="button" key={action.label} className={action.className} onClick={action.onClick}>
+                              {action.label}
+                            </button>
+                          ))}
                         </div>
                       ) : (
                         '-'
@@ -1177,14 +1271,12 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                 </table>
               </div>
               <div className="actions-grid">
-                {getRowAction(selectedRow.project, selectedRow.stage) ? (
-                  <button
-                    type="button"
-                    className={getRowAction(selectedRow.project, selectedRow.stage).className}
-                    onClick={getRowAction(selectedRow.project, selectedRow.stage).onClick}
-                  >
-                    {getRowAction(selectedRow.project, selectedRow.stage).label}
-                  </button>
+                {getRowActions(selectedRow.project, selectedRow.stage).length ? (
+                  getRowActions(selectedRow.project, selectedRow.stage).map((action) => (
+                    <button key={action.label} type="button" className={action.className} onClick={action.onClick}>
+                      {action.label}
+                    </button>
+                  ))
                 ) : (
                   <span className="muted">No actions available for your role.</span>
                 )}
@@ -1619,6 +1711,17 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
           </div>
         </ModalPortal>
       ) : null}
+
+      <MissingDocsDialog
+        open={missingDocsDialog.open}
+        projectName={missingDocsDialog.project?.name || ''}
+        projectNumber={missingDocsDialog.project?.project_number || ''}
+        projectSummary={missingDocsDialog.project?.summary || ''}
+        beforeStageName={formatStageName(missingDocsDialog.stage?.name, missingDocsDialog.stage?.id)}
+        saving={stageMoveLoading}
+        onCancel={closeMissingDocsDialog}
+        onConfirm={handleMissingDocsConfirm}
+      />
 
       <BlockingOverlay
         open={stageMoveLoading}

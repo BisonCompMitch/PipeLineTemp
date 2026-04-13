@@ -18,6 +18,7 @@ import {
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import MissingDocsDialog from '../components/MissingDocsDialog.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import {
   coerceSlabWorkFlag,
@@ -26,6 +27,7 @@ import {
   getEffectiveMoneySubstage,
   getMoneySubstageLabel,
   getStageBadgeStyle,
+  MISSING_DOC_STAGE_IDS,
   isMoneyTrackingStage,
   MONEY_SUBSTAGE_OPTIONS,
   normalizeProjectStages,
@@ -70,7 +72,7 @@ const MONEY_STATUS_STAGE_IDS = new Set([
   'final_payment'
 ]);
 
-const ALL_AREA_STAGE_IDS = STAGE_FLOW.map((stage) => stage.id);
+const ALL_AREA_STAGE_IDS = [...STAGE_FLOW.map((stage) => stage.id), ...MISSING_DOC_STAGE_IDS];
 
 const AREA_FILTER_TO_STAGE_IDS = {
   'plans recieved': ['plans_received'],
@@ -116,6 +118,8 @@ const AREA_FILTER_TO_STAGE_IDS = {
   'invoice sent - shipping': ['invoice_shipping'],
   'invoice sent shipping': ['invoice_shipping'],
   invoice_shipping: ['invoice_shipping'],
+  'invoice needed': ['invoice_needed'],
+  invoice_needed: ['invoice_needed'],
   'manufacturing - invoice sent': ['invoice_shipping'],
   'manufacturing - final invoice sent': ['invoice_shipping'],
   'manufacturing final invoice sent': ['invoice_shipping'],
@@ -229,11 +233,28 @@ function resolveStageWaitingSince(stages = [], stage = null, projectCreatedAt = 
   return firstValid || null;
 }
 
-function toRow(project, formatStageNameFn = formatStageName) {
-  const normalizedStages = normalizeProjectStages(project.stages || [], {
+function normalizeStagesForProject(project) {
+  return normalizeProjectStages(project?.stages || [], {
     hasSlabWork: coerceSlabWorkFlag(project?.slab_work),
-    hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true
+    hasScottsdaleReadyFiles: project?.scottsdale_ready_files === true,
+    missingDocsBeforeStageId: project?.missing_docs_before_stage_id || ''
   });
+}
+
+function projectHasMissingDocs(project) {
+  const parsedSummary = parseProjectSummary(project?.summary || '');
+  if (!parsedSummary.hasDocsSection) return false;
+  return REQUIRED_DOC_OPTIONS.some((option) => !Boolean(parsedSummary.requiredDocs?.[option.id]));
+}
+
+function projectHasMissingDocFlow(project) {
+  if (!project) return false;
+  if (Boolean(project.missing_docs_before_stage_id)) return true;
+  return (project.stages || []).some((stage) => MISSING_DOC_STAGE_IDS.has(stage?.id || stage?.stage_id));
+}
+
+function toRow(project, formatStageNameFn = formatStageName) {
+  const normalizedStages = normalizeStagesForProject(project);
   const stage = currentStage(normalizedStages);
   const waitingSince = resolveStageWaitingSince(normalizedStages, stage, project?.created_at || null);
   return {
@@ -650,6 +671,11 @@ export default function Pipeline({
   const [detailProject, setDetailProject] = useState(null);
   const [detailTab, setDetailTab] = useState('project');
   const [projectActionBusy, setProjectActionBusy] = useState('');
+  const [missingDocsDialog, setMissingDocsDialog] = useState({
+    open: false,
+    project: null,
+    stage: null
+  });
   const [moneySubstageBusy, setMoneySubstageBusy] = useState(false);
   const [detailForm, setDetailForm] = useState(toEditForm(null));
   const [detailStageNoteDraft, setDetailStageNoteDraft] = useState('');
@@ -905,14 +931,9 @@ export default function Pipeline({
 
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
-  const detailStages = useMemo(
-    () =>
-      normalizeProjectStages(detailProject?.stages || [], {
-        hasSlabWork: coerceSlabWorkFlag(detailProject?.slab_work),
-        hasScottsdaleReadyFiles: detailProject?.scottsdale_ready_files === true
-      }),
-    [detailProject?.stages, detailProject?.slab_work, detailProject?.scottsdale_ready_files]
-  );
+  const detailStages = useMemo(() => normalizeStagesForProject(detailProject), [detailProject]);
+  const detailHasMissingDocs = projectHasMissingDocs(detailProject);
+  const detailHasMissingDocFlow = projectHasMissingDocFlow(detailProject);
   const canUploadInFilesTab = canEditProjects || canUploadProjectFiles;
   const projectIsComplete = useMemo(() => {
     const stages = detailStages;
@@ -1533,6 +1554,46 @@ export default function Pipeline({
       setDetailError('Unable to update payment status.');
     } finally {
       setMoneySubstageBusy(false);
+    }
+  };
+
+  const openMissingDocsDialog = (project, stage) => {
+    if (!project?.id || !stage?.id || !canEditProjectDetails) return;
+    if (!projectHasMissingDocs(project)) {
+      setDetailError('No missing documents were found in the project summary.');
+      return;
+    }
+    if (projectHasMissingDocFlow(project)) {
+      setDetailStatus('Missing-document stages are already added.');
+      return;
+    }
+    setMissingDocsDialog({ open: true, project, stage });
+  };
+
+  const closeMissingDocsDialog = () => {
+    if (projectActionBusy || saving) return;
+    setMissingDocsDialog({ open: false, project: null, stage: null });
+  };
+
+  const handleMissingDocsConfirm = async (selectedDocIds) => {
+    if (!missingDocsDialog.project?.id || !missingDocsDialog.stage?.id || !canEditProjectDetails) return;
+    setProjectActionBusy(`missing_docs:${missingDocsDialog.stage.id}`);
+    setDetailError('');
+    setDetailStatus('');
+    try {
+      const updated = await updateProject(missingDocsDialog.project.id, {
+        missing_docs_before_stage_id: missingDocsDialog.stage.id,
+        missing_doc_ids: selectedDocIds
+      });
+      setDetailProject(updated);
+      setDetailForm(toEditForm(updated));
+      setRows((prev) => prev.map((item) => (item.id === updated.id ? toRow(updated, formatDisplayStageName) : item)));
+      setMissingDocsDialog({ open: false, project: null, stage: null });
+      setDetailStatus('Invoice Needed added and admins notified.');
+    } catch (_err) {
+      setDetailError('Unable to add missing-document stages.');
+    } finally {
+      setProjectActionBusy('');
     }
   };
 
@@ -2316,6 +2377,32 @@ export default function Pipeline({
                               </td>
                             ))}
                           </tr>
+                          <tr>
+                            <th className="stage-matrix-label">Actions</th>
+                            {detailStages.map((stage) => {
+                              const actionBusyId = `missing_docs:${stage.id}`;
+                              return (
+                                <td key={`${stage.id}-actions`}>
+                                  {canEditProjectDetails && detailHasMissingDocs && !detailHasMissingDocFlow ? (
+                                    <button
+                                      type="button"
+                                      className="ghost tiny-button"
+                                      title={`Insert missing-document stages before ${formatDisplayStageName(
+                                        stage.name,
+                                        stage.id
+                                      )}`}
+                                      onClick={() => openMissingDocsDialog(detailProject, stage)}
+                                      disabled={Boolean(projectActionBusy) || saving}
+                                    >
+                                      {projectActionBusy === actionBusyId ? 'Adding...' : 'Missing Required Documents'}
+                                    </button>
+                                  ) : (
+                                    '-'
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
                         </tbody>
                       </table>
                     ) : (
@@ -2740,6 +2827,17 @@ export default function Pipeline({
           </div>
         </ModalPortal>
       ) : null}
+
+      <MissingDocsDialog
+        open={missingDocsDialog.open}
+        projectName={missingDocsDialog.project?.name || ''}
+        projectNumber={missingDocsDialog.project?.project_number || ''}
+        projectSummary={missingDocsDialog.project?.summary || ''}
+        beforeStageName={formatDisplayStageName(missingDocsDialog.stage?.name, missingDocsDialog.stage?.id)}
+        saving={Boolean(projectActionBusy) && projectActionBusy.startsWith('missing_docs:')}
+        onCancel={closeMissingDocsDialog}
+        onConfirm={handleMissingDocsConfirm}
+      />
 
       {dialogPortal}
     </>

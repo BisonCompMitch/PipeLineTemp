@@ -148,6 +148,35 @@ export const SCOTTSDALE_READY_SLAB_STAGE_FLOW = [
   { id: 'completed', name: 'Completed', owner: 'Archive', default_duration_hours: 1 }
 ];
 
+export const MISSING_DOC_STAGE_FLOW = [
+  {
+    id: 'invoice_needed',
+    name: 'Invoice Needed',
+    owner: 'Admin',
+    default_duration_hours: 1
+  },
+  {
+    id: 'missing_required_documents',
+    name: 'Missing Required Documents',
+    owner: 'Admin',
+    default_duration_hours: 1
+  },
+  {
+    id: 'missing_doc_invoice_sent',
+    name: 'Missing Doc - Invoice Sent',
+    owner: 'Admin',
+    default_duration_hours: 1
+  },
+  {
+    id: 'missing_doc_payment_received',
+    name: 'Missing Doc - Payment Received',
+    owner: 'Admin',
+    default_duration_hours: 1
+  }
+];
+
+export const MISSING_DOC_STAGE_IDS = new Set(MISSING_DOC_STAGE_FLOW.map((stage) => stage.id));
+
 function mergeFlows(...flows) {
   const merged = [];
   const seen = new Set();
@@ -179,6 +208,10 @@ export const MONEY_STAGE_IDS = new Set([
   'final_payment'
 ]);
 const INVOICE_STAGE_IDS = new Set(['invoice_design', 'invoice_slab', 'invoice_production', 'invoice_shipping']);
+const COLOR_MISSING_DOC_GATE = '#FDE68A';
+const COLOR_INVOICE_NEEDED = '#F59E0B';
+const COLOR_MISSING_DOC_INVOICE = '#FCA5A5';
+const COLOR_MISSING_DOC_PAYMENT = '#86EFAC';
 export const MONEY_SUBSTAGE_OPTIONS = [
   { id: 'money_ordered', label: 'Money Ordered' },
   { id: 'client_paid', label: 'Client Paid' },
@@ -225,6 +258,10 @@ export const STAGE_COLORS = {
   acceptance: COLOR_ACCEPTANCE,
   misc_money: COLOR_MISC_MONEY,
   shipping: COLOR_SHIPPING,
+  invoice_needed: COLOR_INVOICE_NEEDED,
+  missing_required_documents: COLOR_MISSING_DOC_GATE,
+  missing_doc_invoice_sent: COLOR_MISSING_DOC_INVOICE,
+  missing_doc_payment_received: COLOR_MISSING_DOC_PAYMENT,
   final_payment: COLOR_MONEY,
   completed: COLOR_COMPLETED
 };
@@ -232,25 +269,40 @@ export const STAGE_COLORS = {
 function resolveFlow(rawStages, options = {}) {
   const explicitScottsdale = coerceSlabWorkFlag(options?.hasScottsdaleReadyFiles);
   const explicitSlab = coerceSlabWorkFlag(options?.hasSlabWork);
+  let flow;
   if (explicitScottsdale === true) {
-    if (explicitSlab === true) return SCOTTSDALE_READY_SLAB_STAGE_FLOW;
-    return SCOTTSDALE_READY_STAGE_FLOW;
+    flow = explicitSlab === true ? SCOTTSDALE_READY_SLAB_STAGE_FLOW : SCOTTSDALE_READY_STAGE_FLOW;
+  } else if (typeof explicitSlab === 'boolean') {
+    flow = explicitSlab ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
+  } else {
+    const hasSlabStage = (rawStages || []).some((stage) => {
+      const id = normalizeId(stage?.id || stage?.stage_id);
+      return SLAB_STAGE_IDS.has(id);
+    });
+    const hasDesignFamilyStage = (rawStages || []).some((stage) => {
+      const id = normalizeId(stage?.id || stage?.stage_id);
+      return DESIGN_FAMILY_STAGE_IDS.has(id);
+    });
+    flow = hasDesignFamilyStage
+      ? hasSlabStage
+        ? SLAB_STAGE_FLOW
+        : BASE_STAGE_FLOW
+      : hasSlabStage
+        ? SCOTTSDALE_READY_SLAB_STAGE_FLOW
+        : SCOTTSDALE_READY_STAGE_FLOW;
   }
-  if (typeof explicitSlab === 'boolean') {
-    return explicitSlab ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
+  const missingDocsBeforeStageId = normalizeId(options?.missingDocsBeforeStageId);
+  if (missingDocsBeforeStageId && !MISSING_DOC_STAGE_IDS.has(missingDocsBeforeStageId)) {
+    const insertIndex = flow.findIndex((entry) => entry.id === missingDocsBeforeStageId);
+    const fallbackIndex = insertIndex >= 0 ? insertIndex : flow.findIndex((entry) => entry.id === 'completed');
+    const normalizedFallbackIndex = fallbackIndex >= 0 ? fallbackIndex : flow.length;
+    return [
+      ...flow.slice(0, normalizedFallbackIndex),
+      ...MISSING_DOC_STAGE_FLOW,
+      ...flow.slice(normalizedFallbackIndex)
+    ];
   }
-  const hasSlabStage = (rawStages || []).some((stage) => {
-    const id = normalizeId(stage?.id || stage?.stage_id);
-    return SLAB_STAGE_IDS.has(id);
-  });
-  const hasDesignFamilyStage = (rawStages || []).some((stage) => {
-    const id = normalizeId(stage?.id || stage?.stage_id);
-    return DESIGN_FAMILY_STAGE_IDS.has(id);
-  });
-  if (hasDesignFamilyStage) {
-    return hasSlabStage ? SLAB_STAGE_FLOW : BASE_STAGE_FLOW;
-  }
-  return hasSlabStage ? SCOTTSDALE_READY_SLAB_STAGE_FLOW : SCOTTSDALE_READY_STAGE_FLOW;
+  return flow;
 }
 
 export function getStageColor(stageId = '') {
@@ -319,6 +371,17 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (/^rough\s+estimate\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) return 'Budgetary Number / Sales Tax Certificate';
   if (/^budgetary\s+number\s*\/\s*sales\s+tax\s+certificate$/i.test(rawName)) {
     return 'Budgetary Number / Sales Tax Certificate';
+  }
+
+  if (id === 'invoice_needed') return 'Invoice Needed';
+  if (/^invoice\s+needed$/i.test(rawName)) return 'Invoice Needed';
+  if (id === 'missing_required_documents') return 'Missing Required Documents';
+  if (/^missing\s+required\s+documents$/i.test(rawName)) return 'Missing Required Documents';
+  if (id === 'missing_doc_invoice_sent') return 'Missing Doc - Invoice Sent';
+  if (/^missing\s+doc(?:uments?)?\s*-\s*invoice\s*sent$/i.test(rawName)) return 'Missing Doc - Invoice Sent';
+  if (id === 'missing_doc_payment_received') return 'Missing Doc - Payment Received';
+  if (/^missing\s+doc(?:uments?)?\s*-\s*payment\s*(received|recieved)$/i.test(rawName)) {
+    return 'Missing Doc - Payment Received';
   }
 
   if (id === 'money_design') return 'Money - D&E';

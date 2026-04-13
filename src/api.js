@@ -271,6 +271,13 @@ export async function forceLogoutUser(username) {
   return apiJson(`/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST', body: {} });
 }
 
+export async function resetUserPasswords(payload = {}) {
+  return apiJson('/users/password-resets/bulk', {
+    method: 'POST',
+    body: payload
+  });
+}
+
 export async function listProjects(params = '') {
   const suffix = params ? `?${params}` : '';
   return apiJson(`/projects${suffix}`);
