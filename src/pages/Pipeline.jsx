@@ -2405,11 +2405,11 @@ export default function Pipeline({
                 <div className="detail-card detail-actions-card">
                   <div className="detail-card-header">
                     <h3>Actions</h3>
-                    <span className="muted">Workflow flags and invoice actions for this project.</span>
+                    <span className="muted">Workflow flags, invoice actions, and missing-doc handling for this project.</span>
                   </div>
                   {canEditProjectDetails ? (
                     <div className="detail-actions-stack">
-                      <label className="intake-slab-toggle detail-action-toggle">
+                      <label className="switch-field detail-action-toggle">
                         <input
                           type="checkbox"
                           checked={Boolean(detailForm.slab_work)}
@@ -2423,9 +2423,12 @@ export default function Pipeline({
                           }
                           disabled={Boolean(projectActionBusy) || saving}
                         />
-                        <span>{detailForm.slab_work ? 'Slab work required' : 'Enable slab work'}</span>
+                        <span className="switch-track" aria-hidden="true">
+                          <span className="switch-thumb" />
+                        </span>
+                        <span className="switch-text">Slab work required</span>
                       </label>
-                      <label className="intake-slab-toggle detail-action-toggle">
+                      <label className="switch-field detail-action-toggle">
                         <input
                           type="checkbox"
                           checked={Boolean(detailForm.scottsdale_ready_files)}
@@ -2441,7 +2444,10 @@ export default function Pipeline({
                           }
                           disabled={Boolean(projectActionBusy) || saving}
                         />
-                        <span>{detailForm.scottsdale_ready_files ? 'Skip D&E stages' : 'Enable D&E stages'}</span>
+                        <span className="switch-track" aria-hidden="true">
+                          <span className="switch-thumb" />
+                        </span>
+                        <span className="switch-text">Skip D&E stages</span>
                       </label>
                       <div className="detail-action-notice">
                         <div className="detail-action-notice-title">Missing required docs</div>

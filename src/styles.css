@@ -1989,7 +1989,7 @@ body::before {
   width: 100%;
 }
 
-.detail-action-toggle span {
+.detail-action-toggle .switch-text {
   white-space: normal;
 }
 
