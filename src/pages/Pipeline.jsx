@@ -22,7 +22,6 @@ import MissingDocsDialog from '../components/MissingDocsDialog.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 import {
   coerceSlabWorkFlag,
-  formatMoneyStageGlyph,
   formatStageName,
   getEffectiveMoneySubstage,
   getMoneySubstageLabel,
@@ -55,6 +54,7 @@ const TONE_LABELS = {
 };
 const DETAIL_TABS = [
   { id: 'project', label: 'Project' },
+  { id: 'stage_info', label: 'Stage info' },
   { id: 'files', label: 'Files & Photos' },
   { id: 'actions', label: 'Actions' }
 ];
@@ -720,10 +720,6 @@ export default function Pipeline({
       ? window.matchMedia('(min-width: 1101px)').matches
       : true
   );
-  const [isDetailTabletView, setIsDetailTabletView] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-    return window.matchMedia('(max-width: 1100px) and (min-width: 761px)').matches;
-  });
   const [dashboardClockMs, setDashboardClockMs] = useState(() => Date.now());
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
   const externalStageLabels = Boolean(canUploadProjectFiles) && !canEditProjects;
@@ -964,13 +960,6 @@ export default function Pipeline({
     () => completionPercent(detailStages),
     [detailStages]
   );
-  const detailStageRows = useMemo(() => {
-    const rowCount = isDetailTabletView ? 3 : 2;
-    const rowSize = Math.ceil(detailStages.length / rowCount);
-    return Array.from({ length: rowCount }, (_, index) =>
-      detailStages.slice(index * rowSize, (index + 1) * rowSize)
-    ).filter((row) => row.length > 0);
-  }, [detailStages, isDetailTabletView]);
   const stageNoteTooltipByStageId = useMemo(() => {
     const grouped = new Map();
     stageNotesHistory.forEach((entry) => {
@@ -1122,19 +1111,6 @@ export default function Pipeline({
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
     const media = window.matchMedia('(min-width: 1101px)');
     const onChange = () => setSplitDashboardLayout(media.matches);
-    onChange();
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', onChange);
-      return () => media.removeEventListener('change', onChange);
-    }
-    media.addListener(onChange);
-    return () => media.removeListener(onChange);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const media = window.matchMedia('(max-width: 1100px) and (min-width: 761px)');
-    const onChange = () => setIsDetailTabletView(media.matches);
     onChange();
     if (typeof media.addEventListener === 'function') {
       media.addEventListener('change', onChange);
@@ -2012,65 +1988,24 @@ export default function Pipeline({
                 {detailProject ? (
                   <div className="project-detail-grid">
                 {detailTab === 'project' ? (
-                <div className="detail-card pipeline-progress-card">
-                  <div className="detail-card-header">
-                    <h3>Progress</h3>
-                  </div>
+                  <div className="detail-card pipeline-progress-card">
+                    <div className="detail-card-header">
+                      <h3>Progress</h3>
+                    </div>
                     <div className="customer-progress-top pipeline-progress-top">
                       <div className="muted customer-current-stage-label">Your Project Is In</div>
                       <p className="customer-current-stage">
-                      {detailCurrentStageDisplayName || 'Waiting for stage assignment.'}
-                    </p>
-                  </div>
-                  <div className="progress-track">
-                    <div className="progress-fill" style={{ width: `${detailProgress}%` }} />
-                  </div>
-                  <div className="progress-meta">
-                    <div className="muted">Progress</div>
-                    <div className="progress-pill">{`${detailProgress}%`}</div>
-                  </div>
-                  {detailStages.length ? (
-                    <div className="customer-stage-table-wrap">
-                      <div className="customer-stage-table-scroll">
-                        <div className="customer-stage-grid">
-                          {detailStageRows.map((row, rowIndex) => {
-                            const cells = row.map((item) => {
-                              const fullName = formatDisplayStageName(item?.name, item?.id);
-                              const compactName = formatMoneyStageGlyph(item?.name, item?.id, {
-                                audience: externalStageLabels ? 'external' : 'internal'
-                              });
-                              const isMoneyGlyph = compactName.trim().endsWith('$');
-                              return { item, fullName, compactName, isMoneyGlyph };
-                            });
-                            const columnTemplate = cells
-                              .map((cell) => (cell.isMoneyGlyph ? '0.65fr' : '1fr'))
-                              .join(' ');
-                            return (
-                              <div
-                                key={`detail-stage-row-${rowIndex}`}
-                                className="customer-stage-row"
-                                style={{ gridTemplateColumns: columnTemplate }}
-                              >
-                                {cells.map(({ item, fullName, compactName, isMoneyGlyph }) => (
-                                  <div
-                                    key={item.id}
-                                    className={`customer-stage-cell ${progressStageStatusClass(item.status)}${
-                                      isMoneyGlyph ? ' money-glyph' : ''
-                                    }`}
-                                    title={compactName !== fullName ? fullName : undefined}
-                                  >
-                                    <span className="customer-stage-label-desktop">{compactName}</span>
-                                    <span className="customer-stage-label-mobile">{fullName}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                        {detailCurrentStageDisplayName || 'Waiting for stage assignment.'}
+                      </p>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="progress-track">
+                      <div className="progress-fill" style={{ width: `${detailProgress}%` }} />
+                    </div>
+                    <div className="progress-meta">
+                      <div className="muted">Progress</div>
+                      <div className="progress-pill">{`${detailProgress}%`}</div>
+                    </div>
+                  </div>
                 ) : null}
 
                 {detailTab === 'project' ? (
@@ -2319,86 +2254,85 @@ export default function Pipeline({
                 </div>
                 ) : null}
 
-                {detailTab === 'project' ? (
-                <div className="detail-card">
-                  <h3>Stages</h3>
-                  <div className="table-scroll project-stage-table">
+                {detailTab === 'stage_info' ? (
+                  <div className="detail-card stage-info-card">
+                    <div className="detail-card-header stage-info-header">
+                      <div>
+                        <h3>Stage info</h3>
+                        <span className="muted">
+                          Vertical summary of each stage, its owner, status, dates, and notes.
+                        </span>
+                      </div>
+                      <span className="muted">{detailStages.length ? `${detailStages.length} stages` : 'No stages'}</span>
+                    </div>
                     {detailStages.length ? (
-                      <table className="project-table stage-matrix-table">
-                        <thead>
-                          <tr>
-                            <th className="stage-matrix-label">Field</th>
-                            {detailStages.map((stage) => {
-                              const count = stageNoteCountByStageId.get(stage.id) || 0;
-                              const notesTitle = stageNoteTooltipByStageId.get(stage.id) || '';
-                              return (
-                                <th
-                                  key={stage.id}
-                                  className={`stage-matrix-stage${count ? ' has-notes' : ''}`}
-                                  title={notesTitle}
-                                >
-                                  {formatDisplayStageName(stage.name, stage.id)}
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <th className="stage-matrix-label">Owner</th>
-                            {detailStages.map((stage) => (
-                              <td key={`${stage.id}-owner`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
-                                {stage.owner}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <th className="stage-matrix-label">Status</th>
-                            {detailStages.map((stage) => (
-                              <td key={`${stage.id}-status`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
+                      <div className="stage-info-list">
+                        {detailStages.map((stage) => {
+                          const stageName = formatDisplayStageName(stage.name, stage.id);
+                          const stageNotesTooltip = stageNoteTooltipByStageId.get(stage.id) || '';
+                          const stageNoteCount = stageNoteCountByStageId.get(stage.id) || 0;
+                          const stageNotesText = stageNotesTooltip.split('\n').slice(2).join('\n\n').trim();
+                          const isCurrentStage = detailCurrentStage?.id === stage.id;
+                          return (
+                            <section
+                              key={stage.id}
+                              className={`stage-info-item ${progressStageStatusClass(stage.status)}${
+                                isCurrentStage ? ' current-stage' : ''
+                              }`}
+                            >
+                              <div className="stage-info-topline">
+                                <div className="stage-info-title-wrap">
+                                  <div className="stage-info-title-row">
+                                    <h4 className="stage-info-name">{stageName}</h4>
+                                    {isCurrentStage ? <span className="stage-info-current">Current</span> : null}
+                                    {stageNoteCount ? (
+                                      <span className="stage-info-note-count" title={stageNotesTooltip}>
+                                        {stageNoteCount} note{stageNoteCount === 1 ? '' : 's'}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="muted stage-info-stage-id">{stage.id}</div>
+                                </div>
                                 <span className={`status-pill ${stageStatusClass(stage.status)}`}>
-                                  {String(stage.status || 'pending').replace('_', ' ')}
+                                  {String(stage.status || 'pending').replaceAll('_', ' ')}
                                 </span>
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <th className="stage-matrix-label">Expected (hrs)</th>
-                            {detailStages.map((stage) => (
-                              <td key={`${stage.id}-expected`} title={stageNoteTooltipByStageId.get(stage.id) || ''}>
-                                {Number(stage.expected_hours ?? stage.default_duration_hours ?? 0)}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <th className="stage-matrix-label">Started</th>
-                            {detailStages.map((stage) => (
-                              <td key={`${stage.id}-started`} title={formatTimeOnly(stage.started_at)}>
-                                {formatDateOnly(stage.started_at)}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <th className="stage-matrix-label">Completed</th>
-                            {detailStages.map((stage) => (
-                              <td key={`${stage.id}-completed`} title={formatTimeOnly(stage.completed_at)}>
-                                {formatDateOnly(stage.completed_at)}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
+                              </div>
+                              <div className="stage-info-grid">
+                                <div className="stage-info-field">
+                                  <span>Owner</span>
+                                  <strong>{stage.owner || '-'}</strong>
+                                </div>
+                                <div className="stage-info-field">
+                                  <span>Status</span>
+                                  <strong>{String(stage.status || 'pending').replaceAll('_', ' ')}</strong>
+                                </div>
+                                <div className="stage-info-field">
+                                  <span>Expected (hrs)</span>
+                                  <strong>{Number(stage.expected_hours ?? stage.default_duration_hours ?? 0)}</strong>
+                                </div>
+                                <div className="stage-info-field">
+                                  <span>Started</span>
+                                  <strong title={formatTimeOnly(stage.started_at)}>{formatDateOnly(stage.started_at) || '-'}</strong>
+                                </div>
+                                <div className="stage-info-field">
+                                  <span>Completed</span>
+                                  <strong title={formatTimeOnly(stage.completed_at)}>{formatDateOnly(stage.completed_at) || '-'}</strong>
+                                </div>
+                                <div className="stage-info-field stage-info-notes-panel">
+                                  <span>Notes</span>
+                                  <div className="stage-info-notes" title={stageNotesTooltip}>
+                                    {stageNotesText || 'No notes yet for this stage.'}
+                                  </div>
+                                </div>
+                              </div>
+                            </section>
+                          );
+                        })}
+                      </div>
                     ) : (
-                      <table className="project-table">
-                        <tbody>
-                          <tr className="empty-row">
-                            <td>No stages available.</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                      <p className="muted">No stages available.</p>
                     )}
                   </div>
-                </div>
                 ) : null}
 
                 {detailTab === 'actions' ? (
