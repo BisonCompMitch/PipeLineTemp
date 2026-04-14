@@ -71,6 +71,7 @@ export const BASE_STAGE_FLOW = [
   { id: 'estimating', name: 'Estimating', owner: 'Estimating Lead', default_duration_hours: 24 },
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'schedule_inventory', name: 'Schedule Order / Inventory', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
@@ -98,6 +99,7 @@ export const SLAB_STAGE_FLOW = [
   { id: 'estimating', name: 'Estimating', owner: 'Estimating Lead', default_duration_hours: 24 },
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'schedule_inventory', name: 'Schedule Order / Inventory', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
@@ -117,6 +119,7 @@ export const SCOTTSDALE_READY_STAGE_FLOW = [
   },
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'schedule_inventory', name: 'Schedule Order / Inventory', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
@@ -139,6 +142,7 @@ export const SCOTTSDALE_READY_SLAB_STAGE_FLOW = [
   },
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'schedule_inventory', name: 'Schedule Order / Inventory', owner: 'Admin', default_duration_hours: 1 },
   { id: 'manufacturing', name: 'Manufacturing', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'invoice_shipping', name: 'Manufacturing - Final Invoice Sent', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_shipping', name: 'Money - Shipping', owner: 'Admin', default_duration_hours: 1 },
@@ -232,6 +236,7 @@ const COLOR_DESIGN = '#C4B5FD';
 const COLOR_ENGINEERING = '#93C5FD';
 const COLOR_ESTIMATING = '#FDE68A';
 const COLOR_MANUFACTURING = '#FDBA74';
+const COLOR_SCHEDULE_INVENTORY = '#BFDBFE';
 const COLOR_SHIPPING = '#5EEAD4';
 const COLOR_COMPLETED = '#CBD5E1';
 const COLOR_SLAB_MONEY = COLOR_MONEY;
@@ -252,6 +257,7 @@ export const STAGE_COLORS = {
   slab_work: COLOR_SLAB_WORK,
   invoice_production: COLOR_INVOICE,
   money_production: COLOR_MONEY,
+  schedule_inventory: COLOR_SCHEDULE_INVENTORY,
   manufacturing: COLOR_MANUFACTURING,
   invoice_shipping: COLOR_INVOICE,
   money_shipping: COLOR_MONEY,
@@ -403,6 +409,10 @@ export function formatStageName(name, stageId = '', options = {}) {
   if (id === 'invoice_production') return 'Invoice Sent - Production';
   if (/^invoice\s*sent\s*-\s*production$/i.test(rawName)) return 'Invoice Sent - Production';
   if (/^invoice\s*sent\s*production$/i.test(rawName)) return 'Invoice Sent - Production';
+
+  if (id === 'schedule_inventory') return 'Schedule Order / Inventory';
+  if (/^schedule\s+order\s*\/\s*inventory$/i.test(rawName)) return 'Schedule Order / Inventory';
+  if (/^schedule\s+order\s+inventory$/i.test(rawName)) return 'Schedule Order / Inventory';
 
   if (id === 'invoice_shipping') {
     if (hasScottsdaleFlow || /^manufacturing\s*-\s*final\s+invoice\s*sent$/i.test(rawName)) {

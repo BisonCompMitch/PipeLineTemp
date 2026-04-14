@@ -23,6 +23,7 @@ import useSiteDialog from '../utils/useSiteDialog.jsx';
 import {
   coerceSlabWorkFlag,
   formatStageName,
+  formatMoneyStageGlyph,
   getEffectiveMoneySubstage,
   getMoneySubstageLabel,
   getStageBadgeStyle,
@@ -960,6 +961,14 @@ export default function Pipeline({
     () => completionPercent(detailStages),
     [detailStages]
   );
+  const detailPipeRows = useMemo(() => {
+    if (!detailStages.length) return [];
+    const rowCount = 2;
+    const rowSize = Math.ceil(detailStages.length / rowCount);
+    return Array.from({ length: rowCount }, (_, index) =>
+      detailStages.slice(index * rowSize, (index + 1) * rowSize)
+    ).filter((row) => row.length > 0);
+  }, [detailStages]);
   const stageNoteTooltipByStageId = useMemo(() => {
     const grouped = new Map();
     stageNotesHistory.forEach((entry) => {
@@ -2005,6 +2014,47 @@ export default function Pipeline({
                       <div className="muted">Progress</div>
                       <div className="progress-pill">{`${detailProgress}%`}</div>
                     </div>
+                    {detailPipeRows.length ? (
+                      <div className="customer-stage-table-wrap pipeline-project-stage-table-wrap">
+                        <div className="customer-stage-table-scroll">
+                          <div className="customer-stage-grid">
+                            {detailPipeRows.map((row, rowIndex) => {
+                              const cells = row.map((item) => {
+                                const fullName = formatStageName(item?.name, item?.id, { audience: 'external' });
+                                const compactName = formatMoneyStageGlyph(item?.name, item?.id, {
+                                  audience: 'external'
+                                });
+                                const isMoneyGlyph = compactName.trim() === '$';
+                                return { item, fullName, compactName, isMoneyGlyph };
+                              });
+                              const columnTemplate = cells
+                                .map((cell) => (cell.isMoneyGlyph ? 'minmax(56px, 0.42fr)' : 'minmax(130px, 1fr)'))
+                                .join(' ');
+                              return (
+                                <div
+                                  key={`project-stage-row-${rowIndex}`}
+                                  className="customer-stage-row"
+                                  style={{ gridTemplateColumns: columnTemplate }}
+                                >
+                                  {cells.map(({ item, fullName, compactName, isMoneyGlyph }) => (
+                                    <div
+                                      key={item.id}
+                                      className={`customer-stage-cell ${progressStageStatusClass(item.status)}${
+                                        isMoneyGlyph ? ' money-glyph' : ''
+                                      }`}
+                                      title={compactName !== fullName ? fullName : undefined}
+                                    >
+                                      <span className="customer-stage-label-desktop">{compactName}</span>
+                                      <span className="customer-stage-label-mobile">{fullName}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -2259,11 +2309,7 @@ export default function Pipeline({
                     <div className="detail-card-header stage-info-header">
                       <div>
                         <h3>Stage info</h3>
-                        <span className="muted">
-                          Vertical summary of each stage, its owner, status, dates, and notes.
-                        </span>
                       </div>
-                      <span className="muted">{detailStages.length ? `${detailStages.length} stages` : 'No stages'}</span>
                     </div>
                     {detailStages.length ? (
                       <div className="stage-info-list">
@@ -2339,7 +2385,6 @@ export default function Pipeline({
                 <div className="detail-card detail-actions-card">
                   <div className="detail-card-header">
                     <h3>Actions</h3>
-                    <span className="muted">Workflow flags, invoice actions, and missing-doc handling for this project.</span>
                   </div>
                   {canEditProjectDetails ? (
                     <div className="detail-actions-stack">
@@ -2385,9 +2430,6 @@ export default function Pipeline({
                       </label>
                       <div className="detail-action-notice">
                         <div className="detail-action-notice-title">Missing required docs</div>
-                        <p className="muted">
-                          Adds Invoice Needed before the current stage and sends the admin notice for missing documents.
-                        </p>
                         <button
                           type="button"
                           className="primary"

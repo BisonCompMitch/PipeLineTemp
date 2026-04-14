@@ -1930,7 +1930,7 @@ body::before {
 
 .pipeline-progress-card {
   padding: 30px 28px 26px;
-  gap: 30px;
+  gap: 26px;
 }
 
 .pipeline-progress-card .detail-card-header {
@@ -1938,7 +1938,7 @@ body::before {
 }
 
 .pipeline-progress-card .customer-progress-top {
-  gap: 22px;
+  gap: 26px;
   margin-top: 12px;
 }
 
@@ -1956,16 +1956,16 @@ body::before {
 .pipeline-progress-card .progress-track {
   max-width: 100%;
   height: 11px;
-  margin-top: 26px;
+  margin-top: 34px;
 }
 
 .pipeline-progress-card .progress-meta {
   gap: 22px;
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .pipeline-progress-card .customer-stage-table-wrap {
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .pipeline-progress-card .customer-stage-cell {
@@ -2019,7 +2019,7 @@ body::before {
 
 .stage-info-card {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .stage-info-header {
@@ -2028,30 +2028,32 @@ body::before {
 
 .stage-info-list {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .stage-info-item {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 18px;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
   background: var(--panel-2);
   border: 1px solid var(--border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .stage-info-item.current-stage {
-  border-color: rgba(79, 142, 247, 0.52);
-  box-shadow: 0 0 0 1px rgba(79, 142, 247, 0.14) inset;
+  border-color: rgba(79, 142, 247, 0.65);
+  box-shadow: 0 0 0 1px rgba(79, 142, 247, 0.16) inset;
 }
 
 .stage-info-item.complete {
-  background: linear-gradient(180deg, rgba(34, 197, 94, 0.06), rgba(34, 197, 94, 0.03)), var(--panel-2);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.05)), var(--panel-2);
+  border-color: rgba(34, 197, 94, 0.18);
 }
 
 .stage-info-item.in-progress {
-  background: linear-gradient(180deg, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.03)), var(--panel-2);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.13), rgba(251, 191, 36, 0.05)), var(--panel-2);
+  border-color: rgba(251, 191, 36, 0.2);
 }
 
 .stage-info-item.pending {
@@ -2114,15 +2116,15 @@ body::before {
 
 .stage-info-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .stage-info-field {
   display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: var(--bg);
   border: 1px solid var(--border);
   min-width: 0;
@@ -2137,7 +2139,7 @@ body::before {
 }
 
 .stage-info-field strong {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   min-width: 0;
@@ -2149,13 +2151,17 @@ body::before {
 }
 
 .stage-info-notes {
-  min-height: 84px;
-  max-height: 220px;
+  min-height: 72px;
+  max-height: 180px;
   overflow: auto;
   white-space: pre-wrap;
-  line-height: 1.45;
+  line-height: 1.4;
   padding-right: 4px;
   color: var(--text);
+}
+
+.pipeline-project-stage-table-wrap {
+  margin-top: 22px;
 }
 
 @media (max-width: 900px) {
