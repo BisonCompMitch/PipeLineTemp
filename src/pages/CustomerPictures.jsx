@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { downloadProjectFile, listProjectFiles, listProjects } from '../api.js';
+import { downloadProjectFile, listProjectFiles } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 
@@ -40,8 +40,7 @@ function triggerBrowserDownload(blob, filename) {
   window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
 }
 
-export default function CustomerPictures() {
-  const [project, setProject] = useState(null);
+export default function CustomerPictures({ project, loadingProjects = false }) {
   const [photos, setPhotos] = useState([]);
   const [photoUrls, setPhotoUrls] = useState({});
   const [loading, setLoading] = useState(true);
@@ -50,7 +49,10 @@ export default function CustomerPictures() {
   const [previewId, setPreviewId] = useState(null);
   const photoUrlRef = useRef({});
   const blobCacheRef = useRef(new Map());
+  const [reloadToken, setReloadToken] = useState(0);
   const { alertDialog, dialogPortal } = useSiteDialog();
+  const projectId = project?.id || '';
+  const projectName = project?.name || '';
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -73,52 +75,71 @@ export default function CustomerPictures() {
     setPhotoUrls(nextMap);
   }, []);
 
-  const loadPhotos = useCallback(async () => {
-    setLoading(true);
-    setStatus('');
-    setPreviewId(null);
-    try {
-      const projects = await listProjects();
-      const selected = Array.isArray(projects) && projects.length ? projects[0] : null;
-      setProject(selected);
-      if (!selected?.id) {
+  const loadPhotos = useCallback(() => {
+    setReloadToken((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!projectId) {
+        if (!active) return;
+        setLoading(false);
+        setStatus('');
+        setPreviewId(null);
         setPhotos([]);
         replacePhotoUrls({});
         return;
       }
-      const fileList = await listProjectFiles(selected.id);
-      const filtered = (Array.isArray(fileList) ? fileList : []).filter(isImageFile);
-      setPhotos(filtered);
-    } catch (_err) {
+      setLoading(true);
+      setStatus('');
+      setPreviewId(null);
       setPhotos([]);
-      setStatus('Unable to load project pictures.');
-    } finally {
-      setLoading(false);
-    }
-  }, [replacePhotoUrls]);
+      replacePhotoUrls({});
+      try {
+        const fileList = await listProjectFiles(projectId);
+        if (!active) return;
+        const filtered = (Array.isArray(fileList) ? fileList : []).filter(isImageFile);
+        setPhotos(filtered);
+      } catch (_err) {
+        if (!active) return;
+        setPhotos([]);
+        setStatus('Unable to load project pictures.');
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [projectId, reloadToken, replacePhotoUrls]);
 
   useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
-
-  useEffect(() => {
-    if (!project?.id) {
+    if (!projectId) {
       blobCacheRef.current.clear();
       return;
     }
-    const prefix = `${project.id}:`;
+    const prefix = `${projectId}:`;
     Array.from(blobCacheRef.current.keys()).forEach((key) => {
       if (!key.startsWith(prefix)) {
         blobCacheRef.current.delete(key);
       }
     });
-  }, [project?.id]);
+  }, [projectId]);
+
+  useEffect(() => {
+    replacePhotoUrls({});
+    setPreviewId(null);
+  }, [projectId, replacePhotoUrls]);
 
   useEffect(() => {
     let cancelled = false;
     const loadThumbnails = async () => {
-      if (!project?.id || !photos.length) {
+      if (!projectId || !photos.length) {
         replacePhotoUrls({});
+        setThumbLoading(false);
         return;
       }
       setThumbLoading(true);
@@ -126,7 +147,7 @@ export default function CustomerPictures() {
         photos.map(async (fileRecord) => {
           if (!fileRecord?.id) return [null, ''];
           try {
-            const blob = await getCachedBlob(project.id, fileRecord.id);
+            const blob = await getCachedBlob(projectId, fileRecord.id);
             return [fileRecord.id, window.URL.createObjectURL(blob)];
           } catch (_error) {
             return [fileRecord.id, ''];
@@ -137,6 +158,7 @@ export default function CustomerPictures() {
         entries.forEach(([, url]) => {
           if (url) window.URL.revokeObjectURL(url);
         });
+        setThumbLoading(false);
         return;
       }
       const nextMap = {};
@@ -151,7 +173,7 @@ export default function CustomerPictures() {
     return () => {
       cancelled = true;
     };
-  }, [photos, project?.id, replacePhotoUrls, getCachedBlob]);
+  }, [photos, projectId, replacePhotoUrls, getCachedBlob]);
 
   useEffect(() => {
     if (!previewId) return;
@@ -188,10 +210,10 @@ export default function CustomerPictures() {
   const previewUrl = previewPhoto ? photoUrls[previewPhoto.id] : '';
 
   const handleDownloadPreview = async () => {
-    if (!project?.id || !previewPhoto?.id) return;
+    if (!projectId || !previewPhoto?.id) return;
     setStatus('');
     try {
-      const blob = await getCachedBlob(project.id, previewPhoto.id);
+      const blob = await getCachedBlob(projectId, previewPhoto.id);
       triggerBrowserDownload(blob, previewPhoto.filename);
     } catch (_error) {
       setStatus('Unable to download file.');
@@ -203,13 +225,17 @@ export default function CustomerPictures() {
       <div className="panel-header">
         <div>
           <h2>Project Pictures</h2>
+          <p className="muted">
+            {projectName ? `Customer-visible photos for ${projectName}.` : 'Customer-visible photos for the selected project.'}
+          </p>
         </div>
-        <button className="ghost" type="button" onClick={loadPhotos} disabled={loading}>
+        <button className="ghost" type="button" onClick={loadPhotos} disabled={loading || !projectId}>
           Refresh
         </button>
       </div>
-      {loading ? <p className="muted">Loading project pictures...</p> : null}
-      {!project ? (
+      {loadingProjects && !projectId ? <p className="muted">Loading your projects...</p> : null}
+      {loading && projectId ? <p className="muted">Loading project pictures...</p> : null}
+      {!loadingProjects && !projectId ? (
         <div className="empty-state">
           <p className="muted">No project linked yet.</p>
         </div>

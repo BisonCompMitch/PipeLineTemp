@@ -317,6 +317,25 @@ body::before {
   z-index: var(--dropdown-z);
 }
 
+.customer-project-control {
+  min-width: 260px;
+}
+
+.customer-project-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 320px;
+}
+
+.customer-project-trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .testing-panel {
   position: absolute;
   top: calc(100% + 10px);
@@ -330,6 +349,10 @@ body::before {
   display: grid;
   gap: 10px;
   z-index: var(--dropdown-z);
+}
+
+.customer-project-panel {
+  min-width: 280px;
 }
 
 .testing-row {
@@ -2726,6 +2749,62 @@ body[data-theme='light'] .file-upload-actions .muted {
   margin: 0;
   width: auto;
   flex: 0 0 auto;
+}
+
+.project-multi-select {
+  position: relative;
+  z-index: var(--dropdown-z);
+}
+
+.project-multi-select-trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-multi-select-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.project-multi-select-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  z-index: var(--dropdown-z);
+}
+
+.project-multi-select-panel-title {
+  font-size: 13.667px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.project-check-grid {
+  grid-template-columns: 1fr;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.project-check {
+  width: 100%;
+  background: #f1f4f9;
+}
+
+.project-multi-select-empty {
+  padding: 4px 2px;
 }
 
 .login {

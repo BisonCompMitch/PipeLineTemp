@@ -12,6 +12,15 @@ function initialsFor(name) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+function projectLabel(project) {
+  const projectNumber = String(project?.project_number || '').trim();
+  const projectName = String(project?.name || '').trim();
+  if (projectNumber && projectName) {
+    return `${projectNumber} - ${projectName}`;
+  }
+  return projectName || projectNumber || project?.id || 'Project';
+}
+
 function normalizeTestingOverride(value) {
   return {
     rolePreset: value?.rolePreset || 'auto',
@@ -28,22 +37,36 @@ export default function TopBar({
   onToggleTheme,
   testingOverride,
   onTestingOverrideChange,
+  customerProjectOptions = [],
+  selectedCustomerProjectId = '',
+  onCustomerProjectChange,
   showNavToggle = false,
   onToggleNav
 }) {
   const normalizedDisplayName = String(displayName || '').trim() || 'User';
   const [menuOpen, setMenuOpen] = useState(false);
   const [testingOpen, setTestingOpen] = useState(false);
+  const [customerOpen, setCustomerOpen] = useState(false);
   const [draft, setDraft] = useState(() => normalizeTestingOverride(testingOverride || DEFAULT_TESTING_OVERRIDE));
   const menuRef = useRef(null);
   const testingRef = useRef(null);
+  const customerRef = useRef(null);
+
+  const customerProjectList = Array.isArray(customerProjectOptions) ? customerProjectOptions : [];
+  const selectedCustomerProject =
+    customerProjectList.find((project) => project?.id === selectedCustomerProjectId) ||
+    customerProjectList[0] ||
+    null;
+  const customerProjectText = selectedCustomerProject
+    ? projectLabel(selectedCustomerProject)
+    : 'Select project';
 
   useEffect(() => {
     setDraft(normalizeTestingOverride(testingOverride || DEFAULT_TESTING_OVERRIDE));
   }, [testingOverride]);
 
   useEffect(() => {
-    if (!menuOpen && !testingOpen) return undefined;
+    if (!menuOpen && !testingOpen && !customerOpen) return undefined;
     const handleClick = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
@@ -51,20 +74,25 @@ export default function TopBar({
       if (testingRef.current && !testingRef.current.contains(event.target)) {
         setTestingOpen(false);
       }
+      if (customerRef.current && !customerRef.current.contains(event.target)) {
+        setCustomerOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen, testingOpen]);
+  }, [menuOpen, testingOpen, customerOpen]);
 
   const handleLogout = () => {
     setMenuOpen(false);
     setTestingOpen(false);
+    setCustomerOpen(false);
     onSignOut?.();
   };
 
   const handleOpenHelp = () => {
     setMenuOpen(false);
     setTestingOpen(false);
+    setCustomerOpen(false);
     onOpenHelp?.();
   };
 
@@ -73,6 +101,7 @@ export default function TopBar({
       rolePreset: draft.rolePreset || 'auto',
       areas: draft.areas || ''
     });
+    setCustomerOpen(false);
     setTestingOpen(false);
   };
 
@@ -80,7 +109,13 @@ export default function TopBar({
     const reset = { ...DEFAULT_TESTING_OVERRIDE };
     setDraft(reset);
     onTestingOverrideChange?.(reset);
+    setCustomerOpen(false);
     setTestingOpen(false);
+  };
+
+  const handleCustomerProjectChange = (event) => {
+    onCustomerProjectChange?.(event.target.value);
+    setCustomerOpen(false);
   };
 
   return (
@@ -120,6 +155,43 @@ export default function TopBar({
       </div>
       <div className="topbar-right">
         <div className="topbar-actions">
+          {customerProjectList.length > 1 && onCustomerProjectChange ? (
+            <div className="testing-control customer-project-control" ref={customerRef}>
+              <button
+                className="ghost customer-project-trigger"
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setTestingOpen(false);
+                  setCustomerOpen((open) => !open);
+                }}
+                aria-label="Switch customer project"
+              >
+                <span className="customer-project-trigger-label">{customerProjectText}</span>
+                <svg className="caret" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M5 7l5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              {customerOpen ? (
+                <div className="testing-panel customer-project-panel">
+                  <div className="testing-row">
+                    <label htmlFor="customer-project-select">Project</label>
+                    <select
+                      id="customer-project-select"
+                      value={selectedCustomerProject?.id || ''}
+                      onChange={handleCustomerProjectChange}
+                    >
+                      {customerProjectList.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {projectLabel(project)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {onTestingOverrideChange ? (
             <div className="testing-control" ref={testingRef}>
               <button
@@ -127,6 +199,7 @@ export default function TopBar({
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
+                  setCustomerOpen(false);
                   setTestingOpen((open) => !open);
                 }}
               >
@@ -212,6 +285,7 @@ export default function TopBar({
               data-tutorial-id="user-menu-button"
               onClick={() => {
                 setTestingOpen(false);
+                setCustomerOpen(false);
                 setMenuOpen((open) => !open);
               }}
             >

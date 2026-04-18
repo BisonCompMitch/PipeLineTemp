@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createUser,
   createContractor,
@@ -89,6 +89,136 @@ function sortProjects(a, b) {
   return projectLabel(a).localeCompare(projectLabel(b));
 }
 
+function normalizeProjectIds(value) {
+  const raw = Array.isArray(value) ? value : [value];
+  const seen = new Set();
+  const ids = [];
+  raw.forEach((item) => {
+    const projectId = String(item || '').trim();
+    if (!projectId || seen.has(projectId)) return;
+    seen.add(projectId);
+    ids.push(projectId);
+  });
+  return ids;
+}
+
+function projectIdsForCustomer(customer) {
+  const ids = normalizeProjectIds(customer?.project_ids || []);
+  if (ids.length) return ids;
+  return normalizeProjectIds(customer?.project_id || []);
+}
+
+function summarizeProjectSelection(projectIds, projectMap) {
+  const labels = normalizeProjectIds(projectIds)
+    .map((projectId) => projectMap.get(projectId) || projectId)
+    .filter(Boolean);
+  if (!labels.length) {
+    return { text: 'No projects selected', title: '' };
+  }
+  if (labels.length === 1) {
+    return { text: labels[0], title: labels[0] };
+  }
+  if (labels.length === 2) {
+    const title = labels.join(', ');
+    return { text: title, title };
+  }
+  const title = labels.join(', ');
+  return { text: `${labels[0]} +${labels.length - 1} more`, title };
+}
+
+function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No projects selected' }) {
+  const [open, setOpen] = useState(false);
+  const controlRef = useRef(null);
+  const projectList = Array.isArray(projects) ? projects : [];
+  const currentIds = useMemo(() => normalizeProjectIds(selectedIds), [selectedIds]);
+  const selectedSet = useMemo(() => new Set(currentIds), [currentIds]);
+  const selectedLabels = useMemo(
+    () =>
+      currentIds
+        .map((projectId) => projectList.find((project) => project.id === projectId))
+        .filter(Boolean)
+        .map((project) => projectLabel(project)),
+    [currentIds, projectList]
+  );
+  const summary = useMemo(() => {
+    if (!selectedLabels.length) {
+      return { text: placeholder, title: '' };
+    }
+    if (selectedLabels.length === 1) {
+      return { text: selectedLabels[0], title: selectedLabels[0] };
+    }
+    if (selectedLabels.length === 2) {
+      const title = selectedLabels.join(', ');
+      return { text: title, title };
+    }
+    const title = selectedLabels.join(', ');
+    return { text: `${selectedLabels[0]} +${selectedLabels.length - 1} more`, title };
+  }, [placeholder, selectedLabels]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClick = (event) => {
+      if (controlRef.current && !controlRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const toggleProject = (projectId) => {
+    const nextSet = new Set(currentIds);
+    if (nextSet.has(projectId)) {
+      nextSet.delete(projectId);
+    } else {
+      nextSet.add(projectId);
+    }
+    const nextIds = projectList
+      .map((project) => project.id)
+      .filter((projectId) => nextSet.has(projectId));
+    onChange(nextIds);
+  };
+
+  return (
+    <div className="project-multi-select" ref={controlRef}>
+      <button
+        className="ghost project-multi-select-trigger"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        title={summary.title || undefined}
+      >
+        <span className={`project-multi-select-summary${selectedLabels.length ? '' : ' muted'}`}>
+          {summary.text}
+        </span>
+        <svg className="caret" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M5 7l5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open ? (
+        <div className="project-multi-select-panel">
+          <div className="project-multi-select-panel-title">Select one or more projects</div>
+          <div className="area-check-grid project-check-grid">
+            {projectList.length ? (
+              projectList.map((project) => (
+                <label key={project.id} className="area-check project-check">
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(project.id)}
+                    onChange={() => toggleProject(project.id)}
+                  />
+                  <span>{projectLabel(project)}</span>
+                </label>
+              ))
+            ) : (
+              <div className="muted project-multi-select-empty">No projects available.</div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Users() {
   const [allUsers, setAllUsers] = useState([]);
   const [bisonUsers, setBisonUsers] = useState([]);
@@ -115,7 +245,7 @@ export default function Users() {
     areas: []
   });
   const [createContractorForm, setCreateContractorForm] = useState({ company: '', full_name: '', email: '' });
-  const [createCustomerForm, setCreateCustomerForm] = useState({ email: '', project_id: '' });
+  const [createCustomerForm, setCreateCustomerForm] = useState({ email: '', project_ids: [] });
 
   const loadAll = async ({ preserveStatus = false } = {}) => {
     setLoading(true);
@@ -389,7 +519,7 @@ export default function Users() {
         username: linkedUser?.username || customer.email,
         email: customer.email,
         password: '',
-        project_id: customer.project_id || '',
+        project_ids: projectIdsForCustomer(customer),
         is_locked: Boolean(linkedUser?.is_locked)
       }
     });
@@ -479,8 +609,14 @@ export default function Users() {
   const handleSaveCustomer = async () => {
     if (!editing || editing.type !== 'customer') return;
     const form = editing.form;
+    const projectIds = normalizeProjectIds(form.project_ids);
+    if (!projectIds.length) {
+      setEditStatus({ tone: 'error', text: 'Customer must stay linked to at least one project.' });
+      return;
+    }
     const payload = {
-      project_id: form.project_id ? form.project_id : null
+      project_id: projectIds[0],
+      project_ids: projectIds
     };
     if (form.password.trim()) {
       payload.password = form.password.trim();
@@ -680,12 +816,18 @@ export default function Users() {
       setCustomerStatus({ tone: 'error', text: 'Customer email is required.' });
       return;
     }
+    const projectIds = normalizeProjectIds(createCustomerForm.project_ids);
+    if (!projectIds.length) {
+      setCustomerStatus({ tone: 'error', text: 'Select at least one project for the customer.' });
+      return;
+    }
     try {
       await createCustomer({
         email: createCustomerForm.email.trim(),
-        project_id: createCustomerForm.project_id || null
+        project_id: projectIds[0],
+        project_ids: projectIds
       });
-      setCreateCustomerForm({ email: '', project_id: '' });
+      setCreateCustomerForm({ email: '', project_ids: [] });
       setCustomerStatus({
         tone: 'success',
         text: 'Customer created. Temporary password email sent when SMTP is configured.'
@@ -973,7 +1115,7 @@ export default function Users() {
         <div className="panel-header">
           <div>
             <h2>Customers</h2>
-            <p className="muted">Customer accounts linked to a project.</p>
+            <p className="muted">Customer accounts linked to one or more projects.</p>
           </div>
         </div>
         <form className="form-grid user-create-form user-create-form--simple" onSubmit={handleCreateCustomer}>
@@ -986,18 +1128,13 @@ export default function Users() {
             />
           </label>
           <label className="span-2">
-            Linked project (active projects)
-            <select
-              value={createCustomerForm.project_id}
-              onChange={(event) => setCreateCustomerForm({ ...createCustomerForm, project_id: event.target.value })}
-            >
-              <option value="">No project selected</option>
-              {activeProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {projectLabel(project)}
-                </option>
-              ))}
-            </select>
+            Linked projects
+            <ProjectMultiSelect
+              projects={activeProjects}
+              selectedIds={createCustomerForm.project_ids}
+              onChange={(nextIds) => setCreateCustomerForm({ ...createCustomerForm, project_ids: nextIds })}
+              placeholder="Select one or more active projects"
+            />
           </label>
           <div className="user-create-note span-2">
             A temporary password is generated automatically and reset is required on first sign in.
@@ -1013,7 +1150,7 @@ export default function Users() {
             <thead>
               <tr>
                 <th>Email</th>
-                <th>Project</th>
+                <th>Projects</th>
                 <th>Role</th>
                 <th>Theme</th>
                 <th>Active</th>
@@ -1028,10 +1165,11 @@ export default function Users() {
                   const linkedUser =
                     linkedUsersByIdentity.get(normalize(customer.email)) ||
                     linkedUsersByIdentity.get(normalize(customer.username));
+                  const projectSummary = summarizeProjectSelection(projectIdsForCustomer(customer), projectMap);
                   return (
                     <tr key={customer.email} onDoubleClick={() => startEditCustomer(customer)}>
                       <td>{customer.email}</td>
-                      <td>{projectMap.get(customer.project_id) || '-'}</td>
+                      <td title={projectSummary.title || undefined}>{projectSummary.text}</td>
                       <td>{customer.role || 'Customer'}</td>
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
@@ -1294,20 +1432,15 @@ export default function Users() {
                       <input value={editing.form.email} disabled />
                     </label>
                     <label className="span-2">
-                      Linked project
-                      <select
-                        value={editing.form.project_id}
-                        onChange={(event) =>
-                          setEditing({ ...editing, form: { ...editing.form, project_id: event.target.value } })
+                      Linked projects
+                      <ProjectMultiSelect
+                        projects={projects}
+                        selectedIds={editing.form.project_ids}
+                        onChange={(nextIds) =>
+                          setEditing({ ...editing, form: { ...editing.form, project_ids: nextIds } })
                         }
-                      >
-                        <option value="">No project selected</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {projectLabel(project)}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="Select one or more projects"
+                      />
                     </label>
                   </div>
                 </div>

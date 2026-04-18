@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { downloadProjectFile, listProjectFiles, listProjects, uploadProjectFile } from '../api.js';
+import { downloadProjectFile, listProjectFiles, uploadProjectFile } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
 
@@ -82,8 +82,7 @@ function getFileTypeLabel(filename) {
   return ext.slice(0, 5).toUpperCase();
 }
 
-export default function CustomerFiles() {
-  const [project, setProject] = useState(null);
+export default function CustomerFiles({ project, loadingProjects = false }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -95,8 +94,11 @@ export default function CustomerFiles() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState({ open: false, url: '', name: '', kind: '', text: '', record: null });
   const blobCacheRef = useRef(new Map());
+  const [reloadToken, setReloadToken] = useState(0);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
   const { alertDialog, dialogPortal } = useSiteDialog();
+  const projectId = project?.id || '';
+  const projectName = project?.name || '';
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -107,56 +109,83 @@ export default function CustomerFiles() {
     return blob;
   }, []);
 
-  const loadFiles = useCallback(async () => {
-    setLoading(true);
-    setStatus('');
-    setStatusTone('success');
-    setUploadError('');
-    try {
-      const projects = await listProjects();
-      const selected = Array.isArray(projects) && projects.length ? projects[0] : null;
-      setProject(selected);
-      if (!selected?.id) {
-        setFiles([]);
-        return;
-      }
-      const fileList = await listProjectFiles(selected.id);
-      setFiles(Array.isArray(fileList) ? fileList : []);
-    } catch (_err) {
-      setFiles([]);
-      setStatus('Unable to load project files.');
-      setStatusTone('error');
-    } finally {
-      setLoading(false);
-    }
+  const loadFiles = useCallback(() => {
+    setReloadToken((value) => value + 1);
   }, []);
 
   useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+    let active = true;
+    (async () => {
+      if (!projectId) {
+        if (!active) return;
+        setLoading(false);
+        setFiles([]);
+        setStatus('');
+        setStatusTone('success');
+        setUploadFiles([]);
+        setUploadError('');
+        setDragActive(false);
+        return;
+      }
+      setLoading(true);
+      setStatus('');
+      setStatusTone('success');
+      setUploadError('');
+      setUploadFiles([]);
+      setDragActive(false);
+      setFiles([]);
+      try {
+        const fileList = await listProjectFiles(projectId);
+        if (!active) return;
+        setFiles(Array.isArray(fileList) ? fileList : []);
+      } catch (_err) {
+        if (!active) return;
+        setFiles([]);
+        setStatus('Unable to load project files.');
+        setStatusTone('error');
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [projectId, reloadToken]);
 
   useEffect(() => {
-    if (!project?.id) {
+    if (!projectId) {
       blobCacheRef.current.clear();
       return;
     }
-    const prefix = `${project.id}:`;
+    const prefix = `${projectId}:`;
     Array.from(blobCacheRef.current.keys()).forEach((key) => {
       if (!key.startsWith(prefix)) {
         blobCacheRef.current.delete(key);
       }
     });
-  }, [project?.id]);
+  }, [projectId]);
+
+  useEffect(() => {
+    setPreviewLoading(false);
+    setPreview((current) => {
+      if (current.url) {
+        window.URL.revokeObjectURL(current.url);
+      }
+      return { open: false, url: '', name: '', kind: '', text: '', record: null };
+    });
+  }, [projectId]);
 
   const handleView = async (fileRecord) => {
-    if (!project?.id || !fileRecord?.id) return;
+    if (!projectId || !fileRecord?.id) return;
     setStatus('');
     setStatusTone('success');
     const name = fileRecord.filename || 'File preview';
     setPreview({ open: true, url: '', name, kind: 'loading', text: '', record: fileRecord });
     setPreviewLoading(true);
     try {
-      const blob = await getCachedBlob(project.id, fileRecord.id);
+      const blob = await getCachedBlob(projectId, fileRecord.id);
       if (isImageFile(fileRecord)) {
         const url = window.URL.createObjectURL(blob);
         setPreview({ open: true, url, name, kind: 'image', text: '', record: fileRecord });
@@ -191,11 +220,11 @@ export default function CustomerFiles() {
   };
 
   const handleDownload = async (fileRecord) => {
-    if (!project?.id || !fileRecord?.id) return;
+    if (!projectId || !fileRecord?.id) return;
     setStatus('');
     setStatusTone('success');
     try {
-      const blob = await getCachedBlob(project.id, fileRecord.id);
+      const blob = await getCachedBlob(projectId, fileRecord.id);
       triggerBrowserDownload(blob, fileRecord.filename);
     } catch (_err) {
       setStatus('Unable to download file.');
@@ -255,7 +284,7 @@ export default function CustomerFiles() {
 
   const handleUpload = async (event) => {
     event.preventDefault();
-    if (!project?.id) return;
+    if (!projectId) return;
     if (!uploadFiles.length) {
       setUploadError('Select files to upload.');
       return;
@@ -266,7 +295,7 @@ export default function CustomerFiles() {
     setStatusTone('success');
     try {
       for (const file of uploadFiles) {
-        await uploadProjectFile(project.id, file, {
+        await uploadProjectFile(projectId, file, {
           filename: file.name,
           customer_visible: true,
           content_type: file.type || undefined
@@ -297,14 +326,19 @@ export default function CustomerFiles() {
       <div className="panel-header">
         <div>
           <h2>Files</h2>
-          <p className="muted">Project documents shared with you. Your uploads will be shared with the project team.</p>
+          <p className="muted">
+            {projectName
+              ? `Project documents shared with you for ${projectName}. Your uploads will be shared with the project team.`
+              : 'Project documents shared with you. Your uploads will be shared with the project team.'}
+          </p>
         </div>
-        <button className="ghost" type="button" onClick={loadFiles} disabled={loading}>
+        <button className="ghost" type="button" onClick={loadFiles} disabled={loading || !projectId}>
           Refresh
         </button>
       </div>
-      {loading ? <p className="muted">Loading files...</p> : null}
-      {!project ? (
+      {loadingProjects && !projectId ? <p className="muted">Loading your projects...</p> : null}
+      {loading && projectId ? <p className="muted">Loading files...</p> : null}
+      {!loadingProjects && !projectId ? (
         <div className="empty-state">
           <p className="muted">No project linked yet.</p>
         </div>

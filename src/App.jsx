@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   getMyThemePreference,
   getUser,
+  listProjects,
   logoutRequest,
   sendPresenceHeartbeat,
   updateMyThemePreference
@@ -99,6 +100,41 @@ function normalizeAreaKey(value) {
   if (['admin', 'admin area', 'administrator'].includes(normalized)) return 'admin';
   if (['management', 'manager'].includes(normalized)) return 'management';
   return normalized;
+}
+
+function projectLabel(project) {
+  const projectNumber = String(project?.project_number || '').trim();
+  const projectName = String(project?.name || '').trim();
+  if (projectNumber && projectName) {
+    return `${projectNumber} - ${projectName}`;
+  }
+  return projectName || projectNumber || project?.id || 'Unnamed project';
+}
+
+function sortProjectsForSelection(a, b) {
+  const aNumber = String(a?.project_number || '').trim();
+  const bNumber = String(b?.project_number || '').trim();
+  if (aNumber && bNumber) {
+    const aParsed = Number.parseInt(aNumber, 10);
+    const bParsed = Number.parseInt(bNumber, 10);
+    if (!Number.isNaN(aParsed) && !Number.isNaN(bParsed) && aParsed !== bParsed) {
+      return aParsed - bParsed;
+    }
+    if (aNumber !== bNumber) {
+      return aNumber.localeCompare(bNumber);
+    }
+  } else if (aNumber && !bNumber) {
+    return -1;
+  } else if (!aNumber && bNumber) {
+    return 1;
+  }
+  return projectLabel(a).localeCompare(projectLabel(b));
+}
+
+function customerProjectStorageKey(userKey) {
+  const normalized = String(userKey || '').trim().toLowerCase();
+  if (!normalized) return '';
+  return `bw_customer_project:${normalized}`;
 }
 
 function decodeBase64Url(value) {
@@ -390,7 +426,7 @@ function buildTutorialSteps({
       buildInfoStep(
         'customer-progress-details',
         'Progress View',
-        'Progress shows project name, current stage, percent complete, and the full stage flow with status colors for complete, in-progress, and pending. Compact stage names expand on hover where needed so users can read each full stage label.'
+        'Progress shows the active project name, current stage, percent complete, and the full stage flow with status colors for complete, in-progress, and pending. If you have more than one project, use the project switcher in the top-right corner to move between them. Compact stage names expand on hover where needed so users can read each full stage label.'
       )
     );
     pushNavStep(
@@ -446,6 +482,9 @@ function PageShell({
   onToggleTheme,
   testingOverride,
   onTestingOverrideChange,
+  customerProjectOptions,
+  selectedCustomerProjectId,
+  onCustomerProjectChange,
   showNavToggle = false,
   onToggleNav,
   children
@@ -461,6 +500,9 @@ function PageShell({
         onToggleTheme={onToggleTheme}
         testingOverride={testingOverride}
         onTestingOverrideChange={onTestingOverrideChange}
+        customerProjectOptions={customerProjectOptions}
+        selectedCustomerProjectId={selectedCustomerProjectId}
+        onCustomerProjectChange={onCustomerProjectChange}
         showNavToggle={showNavToggle}
         onToggleNav={onToggleNav}
       />
@@ -510,6 +552,9 @@ export default function App() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDontShowAgain, setTutorialDontShowAgain] = useState(false);
   const [tutorialUserKey, setTutorialUserKey] = useState('');
+  const [customerProjects, setCustomerProjects] = useState([]);
+  const [customerProjectsLoading, setCustomerProjectsLoading] = useState(false);
+  const [customerProjectId, setCustomerProjectId] = useState('');
 
   const handleLogin = (username, tokenPayload) => {
     clearTutorialSessionFlags();
@@ -668,6 +713,14 @@ export default function App() {
   const canEditProjectDetails = hasAdminArea;
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
+  const customerSelectionKey = useMemo(
+    () => customerProjectStorageKey(profile?.username || getStoredUsername() || ''),
+    [profile?.username]
+  );
+  const selectedCustomerProject = useMemo(() => {
+    if (!customerProjects.length) return null;
+    return customerProjects.find((project) => project.id === customerProjectId) || customerProjects[0] || null;
+  }, [customerProjects, customerProjectId]);
   const tutorialTitle = useMemo(
     () => `${tutorialRoleLabel({ hasBison, hasAdminArea, hasContractor, hasCustomer })} quick tour`,
     [hasBison, hasAdminArea, hasContractor, hasCustomer]
@@ -695,6 +748,63 @@ export default function App() {
   const handleToggleTheme = () => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   };
+
+  useEffect(() => {
+    if (!authed || profileLoading || !hasCustomer) {
+      setCustomerProjects([]);
+      setCustomerProjectsLoading(false);
+      setCustomerProjectId('');
+      return;
+    }
+    let active = true;
+    setCustomerProjectsLoading(true);
+    (async () => {
+      try {
+        const projects = await listProjects();
+        if (!active) return;
+        const sortedProjects = Array.isArray(projects) ? [...projects].sort(sortProjectsForSelection) : [];
+        setCustomerProjects(sortedProjects);
+        if (!sortedProjects.length) {
+          setCustomerProjectId('');
+          return;
+        }
+        let storedProjectId = '';
+        if (customerSelectionKey) {
+          try {
+            storedProjectId = localStorage.getItem(customerSelectionKey) || '';
+          } catch (_error) {
+            storedProjectId = '';
+          }
+        }
+        const selectedProject =
+          sortedProjects.find((project) => project.id === storedProjectId) || sortedProjects[0] || null;
+        setCustomerProjectId(selectedProject?.id || '');
+      } catch (_error) {
+        if (!active) return;
+        setCustomerProjects([]);
+        setCustomerProjectId('');
+      } finally {
+        if (active) {
+          setCustomerProjectsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [authed, profileLoading, hasCustomer, customerSelectionKey]);
+
+  useEffect(() => {
+    if (!customerSelectionKey || !selectedCustomerProject?.id) return;
+    try {
+      localStorage.setItem(customerSelectionKey, selectedCustomerProject.id);
+    } catch (_error) {
+      // Ignore local storage failures.
+    }
+    if (customerProjectId !== selectedCustomerProject.id) {
+      setCustomerProjectId(selectedCustomerProject.id);
+    }
+  }, [customerSelectionKey, customerProjectId, selectedCustomerProject?.id]);
 
   useEffect(() => {
     if (!canUseTestingOverride) {
@@ -1067,27 +1177,33 @@ export default function App() {
               </Protected>
             }
           />
-            <Route
-              path="/customer"
-              element={
-                <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
-                  <PageShell
+          <Route
+            path="/customer"
+            element={
+              <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
+                <PageShell
                     title={pageTitle}
                     displayName={topBarDisplayName}
                     onSignOut={handleLogout}
                     onOpenHelp={handleOpenHelp}
                     theme={theme}
-                    onToggleTheme={handleToggleTheme}
-                    testingOverride={canUseTestingOverride ? testingOverride : null}
-                    onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
-                    showNavToggle={showNavToggle}
-                    onToggleNav={() => setNavOpen((open) => !open)}
-                  >
-                    <Customer />
-                  </PageShell>
-                </Protected>
-              }
-            />
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  customerProjectOptions={customerProjects}
+                  selectedCustomerProjectId={selectedCustomerProject?.id || ''}
+                  onCustomerProjectChange={setCustomerProjectId}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                    <Customer
+                      project={selectedCustomerProject}
+                      loadingProjects={customerProjectsLoading}
+                    />
+                </PageShell>
+              </Protected>
+            }
+          />
             <Route
               path="/customer/files"
               element={
@@ -1098,17 +1214,23 @@ export default function App() {
                     onSignOut={handleLogout}
                     onOpenHelp={handleOpenHelp}
                     theme={theme}
-                    onToggleTheme={handleToggleTheme}
-                    testingOverride={canUseTestingOverride ? testingOverride : null}
-                    onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
-                    showNavToggle={showNavToggle}
-                    onToggleNav={() => setNavOpen((open) => !open)}
-                  >
-                    <CustomerFiles />
-                  </PageShell>
-                </Protected>
-              }
-            />
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  customerProjectOptions={customerProjects}
+                  selectedCustomerProjectId={selectedCustomerProject?.id || ''}
+                  onCustomerProjectChange={setCustomerProjectId}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                    <CustomerFiles
+                      project={selectedCustomerProject}
+                      loadingProjects={customerProjectsLoading}
+                    />
+                </PageShell>
+              </Protected>
+            }
+          />
             <Route
               path="/customer/pictures"
               element={
@@ -1119,17 +1241,23 @@ export default function App() {
                     onSignOut={handleLogout}
                     onOpenHelp={handleOpenHelp}
                     theme={theme}
-                    onToggleTheme={handleToggleTheme}
-                    testingOverride={canUseTestingOverride ? testingOverride : null}
-                    onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
-                    showNavToggle={showNavToggle}
-                    onToggleNav={() => setNavOpen((open) => !open)}
-                  >
-                    <CustomerPictures />
-                  </PageShell>
-                </Protected>
-              }
-            />
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  customerProjectOptions={customerProjects}
+                  selectedCustomerProjectId={selectedCustomerProject?.id || ''}
+                  onCustomerProjectChange={setCustomerProjectId}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                    <CustomerPictures
+                      project={selectedCustomerProject}
+                      loadingProjects={customerProjectsLoading}
+                    />
+                </PageShell>
+              </Protected>
+            }
+          />
           <Route path="/" element={<Navigate to={authed ? (accessLoading ? '/pipeline' : fallbackRoute) : '/login'} replace />} />
           <Route
             path="*"
