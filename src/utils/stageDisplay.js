@@ -248,30 +248,30 @@ const COLOR_ACCEPTANCE = '#DDD6FE';
 const COLOR_MISC_MONEY = COLOR_MONEY;
 
 const PIPE_COMPACT_STAGE_LABELS = Object.freeze({
-  plans_received: 'Plans Recv.',
-  budget: 'Budget / Tax Cert',
-  invoice_design: 'Inv Sent - D&E',
+  plans_received: 'Plans Rcvd.',
+  budget: 'Budgetary #',
+  invoice_design: 'D&E Inv.',
   money_design: '$',
   design: 'Design',
   engineering: 'Eng.',
   estimating: 'Est.',
-  invoice_slab: 'Inv Sent - Slab',
+  invoice_slab: 'Slab Inv.',
   money_slab: '$',
-  slab_work: 'Slab Work',
-  invoice_production: 'Inv Sent - Prod',
+  slab_work: 'Slab',
+  invoice_production: 'Prod Inv.',
   money_production: '$',
   schedule_inventory: 'Sched / Inv',
   manufacturing: 'Mfg.',
-  invoice_shipping: 'Final Inv Sent',
+  invoice_shipping: 'Final Inv.',
   money_shipping: '$',
   shipping: 'Ship.',
-  acceptance: 'Acceptance / POD',
+  acceptance: 'POD',
   misc_money: 'Misc $',
   invoice_needed: 'Invoice Needed',
   missing_required_documents: 'Missing Docs',
-  missing_doc_invoice_sent: 'Missing Doc - Inv',
-  missing_doc_payment_received: 'Missing Doc - Paid',
-  completed: 'Complete'
+  missing_doc_invoice_sent: 'Miss Doc Inv.',
+  missing_doc_payment_received: 'Miss Doc Paid',
+  completed: 'Done'
 });
 
 export const STAGE_COLORS = {
