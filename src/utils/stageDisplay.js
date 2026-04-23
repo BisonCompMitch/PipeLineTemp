@@ -250,6 +250,7 @@ const COLOR_MISC_MONEY = COLOR_MONEY;
 const PIPE_COMPACT_STAGE_LABELS = Object.freeze({
   plans_received: 'Plans Rcvd.',
   budget: 'Budgetary #',
+  budget_confirmation: 'Budget Conf.',
   invoice_design: 'D&E Inv.',
   money_design: '$',
   design: 'Design',
