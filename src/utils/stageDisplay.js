@@ -64,6 +64,7 @@ export const BASE_STAGE_FLOW = [
     owner: 'CFS',
     default_duration_hours: 24
   },
+  { id: 'budget_confirmation', name: 'Budget # Confirmation', owner: 'Admin', default_duration_hours: 1 },
   { id: 'invoice_design', name: 'Invoice Sent - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
@@ -92,6 +93,7 @@ export const SLAB_STAGE_FLOW = [
     owner: 'CFS',
     default_duration_hours: 24
   },
+  { id: 'budget_confirmation', name: 'Budget # Confirmation', owner: 'Admin', default_duration_hours: 1 },
   { id: 'invoice_design', name: 'Invoice Sent - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
@@ -230,6 +232,7 @@ const MONEY_SUBSTAGE_LABELS = Object.freeze(
 
 const COLOR_PLANS = '#DBEAFE';
 const COLOR_BUDGET = '#86EFAC';
+const COLOR_BUDGET_CONFIRMATION = '#F4B860';
 const COLOR_MONEY = '#FCA5A5';
 const COLOR_INVOICE = '#FCA5A5';
 const COLOR_DESIGN = '#C4B5FD';
@@ -247,6 +250,7 @@ const COLOR_MISC_MONEY = COLOR_MONEY;
 export const STAGE_COLORS = {
   plans_received: COLOR_PLANS,
   budget: COLOR_BUDGET,
+  budget_confirmation: COLOR_BUDGET_CONFIRMATION,
   invoice_design: COLOR_INVOICE,
   invoice_slab: COLOR_INVOICE,
   money_design: COLOR_MONEY,
@@ -371,6 +375,10 @@ export function formatStageName(name, stageId = '', options = {}) {
       return 'Budgetary Number / Sales Tax Certificate';
     }
     return 'Budgetary Number / Sales Tax Certificate';
+  }
+  if (id === 'budget_confirmation') return 'Budget # Confirmation';
+  if (/^budget(?:\s*#|\s+number|\s+no\.?|\s+num(?:ber)?)?\s*confirmation$/i.test(rawName)) {
+    return 'Budget # Confirmation';
   }
   if (/^cfs\s+budget$/i.test(rawName)) return 'Budgetary Number / Sales Tax Certificate';
   if (/^rough\s+estimate$/i.test(rawName)) return 'Budgetary Number / Sales Tax Certificate';
