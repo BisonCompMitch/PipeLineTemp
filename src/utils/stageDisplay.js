@@ -247,6 +247,33 @@ const COLOR_SLAB_WORK = '#F9A8D4';
 const COLOR_ACCEPTANCE = '#DDD6FE';
 const COLOR_MISC_MONEY = COLOR_MONEY;
 
+const PIPE_COMPACT_STAGE_LABELS = Object.freeze({
+  plans_received: 'Plans Recv.',
+  budget: 'Budget / Tax Cert',
+  invoice_design: 'Inv Sent - D&E',
+  money_design: '$',
+  design: 'Design',
+  engineering: 'Eng.',
+  estimating: 'Est.',
+  invoice_slab: 'Inv Sent - Slab',
+  money_slab: '$',
+  slab_work: 'Slab Work',
+  invoice_production: 'Inv Sent - Prod',
+  money_production: '$',
+  schedule_inventory: 'Sched / Inv',
+  manufacturing: 'Mfg.',
+  invoice_shipping: 'Final Inv Sent',
+  money_shipping: '$',
+  shipping: 'Ship.',
+  acceptance: 'Acceptance / POD',
+  misc_money: 'Misc $',
+  invoice_needed: 'Invoice Needed',
+  missing_required_documents: 'Missing Docs',
+  missing_doc_invoice_sent: 'Missing Doc - Inv',
+  missing_doc_payment_received: 'Missing Doc - Paid',
+  completed: 'Complete'
+});
+
 export const STAGE_COLORS = {
   plans_received: COLOR_PLANS,
   budget: COLOR_BUDGET,
@@ -461,10 +488,21 @@ export function formatStageName(name, stageId = '', options = {}) {
 export function formatMoneyStageGlyph(name, stageId = '', options = {}) {
   const displayName = formatStageName(name, stageId, options);
   const id = normalizeStageId(stageId);
-  if (id === 'budget') return 'Rough Estimate';
-  if (INVOICE_STAGE_IDS.has(id)) return 'Invoice Sent';
-  if (MONEY_STAGE_IDS.has(id) || /^money\s*(check\s*)?-\s*/i.test(displayName)) {
-    return '$';
+  if (Object.prototype.hasOwnProperty.call(PIPE_COMPACT_STAGE_LABELS, id)) {
+    return PIPE_COMPACT_STAGE_LABELS[id];
+  }
+  if (/^plans\s+received$/i.test(displayName)) return PIPE_COMPACT_STAGE_LABELS.plans_received;
+  if (/^rough\s+estimate\s*\/\s*sales\s+tax\s+certificate$/i.test(displayName)) {
+    return PIPE_COMPACT_STAGE_LABELS.budget;
+  }
+  if (INVOICE_STAGE_IDS.has(id) || /^invoice\s*sent\b/i.test(displayName)) return 'Inv Sent';
+  if (MONEY_STAGE_IDS.has(id) || /^money\s*(check\s*)?-\s*/i.test(displayName)) return '$';
+  if (/^schedule\s+order\s*\/\s*inventory$/i.test(displayName)) return PIPE_COMPACT_STAGE_LABELS.schedule_inventory;
+  if (/^manufacturing\s*-\s*final\s+invoice\s*sent$/i.test(displayName)) {
+    return PIPE_COMPACT_STAGE_LABELS.invoice_shipping;
+  }
+  if (/^acceptance\s*-\s*proof\s+of\s+delivery$/i.test(displayName)) {
+    return PIPE_COMPACT_STAGE_LABELS.acceptance;
   }
   return displayName;
 }
