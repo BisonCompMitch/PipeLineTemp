@@ -5864,6 +5864,7 @@ body[data-theme='light'] .compact-card-switch {
 
 .dashboard-table.money-status-table:not(.area-queue-table) td:nth-child(3) {
   white-space: normal;
+  vertical-align: middle;
 }
 
 .dashboard-table:not(.area-queue-table) td:nth-child(2) .area-pill {
@@ -5927,6 +5928,8 @@ body[data-theme='light'] .compact-card-switch {
 }
 
 .money-substage-select {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
   padding: 10px 14px;
@@ -5937,6 +5940,13 @@ body[data-theme='light'] .compact-card-switch {
   font: inherit;
   line-height: 1.2;
   color-scheme: dark;
+}
+
+.money-substage-select--table {
+  width: min(100%, 210px);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 15px;
 }
 
 .money-substage-select.yellow {
@@ -5965,6 +5975,10 @@ body[data-theme='light'] .compact-card-switch {
 body[data-theme='light'] .money-substage-select {
   background: #ffffff;
   color: var(--text);
+  color-scheme: light;
+}
+
+body[data-theme='light'] .money-substage-select--table {
   color-scheme: light;
 }
 

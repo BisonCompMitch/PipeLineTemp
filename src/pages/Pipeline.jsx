@@ -1820,17 +1820,17 @@ export default function Pipeline({
     const stageLabel = dashboardMode === 'money' ? row.moneyStageName : row.area;
     const paymentStatusLabel = row.moneySubstageLabel || 'Awaiting update';
     const paymentStatusTone = moneySubstageToneClass(row.moneySubstage);
-    const paymentStatusSelect = dashboardMode === 'money' && canEditMoneySubstages ? (
-      <label className="money-substage-select-wrap" title={paymentStatusLabel}>
-        <span className="sr-only">Payment status</span>
+    const paymentStatusSelect =
+      dashboardMode === 'money' && canEditMoneySubstages ? (
         <select
-          className={`money-substage-select ${paymentStatusTone}`}
+          className={`money-substage-select money-substage-select--table ${paymentStatusTone}`}
           value={row.moneySubstage || ''}
           onChange={(event) => {
             void handleDashboardMoneySubstageChange(row, event.target.value);
           }}
           disabled={moneySubstageBusy}
           aria-label="Payment status"
+          title={paymentStatusLabel}
         >
           <option value="" disabled>
             Awaiting update
@@ -1841,8 +1841,7 @@ export default function Pipeline({
             </option>
           ))}
         </select>
-      </label>
-    ) : null;
+      ) : null;
     return (
       <tr
         key={row.id || `${row.name}-${keyPrefix}-${idx}`}
