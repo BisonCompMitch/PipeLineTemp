@@ -31,6 +31,20 @@ function activityKey(value) {
   return normalize(value);
 }
 
+function formatLastLogin(value) {
+  if (!value) {
+    return { text: '-', title: '' };
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { text: '-', title: '' };
+  }
+  return {
+    text: date.toLocaleDateString(),
+    title: date.toLocaleString()
+  };
+}
+
 function splitRoles(value) {
   return String(value || '')
     .split(',')
@@ -975,6 +989,7 @@ export default function Users() {
                 <th>Username</th>
                 <th>Full name</th>
                 <th>Email</th>
+                <th>Last login</th>
                 <th>Roles</th>
                 <th>Areas</th>
                 <th>Theme</th>
@@ -991,11 +1006,13 @@ export default function Users() {
                     activityMap.get(activityKey(user.username)) ||
                     activityMap.get(activityKey(user.email)) ||
                     {};
+                  const lastLogin = formatLastLogin(user.last_login_at || activity.last_seen);
                   return (
                     <tr key={user.username} onDoubleClick={() => startEditBison(user)}>
                       <td>{user.login_username || user.username}</td>
                       <td>{user.full_name || '-'}</td>
                       <td>{user.email}</td>
+                      <td title={lastLogin.title || undefined}>{lastLogin.text}</td>
                       <td>{(user.roles || []).join(', ') || '-'}</td>
                       <td className="users-cell-areas">{(user.areas || []).join(', ') || '-'}</td>
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
@@ -1008,7 +1025,7 @@ export default function Users() {
                 })
               ) : (
                 <tr className="empty-row">
-                  <td colSpan={10}>No Bison users available.</td>
+                  <td colSpan={11}>No Bison users available.</td>
                 </tr>
               )}
             </tbody>
@@ -1075,6 +1092,7 @@ export default function Users() {
                 <th>Company</th>
                 <th>Role</th>
                 <th>Created</th>
+                <th>Last login</th>
                 <th>Theme</th>
                 <th>Active</th>
                 <th>Instances</th>
@@ -1088,12 +1106,14 @@ export default function Users() {
                   const linkedUser =
                     linkedUsersByIdentity.get(normalize(contractor.email)) ||
                     linkedUsersByIdentity.get(normalize(contractor.username));
+                  const lastLogin = formatLastLogin(linkedUser?.last_login_at || activity.last_seen);
                   return (
                     <tr key={contractor.email} onDoubleClick={() => startEditContractor(contractor)}>
                       <td>{contractor.email}</td>
                       <td>{contractor.company || '-'}</td>
                       <td>{contractor.role || 'Contractor'}</td>
                       <td>{contractor.created_at ? new Date(contractor.created_at).toLocaleDateString() : '-'}</td>
+                      <td title={lastLogin.title || undefined}>{lastLogin.text}</td>
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
                       <td>{activity.active_instances ?? 0}</td>
@@ -1103,7 +1123,7 @@ export default function Users() {
                 })
               ) : (
                 <tr className="empty-row">
-                  <td colSpan={8}>No contractor users yet.</td>
+                  <td colSpan={9}>No contractor users yet.</td>
                 </tr>
               )}
             </tbody>
@@ -1152,6 +1172,7 @@ export default function Users() {
                 <th>Email</th>
                 <th>Projects</th>
                 <th>Role</th>
+                <th>Last login</th>
                 <th>Theme</th>
                 <th>Active</th>
                 <th>Instances</th>
@@ -1166,11 +1187,13 @@ export default function Users() {
                     linkedUsersByIdentity.get(normalize(customer.email)) ||
                     linkedUsersByIdentity.get(normalize(customer.username));
                   const projectSummary = summarizeProjectSelection(projectIdsForCustomer(customer), projectMap);
+                  const lastLogin = formatLastLogin(linkedUser?.last_login_at || activity.last_seen);
                   return (
                     <tr key={customer.email} onDoubleClick={() => startEditCustomer(customer)}>
                       <td>{customer.email}</td>
                       <td title={projectSummary.title || undefined}>{projectSummary.text}</td>
                       <td>{customer.role || 'Customer'}</td>
+                      <td title={lastLogin.title || undefined}>{lastLogin.text}</td>
                       <td>{activity.theme === 'light' ? 'Light' : 'Dark'}</td>
                       <td>{activity.is_active ? 'Yes' : 'No'}</td>
                       <td>{activity.active_instances ?? 0}</td>
@@ -1180,7 +1203,7 @@ export default function Users() {
                 })
               ) : (
                 <tr className="empty-row">
-                  <td colSpan={7}>No customer users yet.</td>
+                  <td colSpan={8}>No customer users yet.</td>
                 </tr>
               )}
             </tbody>
