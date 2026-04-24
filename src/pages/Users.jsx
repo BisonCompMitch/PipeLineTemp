@@ -214,12 +214,14 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
           <div className="area-check-grid project-check-grid">
             {projectList.length ? (
               projectList.map((project) => (
-                <label key={project.id} className="area-check project-check">
+              <label key={project.id} className="area-check project-check">
                   <input
+                    className="project-check-input"
                     type="checkbox"
                     checked={selectedSet.has(project.id)}
                     onChange={() => toggleProject(project.id)}
                   />
+                  <span className="project-check-box" aria-hidden="true" />
                   <span>{projectLabel(project)}</span>
                 </label>
               ))
