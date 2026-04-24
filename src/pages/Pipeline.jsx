@@ -1522,35 +1522,72 @@ export default function Pipeline({
     }
   };
 
-  const handleMoneySubstageChange = async (nextValue) => {
-    if (!detailProject?.id || !detailCurrentStage?.id || !canEditMoneySubstages) return;
-    if (!isMoneyTrackingStage(detailCurrentStage.id)) return;
-    if (nextValue === detailCurrentMoneySubstage) return;
+  const applyMoneySubstageChange = async ({
+    project,
+    stageId,
+    nextValue,
+    successMessage = '',
+    failureMessage = 'Unable to update payment status.'
+  }) => {
+    if (!project?.id || !stageId || !canEditMoneySubstages) return false;
+    if (!isMoneyTrackingStage(stageId)) return false;
+    const stage = (project.stages || []).find((entry) => String(entry?.id || '') === String(stageId || ''));
+    const currentValue = getEffectiveMoneySubstage(stage);
+    if (nextValue === currentValue) return false;
     setMoneySubstageBusy(true);
-    setDetailError('');
-    setDetailStatus('');
+    if (successMessage) {
+      setDetailError('');
+      setDetailStatus('');
+    }
     try {
-      const updatedStage = await updateMoneySubstage(detailProject.id, detailCurrentStage.id, {
+      const updatedStage = await updateMoneySubstage(project.id, stageId, {
         money_substage: nextValue
       });
       const nextProject = {
-        ...detailProject,
-        stages: (detailProject.stages || []).map((stage) =>
-          stage.id === detailCurrentStage.id ? { ...stage, ...(updatedStage || {}) } : stage
+        ...project,
+        stages: (project.stages || []).map((entry) =>
+          entry.id === stageId ? { ...entry, ...(updatedStage || {}) } : entry
         )
       };
-      setDetailProject(nextProject);
+      if (detailProject?.id === nextProject.id) {
+        setDetailProject(nextProject);
+        if (successMessage) {
+          setDetailStatus(successMessage);
+        }
+      }
       setRows((prev) =>
-        prev.map((item) =>
-          item.id === nextProject.id ? toRow(nextProject, formatDisplayStageName) : item
-        )
+        prev.map((item) => (item.id === nextProject.id ? toRow(nextProject, formatDisplayStageName) : item))
       );
-      setDetailStatus('Payment status updated.');
+      return true;
     } catch (_err) {
-      setDetailError('Unable to update payment status.');
+      if (successMessage) {
+        setDetailError(failureMessage);
+      }
+      return false;
     } finally {
       setMoneySubstageBusy(false);
     }
+  };
+
+  const handleMoneySubstageChange = async (nextValue) => {
+    if (!detailProject?.id || !detailCurrentStage?.id) return;
+    await applyMoneySubstageChange({
+      project: detailProject,
+      stageId: detailCurrentStage.id,
+      nextValue,
+      successMessage: 'Payment status updated.'
+    });
+  };
+
+  const handleDashboardMoneySubstageChange = async (row, nextValue) => {
+    if (!row?.project?.id || !row?.stage?.id) return;
+    const shouldNotifyDetail = Boolean(detailOpen && detailProject?.id === row.project.id && detailCurrentStage?.id === row.stage.id);
+    await applyMoneySubstageChange({
+      project: row.project,
+      stageId: row.stage.id,
+      nextValue,
+      successMessage: shouldNotifyDetail ? 'Payment status updated.' : ''
+    });
   };
 
   const openMissingDocsDialog = (project, stage) => {
@@ -1783,6 +1820,29 @@ export default function Pipeline({
     const stageLabel = dashboardMode === 'money' ? row.moneyStageName : row.area;
     const paymentStatusLabel = row.moneySubstageLabel || 'Awaiting update';
     const paymentStatusTone = moneySubstageToneClass(row.moneySubstage);
+    const paymentStatusSelect = dashboardMode === 'money' && canEditMoneySubstages ? (
+      <label className="money-substage-select-wrap" title={paymentStatusLabel}>
+        <span className="sr-only">Payment status</span>
+        <select
+          className={`money-substage-select ${paymentStatusTone}`}
+          value={row.moneySubstage || ''}
+          onChange={(event) => {
+            void handleDashboardMoneySubstageChange(row, event.target.value);
+          }}
+          disabled={moneySubstageBusy}
+          aria-label="Payment status"
+        >
+          <option value="" disabled>
+            Awaiting update
+          </option>
+          {MONEY_SUBSTAGE_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null;
     return (
       <tr
         key={row.id || `${row.name}-${keyPrefix}-${idx}`}
@@ -1806,7 +1866,7 @@ export default function Pipeline({
         </td>
         {dashboardMode === 'money' ? (
           <td>
-            <span className={`status-pill ${paymentStatusTone}`}>{paymentStatusLabel}</span>
+            {paymentStatusSelect || <span className={`status-pill ${paymentStatusTone}`}>{paymentStatusLabel}</span>}
           </td>
         ) : null}
       </tr>
@@ -2198,34 +2258,40 @@ export default function Pipeline({
                     {dashboardMode === 'money' && detailCurrentStage && isMoneyTrackingStage(detailCurrentStage.id) ? (
                       <div className="span-2 detail-money-substage-card">
                         <div className="detail-money-substage-head">
-                          <div>
-                            <div className="detail-money-substage-title">Payment status</div>
-                            <div className="muted">
-                              Current money stage: {formatMoneyStageName(detailCurrentStage.name, detailCurrentStage.id)}
-                            </div>
+                        <div>
+                          <div className="detail-money-substage-title">Payment status</div>
+                          <div className="muted">
+                            Current money stage: {formatMoneyStageName(detailCurrentStage.name, detailCurrentStage.id)}
                           </div>
-                          <span className={`status-pill ${moneySubstageToneClass(detailCurrentMoneySubstage)}`}>
-                            {detailCurrentMoneySubstageLabel}
-                          </span>
                         </div>
-                        {canEditMoneySubstages ? (
-                          <div className="detail-money-substage-actions">
-                            {MONEY_SUBSTAGE_OPTIONS.map((option) => (
-                              <button
-                                key={option.id}
-                                type="button"
-                                className={`ghost money-substage-button${
-                                  detailCurrentMoneySubstage === option.id ? ' active' : ''
-                                }`}
-                                onClick={() => handleMoneySubstageChange(option.id)}
-                                disabled={moneySubstageBusy || saving}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
+                        <span className={`status-pill ${moneySubstageToneClass(detailCurrentMoneySubstage)}`}>
+                          {detailCurrentMoneySubstageLabel}
+                        </span>
                       </div>
+                      {canEditMoneySubstages ? (
+                        <div className="detail-money-substage-actions">
+                          <label className="money-substage-select-wrap money-substage-select-wrap--detail">
+                            <span className="sr-only">Payment status</span>
+                            <select
+                              className={`money-substage-select ${moneySubstageToneClass(detailCurrentMoneySubstage)}`}
+                              value={detailCurrentMoneySubstage || ''}
+                              onChange={(event) => void handleMoneySubstageChange(event.target.value)}
+                              disabled={moneySubstageBusy || saving}
+                              aria-label="Payment status"
+                            >
+                              <option value="" disabled>
+                                Awaiting update
+                              </option>
+                              {MONEY_SUBSTAGE_OPTIONS.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      ) : null}
+                    </div>
                     ) : null}
                     <div className="intake-docs span-2" role="group" aria-labelledby="detail-required-docs-title">
                       <div id="detail-required-docs-title" className="intake-docs-title">

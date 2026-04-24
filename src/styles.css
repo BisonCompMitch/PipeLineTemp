@@ -5917,6 +5917,69 @@ body[data-theme='light'] .compact-card-switch {
   border-color: color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
+.money-substage-select-wrap {
+  display: block;
+  width: 100%;
+}
+
+.money-substage-select-wrap--detail {
+  max-width: 420px;
+}
+
+.money-substage-select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.2;
+  color-scheme: dark;
+}
+
+.money-substage-select.yellow {
+  background: #fef3c7;
+  border-color: rgba(217, 119, 6, 0.28);
+  color: #92400e;
+}
+
+.money-substage-select.progress {
+  background: #dbeafe;
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #1d4ed8;
+}
+
+.money-substage-select.complete {
+  background: #d1fae5;
+  border-color: rgba(16, 185, 129, 0.26);
+  color: #047857;
+}
+
+.money-status-table .money-substage-select {
+  min-width: 170px;
+  max-width: 100%;
+}
+
+body[data-theme='light'] .money-substage-select {
+  background: #ffffff;
+  color: var(--text);
+  color-scheme: light;
+}
+
+body[data-theme='light'] .money-substage-select.yellow {
+  background: #fef3c7;
+}
+
+body[data-theme='light'] .money-substage-select.progress {
+  background: #dbeafe;
+}
+
+body[data-theme='light'] .money-substage-select.complete {
+  background: #d1fae5;
+}
+
 .lead-table {
   min-width: max(1000px, 100%);
 }
