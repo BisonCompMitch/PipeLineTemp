@@ -86,7 +86,6 @@ export const SLAB_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
   { id: 'invoice_slab', name: 'Invoice Sent - Slab', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_slab', name: 'Money - Slab', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   {
     id: 'budget',
     name: 'Budgetary Number / Sales Tax Certificate',
@@ -94,6 +93,7 @@ export const SLAB_STAGE_FLOW = [
     default_duration_hours: 24
   },
   { id: 'budget_confirmation', name: 'Budget # Confirmation', owner: 'Admin', default_duration_hours: 1 },
+  { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'invoice_design', name: 'Invoice Sent - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_design', name: 'Money - D&E', owner: 'Admin', default_duration_hours: 1 },
   { id: 'design', name: 'Design', owner: 'Design Lead', default_duration_hours: 24 },
@@ -135,13 +135,13 @@ export const SCOTTSDALE_READY_SLAB_STAGE_FLOW = [
   { id: 'plans_received', name: 'Plans Received', owner: 'Admin', default_duration_hours: 1 },
   { id: 'invoice_slab', name: 'Invoice Sent - Slab', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_slab', name: 'Money - Slab', owner: 'Admin', default_duration_hours: 1 },
-  { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   {
     id: 'budget',
     name: 'Budgetary Number / Sales Tax Certificate',
     owner: 'CFS',
     default_duration_hours: 24
   },
+  { id: 'slab_work', name: 'Slab Work', owner: 'Manufacturing Lead', default_duration_hours: 24 },
   { id: 'invoice_production', name: 'Invoice Sent - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'money_production', name: 'Money - Production', owner: 'Admin', default_duration_hours: 1 },
   { id: 'schedule_inventory', name: 'Schedule Order / Inventory', owner: 'Admin', default_duration_hours: 1 },
