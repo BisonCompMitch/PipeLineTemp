@@ -890,7 +890,7 @@ export default function App() {
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Project Intake', path: '/intake' });
     }
-    if (hasBison) {
+    if (hasContractor || hasBison) {
       items.push({ label: 'Create Estimate', path: '/create-estimate' });
     }
     if (hasBison && hasAdminArea) {
@@ -1137,7 +1137,12 @@ export default function App() {
           <Route
             path="/create-estimate"
             element={
-              <Protected authed={authed} allowed={!firstLoginRequired && hasBison} fallback={fallbackRoute} loading={accessLoading}>
+              <Protected
+                authed={authed}
+                allowed={!firstLoginRequired && (hasContractor || hasBison)}
+                fallback={fallbackRoute}
+                loading={accessLoading}
+              >
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
