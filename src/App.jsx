@@ -876,7 +876,25 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [authed, theme, location.pathname, sessionId]);
 
+  const isCustomerPortal = useMemo(
+    () =>
+      ['/customer', '/customer/files', '/customer/pictures'].some((route) =>
+        location.pathname === route || location.pathname.startsWith(`${route}/`)
+      ),
+    [location.pathname]
+  );
+  const customerNavItems = useMemo(
+    () => [
+      { label: 'Progress', path: '/customer' },
+      { label: 'Files for Review', path: '/customer/files' },
+      { label: 'Project Pictures', path: '/customer/pictures' }
+    ],
+    []
+  );
   const navItems = useMemo(() => {
+    if (isCustomerPortal) {
+      return customerNavItems;
+    }
     const items = [];
     if (canAccessDashboard) {
       items.push({ label: 'Dashboard', path: '/pipeline' });
@@ -910,7 +928,15 @@ export default function App() {
       seen.add(item.path);
       return true;
     });
-  }, [hasBison, hasContractor, hasCustomer, canAccessDashboard, hasAdminArea]);
+  }, [
+    isCustomerPortal,
+    customerNavItems,
+    hasBison,
+    hasContractor,
+    hasCustomer,
+    canAccessDashboard,
+    hasAdminArea
+  ]);
   const topBarDisplayName = String(
     profile?.full_name || getDisplayName() || profile?.username || getStoredUsername() || 'User'
   ).trim() || 'User';
