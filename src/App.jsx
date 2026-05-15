@@ -29,6 +29,7 @@ import FirstLoginSetup from './pages/FirstLoginSetup.jsx';
 import Pipeline from './pages/Pipeline.jsx';
 import Areas from './pages/Areas.jsx';
 import Intake from './pages/Intake.jsx';
+import CreateEstimate from './pages/CreateEstimate.jsx';
 import Leads from './pages/Leads.jsx';
 import Users from './pages/Users.jsx';
 import Customer from './pages/Customer.jsx';
@@ -41,6 +42,7 @@ const ROUTE_TITLES = {
   '/money-status': 'Money Status',
   '/areas': 'Areas',
   '/intake': 'Project Intake',
+  '/create-estimate': 'Create Estimate',
   '/leads': 'Leads',
   '/users': 'Manage Users',
   '/customer/files': 'Files for Review',
@@ -888,6 +890,9 @@ export default function App() {
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Project Intake', path: '/intake' });
     }
+    if (hasBison) {
+      items.push({ label: 'Create Estimate', path: '/create-estimate' });
+    }
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Manage Users', path: '/users' });
     }
@@ -1125,6 +1130,27 @@ export default function App() {
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
                   <Intake />
+                </PageShell>
+              </Protected>
+            }
+          />
+          <Route
+            path="/create-estimate"
+            element={
+              <Protected authed={authed} allowed={!firstLoginRequired && hasBison} fallback={fallbackRoute} loading={accessLoading}>
+                <PageShell
+                  title={pageTitle}
+                  displayName={topBarDisplayName}
+                  onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
+                  theme={theme}
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                  <CreateEstimate />
                 </PageShell>
               </Protected>
             }

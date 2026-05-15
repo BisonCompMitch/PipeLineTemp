@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   convertLeadToProject,
   createLead,
@@ -242,6 +242,134 @@ function summarizeSelection(items, emptyLabel, pluralLabel) {
   return count === 1 ? '1 file selected' : `${count} ${pluralLabel} selected`;
 }
 
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'];
+const TEXT_EXTENSIONS = ['.txt', '.md', '.csv', '.tsv', '.log', '.json', '.yaml', '.yml', '.xml'];
+const PDF_EXTENSIONS = ['.pdf'];
+const SPREADSHEET_EXTENSIONS = ['.csv', '.tsv', '.xlsx', '.xls'];
+const TEXT_PREVIEW_LIMIT_BYTES = 1024 * 1024;
+const SPREADSHEET_PREVIEW_MAX_ROWS = 200;
+const SPREADSHEET_PREVIEW_MAX_COLUMNS = 30;
+
+function isImageFile(fileRecord) {
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  if (type.startsWith('image/')) return true;
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  return IMAGE_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function isTextFile(fileRecord) {
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  if (type.startsWith('text/')) return true;
+  if (
+    [
+      'application/json',
+      'application/xml',
+      'application/x-yaml',
+      'text/csv',
+      'text/tab-separated-values',
+      'application/csv',
+      'application/vnd.ms-excel'
+    ].includes(type)
+  ) {
+    return true;
+  }
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  return TEXT_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function isPdfFile(fileRecord) {
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  if (type === 'application/pdf' || type.includes('/pdf')) return true;
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  return PDF_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function isSpreadsheetFile(fileRecord) {
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  if (
+    [
+      'text/csv',
+      'text/tab-separated-values',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ].includes(type)
+  ) {
+    return true;
+  }
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  return SPREADSHEET_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+async function buildSpreadsheetPreview(fileRecord, blob) {
+  const name = String(fileRecord?.filename || '').toLowerCase();
+  const type = String(fileRecord?.content_type || '').toLowerCase();
+  const isDelimited =
+    name.endsWith('.csv') ||
+    name.endsWith('.tsv') ||
+    type === 'text/csv' ||
+    type === 'text/tab-separated-values' ||
+    type === 'application/csv';
+  if (isDelimited) {
+    const Papa = (await import('papaparse')).default;
+    const raw = await blob.text();
+    const delimiter = name.endsWith('.tsv') || type === 'text/tab-separated-values' ? '\t' : undefined;
+    const parsed = Papa.parse(raw, {
+      header: false,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      delimiter
+    });
+    if (parsed?.errors?.length) {
+      throw new Error('Unable to parse CSV/TSV preview.');
+    }
+    const data = Array.isArray(parsed.data) ? parsed.data : [];
+    const rowCount = data.length;
+    const safeRows = data.slice(0, SPREADSHEET_PREVIEW_MAX_ROWS).map((row) => {
+      const values = Array.isArray(row) ? row : [row];
+      return values.slice(0, SPREADSHEET_PREVIEW_MAX_COLUMNS).map((value) => String(value ?? ''));
+    });
+    const maxColumns = safeRows.reduce((max, row) => Math.max(max, row.length), 0);
+    const headers = Array.from({ length: maxColumns }, (_, index) => `Col ${index + 1}`);
+    return {
+      rows: safeRows,
+      headers,
+      note:
+        rowCount > SPREADSHEET_PREVIEW_MAX_ROWS
+          ? `Showing first ${SPREADSHEET_PREVIEW_MAX_ROWS} rows. Download for full file.`
+          : ''
+    };
+  }
+
+  const XLSX = await import('xlsx');
+  const buffer = await blob.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array', dense: true });
+  const sheetName = workbook?.SheetNames?.[0];
+  if (!sheetName) throw new Error('Spreadsheet has no sheets to preview.');
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    blankrows: false,
+    raw: false
+  });
+  const tableRows = Array.isArray(rawRows) ? rawRows : [];
+  const rowCount = tableRows.length;
+  const safeRows = tableRows.slice(0, SPREADSHEET_PREVIEW_MAX_ROWS).map((row) => {
+    const values = Array.isArray(row) ? row : [row];
+    return values.slice(0, SPREADSHEET_PREVIEW_MAX_COLUMNS).map((value) => String(value ?? ''));
+  });
+  const maxColumns = safeRows.reduce((max, row) => Math.max(max, row.length), 0);
+  const headers = Array.from({ length: maxColumns }, (_, index) => `Col ${index + 1}`);
+  return {
+    rows: safeRows,
+    headers,
+    note:
+      rowCount > SPREADSHEET_PREVIEW_MAX_ROWS
+        ? `Showing first ${SPREADSHEET_PREVIEW_MAX_ROWS} rows. Download for full file.`
+        : ''
+  };
+}
+
 function queueFiles(files) {
   return files.map((file, index) => ({
     id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
@@ -276,6 +404,18 @@ export default function Leads({ isAdminView = false }) {
   const [editFiles, setEditFiles] = useState([]);
   const [newEditFiles, setNewEditFiles] = useState([]);
   const [editFilesStatus, setEditFilesStatus] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewRecord, setPreviewRecord] = useState(null);
+  const [cardPreviewUrls, setCardPreviewUrls] = useState({});
+  const [cardPreviewStatus, setCardPreviewStatus] = useState({});
+  const [preview, setPreview] = useState({
+    open: false,
+    url: '',
+    name: '',
+    kind: '',
+    text: '',
+    table: null
+  });
   const [filters, setFilters] = useState({
     name: '',
     company: '',
@@ -291,6 +431,8 @@ export default function Leads({ isAdminView = false }) {
     creator_company: CREATOR_COMPANY_ALL
   });
   const { alertDialog, confirmDialog, promptDialog, dialogPortal } = useSiteDialog();
+  const cardPreviewUrlRef = useRef({});
+  const previewBlobCacheRef = useRef(new Map());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -350,6 +492,204 @@ export default function Leads({ isAdminView = false }) {
       setEditFiles([]);
       setEditFilesStatus('Unable to load lead files.');
     }
+  }, []);
+
+  const getCachedLeadBlob = useCallback(async (leadId, fileId) => {
+    const key = `${leadId}:${fileId}`;
+    const cached = previewBlobCacheRef.current.get(key);
+    if (cached) return cached;
+    const blob = await downloadLeadFile(leadId, fileId);
+    previewBlobCacheRef.current.set(key, blob);
+    return blob;
+  }, []);
+
+  const replaceCardPreviewUrls = useCallback((nextMap) => {
+    const previousMap = cardPreviewUrlRef.current || {};
+    const nextValues = new Set(Object.values(nextMap));
+    Object.values(previousMap).forEach((url) => {
+      if (url && !nextValues.has(url)) {
+        window.URL.revokeObjectURL(url);
+      }
+    });
+    cardPreviewUrlRef.current = nextMap;
+    setCardPreviewUrls(nextMap);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    if (preview.url) {
+      window.URL.revokeObjectURL(preview.url);
+    }
+    setPreviewLoading(false);
+    setPreviewRecord(null);
+    setPreview({ open: false, url: '', name: '', kind: '', text: '', table: null });
+  }, [preview.url]);
+
+  const handleViewLeadFile = useCallback(
+    async (fileRecord) => {
+      if (!editing?.id || !fileRecord?.id) return;
+      setEditFilesStatus('');
+      const name = fileRecord.filename || 'File preview';
+      setPreviewRecord(fileRecord);
+      setPreview({ open: true, url: '', name, kind: 'loading', text: '', table: null });
+      setPreviewLoading(true);
+      try {
+        const blob = await getCachedLeadBlob(editing.id, fileRecord.id);
+        if (isImageFile(fileRecord)) {
+          const url = window.URL.createObjectURL(blob);
+          setPreview({ open: true, url, name, kind: 'image', text: '', table: null });
+          return;
+        }
+        if (isSpreadsheetFile(fileRecord)) {
+          const table = await buildSpreadsheetPreview(fileRecord, blob);
+          setPreview({
+            open: true,
+            url: '',
+            name,
+            kind: 'table',
+            text: table.note || '',
+            table
+          });
+          return;
+        }
+        if (isTextFile(fileRecord)) {
+          const isTruncated = blob.size > TEXT_PREVIEW_LIMIT_BYTES;
+          const textBlob = isTruncated ? blob.slice(0, TEXT_PREVIEW_LIMIT_BYTES) : blob;
+          const text = await textBlob.text();
+          setPreview({ open: true, url: '', name, kind: 'text', text, table: null });
+          if (isTruncated) {
+            setEditFilesStatus('Showing partial text preview (first 1 MB). Download for full file.');
+          }
+          return;
+        }
+        if (isPdfFile(fileRecord)) {
+          const url = window.URL.createObjectURL(blob);
+          setPreview({ open: true, url, name, kind: 'pdf', text: '', table: null });
+          return;
+        }
+        setPreview({
+          open: true,
+          url: '',
+          name,
+          kind: 'unsupported',
+          text: 'Preview unavailable for this file type. Use Download.',
+          table: null
+        });
+      } catch (_error) {
+        setPreview({
+          open: true,
+          url: '',
+          name,
+          kind: 'unsupported',
+          text: 'Unable to load preview. You can still use Download or Delete.',
+          table: null
+        });
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [editing?.id, getCachedLeadBlob]
+  );
+
+  const handleDownloadLeadFilePreview = useCallback(
+    async (fileRecord) => {
+      if (!editing?.id || !fileRecord?.id) return;
+      try {
+        const blob = await getCachedLeadBlob(editing.id, fileRecord.id);
+        downloadBlob(blob, fileRecord.filename);
+      } catch (_error) {
+        await alertDialog('Unable to download lead file.', { title: 'Lead files' });
+      }
+    },
+    [alertDialog, editing?.id, getCachedLeadBlob]
+  );
+
+  useEffect(() => {
+    if (!editing?.id) {
+      previewBlobCacheRef.current.clear();
+      replaceCardPreviewUrls({});
+      setCardPreviewStatus({});
+      return;
+    }
+    const prefix = `${editing.id}:`;
+    Array.from(previewBlobCacheRef.current.keys()).forEach((key) => {
+      if (!key.startsWith(prefix)) {
+        previewBlobCacheRef.current.delete(key);
+      }
+    });
+  }, [editing?.id, replaceCardPreviewUrls]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCardPreviews = async () => {
+      if (!editing?.id || !editFiles.length) {
+        replaceCardPreviewUrls({});
+        setCardPreviewStatus({});
+        return;
+      }
+      const imageFiles = editFiles.filter((fileRecord) => isImageFile(fileRecord));
+      if (!imageFiles.length) {
+        replaceCardPreviewUrls({});
+        setCardPreviewStatus({});
+        return;
+      }
+      setCardPreviewStatus(
+        imageFiles.reduce((acc, fileRecord) => {
+          if (fileRecord?.id) acc[fileRecord.id] = 'loading';
+          return acc;
+        }, {})
+      );
+      const entries = await Promise.all(
+        imageFiles.map(async (fileRecord) => {
+          if (!fileRecord?.id) return [null, ''];
+          const key = `${editing.id}:${fileRecord.id}`;
+          try {
+            let blob = previewBlobCacheRef.current.get(key);
+            if (!blob) {
+              blob = await downloadLeadFile(editing.id, fileRecord.id);
+              previewBlobCacheRef.current.set(key, blob);
+            }
+            return [fileRecord.id, window.URL.createObjectURL(blob)];
+          } catch (_error) {
+            return [fileRecord.id, ''];
+          }
+        })
+      );
+      if (cancelled) {
+        entries.forEach(([, url]) => {
+          if (url) window.URL.revokeObjectURL(url);
+        });
+        return;
+      }
+      const nextMap = {};
+      const nextStatus = {};
+      entries.forEach(([id, url]) => {
+        if (!id) return;
+        if (url) {
+          nextMap[id] = url;
+          nextStatus[id] = 'ready';
+        } else {
+          nextStatus[id] = 'error';
+        }
+      });
+      replaceCardPreviewUrls(nextMap);
+      setCardPreviewStatus(nextStatus);
+    };
+
+    loadCardPreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [editFiles, editing?.id, replaceCardPreviewUrls]);
+
+  useEffect(() => {
+    return () => {
+      const map = cardPreviewUrlRef.current || {};
+      Object.values(map).forEach((url) => {
+        if (url) window.URL.revokeObjectURL(url);
+      });
+      cardPreviewUrlRef.current = {};
+      previewBlobCacheRef.current.clear();
+    };
   }, []);
 
   const creatorCompanyOptions = useMemo(() => {
@@ -1317,65 +1657,71 @@ export default function Leads({ isAdminView = false }) {
                           {newEditFiles.length ? `${newEditFiles.length} file(s) selected` : 'No files selected'}
                         </div>
                         {editFilesStatus ? <p className="muted">{editFilesStatus}</p> : null}
-                        <div className="table-scroll">
-                          <table className="project-table">
-                            <thead>
-                              <tr>
-                                <th>File</th>
-                                <th>Uploaded</th>
-                                <th>Size</th>
-                                <th>Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {editFiles.length ? (
-                                editFiles.map((file) => (
-                                  <tr key={file.id}>
-                                    <td>{file.filename}</td>
-                                    <td>{formatDateTime(file.created_at)}</td>
-                                    <td>{formatBytes(file.size_bytes)}</td>
-                                    <td>
-                                      <div className="lead-file-actions-inline">
-                                        <button
-                                          className="ghost tiny-button"
-                                          type="button"
-                                          onClick={async () => {
-                                            try {
-                                              const blob = await downloadLeadFile(editing.id, file.id);
-                                              downloadBlob(blob, file.filename);
-                                            } catch (_error) {
-                                              await alertDialog('Unable to download lead file.', { title: 'Lead files' });
-                                            }
-                                          }}
-                                        >
-                                          Download
-                                        </button>
-                                        <button
-                                          className="ghost tiny-button"
-                                          type="button"
-                                          onClick={async () => {
-                                            const ok = await confirmDialog('Delete this file?', {
-                                              title: 'Delete file',
-                                              confirmText: 'Delete'
-                                            });
-                                            if (!ok) return;
-                                            await deleteLeadFile(editing.id, file.id);
-                                            await loadLeadFiles(editing.id);
-                                          }}
-                                        >
-                                          Delete
-                                        </button>
+                        <div className="photo-gallery-panel">
+                          {editFiles.length ? (
+                            <div className="photo-gallery upload-card-gallery">
+                              {editFiles.map((file) => (
+                                <div key={file.id} className="photo-card compact-upload-card lead-file-card">
+                                  <button
+                                    className="file-card-open"
+                                    type="button"
+                                    onClick={() => handleViewLeadFile(file)}
+                                  >
+                                    <div className="photo-thumb-wrap file-thumb-wrap">
+                                      {cardPreviewUrls[file.id] ? (
+                                        <img className="photo-thumb" src={cardPreviewUrls[file.id]} alt={file.filename} />
+                                      ) : (
+                                        <div className="file-thumb-placeholder">
+                                          <span className="file-thumb-type">
+                                            {cardPreviewStatus[file.id] === 'loading' ? 'Loading...' : getFileTypeLabel(file.filename)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="photo-meta">
+                                      <div className="photo-name" title={file.filename}>
+                                        {file.filename}
                                       </div>
-                                    </td>
-                                  </tr>
-                                ))
-                              ) : (
-                                <tr className="empty-row">
-                                  <td colSpan={4}>No files uploaded yet.</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                                      <div className="photo-sub muted">
+                                        <span>{formatDateTime(file.created_at)}</span>
+                                        <span>{formatBytes(file.size_bytes)}</span>
+                                      </div>
+                                    </div>
+                                  </button>
+                                  <div className="lead-file-actions-inline">
+                                    <button
+                                      className="ghost tiny-button"
+                                      type="button"
+                                      onClick={async () => {
+                                        await handleDownloadLeadFilePreview(file);
+                                      }}
+                                    >
+                                      Download
+                                    </button>
+                                    <button
+                                      className="ghost tiny-button"
+                                      type="button"
+                                      onClick={async () => {
+                                        const ok = await confirmDialog('Delete this file?', {
+                                          title: 'Delete file',
+                                          confirmText: 'Delete'
+                                        });
+                                        if (!ok) return;
+                                        await deleteLeadFile(editing.id, file.id);
+                                        await loadLeadFiles(editing.id);
+                                      }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="empty-state">
+                              <p className="muted">No files uploaded yet.</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : null}
@@ -1392,6 +1738,74 @@ export default function Leads({ isAdminView = false }) {
                   </button>
                 </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </ModalPortal>
+        ) : null}
+
+        {preview.open ? (
+          <ModalPortal>
+            <div className="modal-backdrop preview-backdrop" onClick={closePreview}>
+              <div className="modal file-preview-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="modal-header">
+                  <div className="modal-title">{preview.name}</div>
+                  <div className="file-preview-header-actions">
+                    <button className="ghost tiny-button" type="button" onClick={() => previewRecord && handleDownloadLeadFilePreview(previewRecord)} disabled={!previewRecord}>
+                      Download
+                    </button>
+                    <button className="ghost tiny-button" type="button" onClick={closePreview}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+                <div className="file-preview-body">
+                  {previewLoading || preview.kind === 'loading' ? (
+                    <div className="file-preview-loading">
+                      <div className="file-preview-spinner" aria-hidden="true" />
+                      <p>Opening file preview...</p>
+                    </div>
+                  ) : preview.kind === 'image' ? (
+                    <img src={preview.url} alt={preview.name} />
+                  ) : preview.kind === 'text' ? (
+                    <pre className="file-preview-text">{preview.text || 'No preview available.'}</pre>
+                  ) : preview.kind === 'table' ? (
+                    <div className="file-preview-table-wrap">
+                      {preview.text ? <p className="muted">{preview.text}</p> : null}
+                      {Array.isArray(preview.table?.rows) && preview.table.rows.length ? (
+                        <div className="table-scroll">
+                          <table className="project-table file-preview-table">
+                            <thead>
+                              <tr>
+                                {(preview.table.headers || []).map((header, index) => (
+                                  <th key={`${header}-${index}`}>{header}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {preview.table.rows.map((row, rowIndex) => (
+                                <tr key={`row-${rowIndex}`}>
+                                  {(preview.table.headers || []).map((_, colIndex) => (
+                                    <td key={`cell-${rowIndex}-${colIndex}`}>{row[colIndex] || ''}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="file-preview-fallback">No tabular data found to preview.</div>
+                      )}
+                    </div>
+                  ) : preview.kind === 'pdf' ? (
+                    <object className="file-preview-frame" data={preview.url} type="application/pdf">
+                      <div className="file-preview-fallback">PDF preview unavailable. Download to open.</div>
+                    </object>
+                  ) : (
+                    <div className="file-preview-fallback">
+                      {preview.text || 'Preview unavailable for this file type.'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
