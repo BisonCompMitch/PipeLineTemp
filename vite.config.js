@@ -7,6 +7,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
+      '/builder-app': {
+        target: process.env.VITE_BISON_BUILDER_TARGET || 'http://127.0.0.1:5001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/builder-app/, '') || '/'
+      },
+      '/static': {
+        target: process.env.VITE_BISON_BUILDER_TARGET || 'http://127.0.0.1:5001',
+        changeOrigin: true
+      },
       '/api': {
         target: process.env.VITE_LOCAL_API_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true,

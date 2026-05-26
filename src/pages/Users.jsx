@@ -67,11 +67,15 @@ function isBisonUser(user) {
 }
 
 function isContractorOnly(user) {
-  return hasRole(user, 'contractor') && !isBisonUser(user) && !hasRole(user, 'customer');
+  return hasRole(user, 'contractor') && !isBisonUser(user) && !hasRole(user, 'customer') && !hasRole(user, 'builder');
 }
 
 function isCustomerOnly(user) {
-  return hasRole(user, 'customer') && !isBisonUser(user) && !hasRole(user, 'contractor');
+  return hasRole(user, 'customer') && !isBisonUser(user) && !hasRole(user, 'contractor') && !hasRole(user, 'builder');
+}
+
+function isBuilderOnly(user) {
+  return hasRole(user, 'builder') && !isBisonUser(user) && !hasRole(user, 'customer') && !hasRole(user, 'contractor');
 }
 
 function projectLabel(project) {
@@ -261,7 +265,7 @@ export default function Users() {
     areas: []
   });
   const [createContractorForm, setCreateContractorForm] = useState({ company: '', full_name: '', email: '' });
-  const [createCustomerForm, setCreateCustomerForm] = useState({ email: '', project_ids: [] });
+  const [createCustomerForm, setCreateCustomerForm] = useState({ email: '', role: 'Customer', project_ids: [] });
 
   const loadAll = async ({ preserveStatus = false } = {}) => {
     setLoading(true);
@@ -282,7 +286,7 @@ export default function Users() {
         const all = Array.isArray(usersResult.value) ? usersResult.value : [];
         setAllUsers(all);
         const filtered = all.filter(
-          (user) => !isCustomerOnly(user) && !isContractorOnly(user)
+          (user) => !isCustomerOnly(user) && !isBuilderOnly(user) && !isContractorOnly(user)
         );
         setBisonUsers(filtered);
       } else {
@@ -534,6 +538,7 @@ export default function Users() {
       form: {
         username: linkedUser?.username || customer.email,
         email: customer.email,
+        role: customer.role || 'Customer',
         password: '',
         project_ids: projectIdsForCustomer(customer),
         is_locked: Boolean(linkedUser?.is_locked)
@@ -631,6 +636,7 @@ export default function Users() {
       return;
     }
     const payload = {
+      role: form.role || 'Customer',
       project_id: projectIds[0],
       project_ids: projectIds
     };
@@ -840,13 +846,14 @@ export default function Users() {
     try {
       await createCustomer({
         email: createCustomerForm.email.trim(),
+        role: createCustomerForm.role || 'Customer',
         project_id: projectIds[0],
         project_ids: projectIds
       });
-      setCreateCustomerForm({ email: '', project_ids: [] });
+      setCreateCustomerForm({ email: '', role: 'Customer', project_ids: [] });
       setCustomerStatus({
         tone: 'success',
-        text: 'Customer created. Temporary password email sent when SMTP is configured.'
+        text: `${createCustomerForm.role === 'Builder' ? 'Builder' : 'Customer'} created. Temporary password email sent when SMTP is configured.`
       });
       loadAll({ preserveStatus: true });
     } catch (err) {
@@ -1136,8 +1143,8 @@ export default function Users() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Customers</h2>
-            <p className="muted">Customer accounts linked to one or more projects.</p>
+            <h2>Customers & Builders</h2>
+            <p className="muted">External project accounts linked to one or more projects.</p>
           </div>
         </div>
         <form className="form-grid user-create-form user-create-form--simple" onSubmit={handleCreateCustomer}>
@@ -1149,6 +1156,16 @@ export default function Users() {
               placeholder="customer@email.com"
             />
           </label>
+          <label>
+            Role
+            <select
+              value={createCustomerForm.role}
+              onChange={(event) => setCreateCustomerForm({ ...createCustomerForm, role: event.target.value })}
+            >
+              <option value="Customer">Customer</option>
+              <option value="Builder">Builder</option>
+            </select>
+          </label>
           <label className="span-2">
             Linked projects
             <ProjectMultiSelect
@@ -1159,11 +1176,11 @@ export default function Users() {
             />
           </label>
           <div className="user-create-note span-2">
-            A temporary password is generated automatically and reset is required on first sign in.
+            A temporary password is generated automatically. Builder accounts only load assigned Builder models.
           </div>
           <div className="user-create-actions user-create-actions--end">
             <button className="primary" type="submit">
-              Add customer
+              Add account
             </button>
           </div>
         </form>
@@ -1455,6 +1472,18 @@ export default function Users() {
                     <label>
                       Email
                       <input value={editing.form.email} disabled />
+                    </label>
+                    <label>
+                      Role
+                      <select
+                        value={editing.form.role || 'Customer'}
+                        onChange={(event) =>
+                          setEditing({ ...editing, form: { ...editing.form, role: event.target.value } })
+                        }
+                      >
+                        <option value="Customer">Customer</option>
+                        <option value="Builder">Builder</option>
+                      </select>
                     </label>
                     <label className="span-2">
                       Linked projects

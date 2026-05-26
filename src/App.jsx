@@ -30,6 +30,7 @@ import Pipeline from './pages/Pipeline.jsx';
 import Areas from './pages/Areas.jsx';
 import Intake from './pages/Intake.jsx';
 import CreateEstimate from './pages/CreateEstimate.jsx';
+import BuilderView from './pages/BuilderView.jsx';
 import Leads from './pages/Leads.jsx';
 import Users from './pages/Users.jsx';
 import Customer from './pages/Customer.jsx';
@@ -43,6 +44,7 @@ const ROUTE_TITLES = {
   '/areas': 'Areas',
   '/intake': 'Project Intake',
   '/create-estimate': 'Create Estimate',
+  '/builder': 'Builder View',
   '/leads': 'Leads',
   '/users': 'Manage Users',
   '/customer/files': 'Files for Review',
@@ -692,13 +694,16 @@ export default function App() {
   const profileAreas = normalizeListValues(profile?.areas);
   const normalizedProfileAreas = profileAreas.map((area) => normalizeAreaKey(area)).filter(Boolean);
   const normalizedRoles = roles.map((role) => String(role || '').trim().toLowerCase());
+  const hasBuilderRole = normalizedRoles.some((role) => role.includes('builder'));
   const hasAdminRole = normalizedRoles.some((role) => role === 'admin' || role.includes('admin'));
   const canUseTestingOverride = hasAdminRole || normalizedProfileAreas.includes('admin');
   const activeTestingOverride = canUseTestingOverride ? testingOverride : DEFAULT_TESTING_OVERRIDE;
   const baseHasCustomer = normalizedRoles.some((role) => role.includes('customer'));
   const baseHasContractor = normalizedRoles.some((role) => role.includes('contractor'));
   const baseHasBison =
-    normalizedRoles.some((role) => role && !role.includes('customer') && !role.includes('contractor')) ||
+    normalizedRoles.some(
+      (role) => role && !role.includes('customer') && !role.includes('contractor') && !role.includes('builder')
+    ) ||
     profileAreas.length > 0 ||
     normalizedRoles.length === 0;
   const preset = TEST_ROLE_PRESETS[activeTestingOverride.rolePreset] || TEST_ROLE_PRESETS.auto;
@@ -715,6 +720,7 @@ export default function App() {
   const canEditProjectDetails = hasAdminArea;
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
+  const canAccessBuilderView = hasCustomer || hasBuilderRole || hasContractor || hasBison || hasAdminArea || hasManagementArea;
   const customerSelectionKey = useMemo(
     () => customerProjectStorageKey(profile?.username || getStoredUsername() || ''),
     [profile?.username]
@@ -745,7 +751,11 @@ export default function App() {
     ? '/pipeline'
     : hasBison
       ? '/pipeline'
-      : '/customer';
+      : hasCustomer
+        ? '/customer'
+        : hasBuilderRole
+          ? '/builder'
+          : '/customer';
   const fallbackRoute = firstLoginRequired ? '/first-login-setup' : defaultRoute;
   const handleToggleTheme = () => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
@@ -911,6 +921,9 @@ export default function App() {
     if (hasContractor || hasBison) {
       items.push({ label: 'Create Estimate', path: '/create-estimate' });
     }
+    if (canAccessBuilderView) {
+      items.push({ label: 'Builder View', path: '/builder' });
+    }
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Manage Users', path: '/users' });
     }
@@ -934,14 +947,21 @@ export default function App() {
     hasBison,
     hasContractor,
     hasCustomer,
+    hasBuilderRole,
     canAccessDashboard,
-    hasAdminArea
+    hasAdminArea,
+    canAccessBuilderView
   ]);
   const topBarDisplayName = String(
     profile?.full_name || getDisplayName() || profile?.username || getStoredUsername() || 'User'
   ).trim() || 'User';
 
   const showSidebar = location.pathname !== '/login' && location.pathname !== '/first-login-setup';
+  const appShellClassName = [
+    'app-shell',
+    showSidebar && navOpen ? 'nav-open' : '',
+    showSidebar ? '' : 'no-sidebar'
+  ].filter(Boolean).join(' ');
   const pageTitle = useMemo(() => titleForPath(location.pathname), [location.pathname]);
   const showNavToggle = showSidebar;
 
@@ -991,7 +1011,7 @@ export default function App() {
   };
 
   return (
-    <div className={showSidebar ? `app-shell${navOpen ? ' nav-open' : ''}` : 'app-shell no-sidebar'}>
+    <div className={appShellClassName}>
       {showSidebar ? (
         <>
           <button
@@ -1181,7 +1201,33 @@ export default function App() {
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
-                  <CreateEstimate />
+                <CreateEstimate />
+              </PageShell>
+            </Protected>
+          }
+          />
+          <Route
+            path="/builder"
+            element={
+              <Protected
+                authed={authed}
+                allowed={!firstLoginRequired && canAccessBuilderView}
+                fallback={fallbackRoute}
+                loading={accessLoading}
+              >
+                <PageShell
+                  title={pageTitle}
+                  displayName={topBarDisplayName}
+                  onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
+                  theme={theme}
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                  <BuilderView />
                 </PageShell>
               </Protected>
             }
