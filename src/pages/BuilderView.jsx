@@ -2,11 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { getAccessToken } from '../utils/authStorage.js';
 
 function defaultBuilderAppUrl() {
-  const host = window.location.hostname.toLowerCase();
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return '/builder-app/';
-  }
-  return 'https://builder.scottsdaleutah.com/';
+  return '/builder-app/';
 }
 
 const BUILDER_APP_URL = import.meta.env.VITE_BISON_BUILDER_URL || defaultBuilderAppUrl();
