@@ -721,6 +721,7 @@ export default function App() {
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
   const canAccessBuilderView = hasCustomer || hasBuilderRole || hasContractor || hasBison || hasAdminArea || hasManagementArea;
+  const canUploadBuilderModel = canAccessBuilderView && !hasCustomer && !hasBuilderRole;
   const customerSelectionKey = useMemo(
     () => customerProjectStorageKey(profile?.username || getStoredUsername() || ''),
     [profile?.username]
@@ -1227,7 +1228,7 @@ export default function App() {
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
-                  <BuilderView />
+                  <BuilderView canUpload={canUploadBuilderModel} />
                 </PageShell>
               </Protected>
             }

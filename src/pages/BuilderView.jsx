@@ -15,7 +15,7 @@ function resolveOrigin(url) {
   }
 }
 
-export default function BuilderView() {
+export default function BuilderView({ canUpload = false }) {
   const frameRef = useRef(null);
   const builderOrigin = useMemo(() => resolveOrigin(BUILDER_APP_URL), []);
 
@@ -25,11 +25,12 @@ export default function BuilderView() {
     targetWindow.postMessage(
       {
         type: 'bisonworks-builder-auth',
-        accessToken: getAccessToken()
+        accessToken: getAccessToken(),
+        canUpload
       },
       builderOrigin
     );
-  }, [builderOrigin]);
+  }, [builderOrigin, canUpload]);
 
   useEffect(() => {
     const handleMessage = (event) => {
