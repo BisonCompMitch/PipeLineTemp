@@ -15,9 +15,20 @@ function resolveOrigin(url) {
   }
 }
 
-export default function BuilderView({ canUpload = false }) {
+export default function BuilderView({ capabilities = null }) {
   const frameRef = useRef(null);
   const builderOrigin = useMemo(() => resolveOrigin(BUILDER_APP_URL), []);
+  const builderCapabilities = useMemo(() => {
+    const source = capabilities && typeof capabilities === 'object' ? capabilities : {};
+    const canAssign = !!source.canAssign;
+    return {
+      assignedOnly: !!source.assignedOnly,
+      canUpload: !!source.canUpload,
+      canAssign,
+      canClearAssignment: source.canClearAssignment === undefined ? canAssign : !!source.canClearAssignment,
+      canUseProjectSelector: !!source.canUseProjectSelector || canAssign
+    };
+  }, [capabilities]);
 
   const sendAuthToBuilder = useCallback(() => {
     const targetWindow = frameRef.current?.contentWindow;
@@ -26,11 +37,12 @@ export default function BuilderView({ canUpload = false }) {
       {
         type: 'bisonworks-builder-auth',
         accessToken: getAccessToken(),
-        canUpload
+        canUpload: builderCapabilities.canUpload,
+        capabilities: builderCapabilities
       },
       builderOrigin
     );
-  }, [builderOrigin, canUpload]);
+  }, [builderOrigin, builderCapabilities]);
 
   useEffect(() => {
     const handleMessage = (event) => {
