@@ -60,6 +60,8 @@ const DETAIL_TABS = [
   { id: 'files', label: 'Files & Photos' },
   { id: 'actions', label: 'Actions' }
 ];
+const BUILDER_ASSIGNMENT_EVENT = 'bisonworks-builder-assignment-updated';
+const BUILDER_ASSIGNMENT_STORAGE_KEY = 'bisonworks_builder_assignment_updated';
 
 const DASHBOARD_FILTER_ALL = '__all__';
 const MONEY_STATUS_STAGE_IDS = new Set([
@@ -572,6 +574,23 @@ function isImageUploadFile(file) {
 
 function isIfcProjectFile(fileRecord) {
   return String(fileRecord?.filename || '').trim().toLowerCase().endsWith('.ifc');
+}
+
+function notifyBuilderAssignmentChanged(projectId, updatedProject) {
+  if (typeof window === 'undefined' || !projectId) return;
+  const payload = {
+    projectId,
+    builderFileId: updatedProject?.builder_file_id || null,
+    builderFileName: updatedProject?.builder_file_name || '',
+    hasBuilderModel: Boolean(updatedProject?.builder_file_id),
+    updatedAt: Date.now()
+  };
+  window.dispatchEvent(new CustomEvent(BUILDER_ASSIGNMENT_EVENT, { detail: payload }));
+  try {
+    window.localStorage.setItem(BUILDER_ASSIGNMENT_STORAGE_KEY, JSON.stringify(payload));
+  } catch (_error) {
+    // Some private browsing modes block localStorage; the same-window event still works.
+  }
 }
 
 function summarizeSelection(fileList, emptyLabel, noun) {
@@ -1678,6 +1697,7 @@ export default function Pipeline({
         builder_file_id: updated?.builder_file_id || null
       };
       syncDetailProjectState(nextProject);
+      notifyBuilderAssignmentChanged(detailProject.id, updated);
       setDetailStatus(
         updated?.builder_file_id
           ? `Builder IFC assigned${updated?.builder_file_name ? `: ${updated.builder_file_name}` : ''}.`
