@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  assignBuilderProjectFile,
   archiveProject,
   compressProjectFiles,
   deleteProject,
@@ -569,6 +570,10 @@ function isImageUploadFile(file) {
   return IMAGE_EXTENSIONS.some((ext) => name.endsWith(ext));
 }
 
+function isIfcProjectFile(fileRecord) {
+  return String(fileRecord?.filename || '').trim().toLowerCase().endsWith('.ifc');
+}
+
 function summarizeSelection(fileList, emptyLabel, noun) {
   if (!fileList.length) return emptyLabel;
   if (fileList.length === 1) return fileList[0].name;
@@ -657,6 +662,7 @@ export default function Pipeline({
   canEditProjects = false,
   canEditProjectDetails = false,
   canUploadProjectFiles = false,
+  canAssignBuilderModel = false,
   canEditMoneySubstages = false,
   dashboardMode = 'all',
   applyAreaFilter = false,
@@ -937,6 +943,11 @@ export default function Pipeline({
   const detailHasMissingDocs = projectHasMissingDocs(detailProject);
   const detailHasMissingDocFlow = projectHasMissingDocFlow(detailProject);
   const canUploadInFilesTab = canEditProjects || canUploadProjectFiles;
+  const builderIfcFiles = useMemo(() => files.filter(isIfcProjectFile), [files]);
+  const assignedBuilderFile = useMemo(
+    () => builderIfcFiles.find((fileRecord) => fileRecord.id === detailProject?.builder_file_id) || null,
+    [builderIfcFiles, detailProject?.builder_file_id]
+  );
   const projectIsComplete = useMemo(() => {
     const stages = detailStages;
     if (!stages.length) return false;
@@ -1654,6 +1665,31 @@ export default function Pipeline({
     }
   };
 
+  const handleBuilderFileAssignment = async (event) => {
+    const fileId = String(event.target.value || '').trim();
+    if (!detailProject?.id || !canAssignBuilderModel) return;
+    setDetailError('');
+    setDetailStatus('');
+    setProjectActionBusy('builder_file');
+    try {
+      const updated = await assignBuilderProjectFile(detailProject.id, fileId || null);
+      const nextProject = {
+        ...detailProject,
+        builder_file_id: updated?.builder_file_id || null
+      };
+      syncDetailProjectState(nextProject);
+      setDetailStatus(
+        updated?.builder_file_id
+          ? `Builder IFC assigned${updated?.builder_file_name ? `: ${updated.builder_file_name}` : ''}.`
+          : 'Builder IFC assignment cleared.'
+      );
+    } catch (err) {
+      setDetailError(err?.message || 'Unable to assign Builder IFC.');
+    } finally {
+      setProjectActionBusy('');
+    }
+  };
+
   const toggleDetailRequiredDoc = (docId) => (event) => {
     const checked = Boolean(event.target.checked);
     setDetailForm((prev) => ({
@@ -1686,6 +1722,9 @@ export default function Pipeline({
     try {
       await deleteProjectFile(detailProject.id, fileRecord.id);
       setFiles((prev) => prev.filter((item) => item.id !== fileRecord.id));
+      if (detailProject.builder_file_id === fileRecord.id) {
+        syncDetailProjectState({ ...detailProject, builder_file_id: null });
+      }
       return true;
     } catch (_err) {
       setFilesError('Unable to delete file.');
@@ -2454,73 +2493,111 @@ export default function Pipeline({
                   <div className="detail-card-header">
                     <h3>Actions</h3>
                   </div>
-                  {canEditProjectDetails ? (
+                  {canEditProjectDetails || canAssignBuilderModel ? (
                     <div className="detail-actions-stack">
-                      <label className="switch-field detail-action-toggle">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(detailForm.slab_work)}
-                          onChange={(event) =>
-                            handleProjectActionToggle(
-                              'slab_work',
-                              event.target.checked,
-                              'toggle:slab_work',
-                              event.target.checked ? 'Slab work enabled.' : 'Slab work disabled.'
-                            )
-                          }
-                          disabled={Boolean(projectActionBusy) || saving}
-                        />
-                        <span className="switch-track" aria-hidden="true">
-                          <span className="switch-thumb" />
-                        </span>
-                        <span className="switch-text">Slab work required</span>
-                      </label>
-                      <label className="switch-field detail-action-toggle">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(detailForm.scottsdale_ready_files)}
-                          onChange={(event) =>
-                            handleProjectActionToggle(
-                              'scottsdale_ready_files',
-                              event.target.checked,
-                              'toggle:scottsdale_ready_files',
-                              event.target.checked
-                                ? 'D&E stages skipped for this project.'
-                                : 'D&E stages restored for this project.'
-                            )
-                          }
-                          disabled={Boolean(projectActionBusy) || saving}
-                        />
-                        <span className="switch-track" aria-hidden="true">
-                          <span className="switch-thumb" />
-                        </span>
-                        <span className="switch-text">Skip D&E stages</span>
-                      </label>
-                      <div className="detail-action-notice">
-                        <div className="detail-action-notice-title">Missing required docs</div>
-                        <button
-                          type="button"
-                          className="primary"
-                          onClick={() => openMissingDocsDialog(detailProject, detailCurrentStage)}
-                          disabled={
-                            Boolean(projectActionBusy) ||
-                            saving ||
-                            !detailCurrentStage?.id ||
-                            !detailHasMissingDocs ||
-                            detailHasMissingDocFlow
-                          }
-                        >
-                          {projectActionBusy === `missing_docs:${detailCurrentStage?.id || ''}`
-                            ? 'Adding...'
-                            : 'Missing Required Documents'}
-                        </button>
-                        {!detailHasMissingDocs ? (
-                          <div className="muted detail-action-hint">No missing documents were found in the project summary.</div>
-                        ) : null}
-                        {detailHasMissingDocFlow ? (
-                          <div className="muted detail-action-hint">Missing-document stages are already active.</div>
-                        ) : null}
-                      </div>
+                      {canEditProjectDetails ? (
+                        <>
+                          <label className="switch-field detail-action-toggle">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(detailForm.slab_work)}
+                              onChange={(event) =>
+                                handleProjectActionToggle(
+                                  'slab_work',
+                                  event.target.checked,
+                                  'toggle:slab_work',
+                                  event.target.checked ? 'Slab work enabled.' : 'Slab work disabled.'
+                                )
+                              }
+                              disabled={Boolean(projectActionBusy) || saving}
+                            />
+                            <span className="switch-track" aria-hidden="true">
+                              <span className="switch-thumb" />
+                            </span>
+                            <span className="switch-text">Slab work required</span>
+                          </label>
+                          <label className="switch-field detail-action-toggle">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(detailForm.scottsdale_ready_files)}
+                              onChange={(event) =>
+                                handleProjectActionToggle(
+                                  'scottsdale_ready_files',
+                                  event.target.checked,
+                                  'toggle:scottsdale_ready_files',
+                                  event.target.checked
+                                    ? 'D&E stages skipped for this project.'
+                                    : 'D&E stages restored for this project.'
+                                )
+                              }
+                              disabled={Boolean(projectActionBusy) || saving}
+                            />
+                            <span className="switch-track" aria-hidden="true">
+                              <span className="switch-thumb" />
+                            </span>
+                            <span className="switch-text">Skip D&E stages</span>
+                          </label>
+                          <div className="detail-action-notice">
+                            <div className="detail-action-notice-title">Missing required docs</div>
+                            <button
+                              type="button"
+                              className="primary"
+                              onClick={() => openMissingDocsDialog(detailProject, detailCurrentStage)}
+                              disabled={
+                                Boolean(projectActionBusy) ||
+                                saving ||
+                                !detailCurrentStage?.id ||
+                                !detailHasMissingDocs ||
+                                detailHasMissingDocFlow
+                              }
+                            >
+                              {projectActionBusy === `missing_docs:${detailCurrentStage?.id || ''}`
+                                ? 'Adding...'
+                                : 'Missing Required Documents'}
+                            </button>
+                            {!detailHasMissingDocs ? (
+                              <div className="muted detail-action-hint">No missing documents were found in the project summary.</div>
+                            ) : null}
+                            {detailHasMissingDocFlow ? (
+                              <div className="muted detail-action-hint">Missing-document stages are already active.</div>
+                            ) : null}
+                          </div>
+                        </>
+                      ) : null}
+                      {canAssignBuilderModel ? (
+                        <div className="detail-action-notice builder-file-action">
+                          <div className="detail-action-notice-title">Builder IFC</div>
+                          <label className="builder-file-select-field">
+                            <span>Assigned Builder file</span>
+                            <select
+                              value={detailProject?.builder_file_id || ''}
+                              onChange={handleBuilderFileAssignment}
+                              disabled={projectActionBusy === 'builder_file' || filesLoading || saving}
+                            >
+                              <option value="">No Builder file assigned</option>
+                              {detailProject?.builder_file_id && !assignedBuilderFile ? (
+                                <option value={detailProject.builder_file_id}>Assigned file unavailable</option>
+                              ) : null}
+                              {builderIfcFiles.map((fileRecord) => (
+                                <option key={fileRecord.id} value={fileRecord.id}>
+                                  {fileRecord.filename}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {filesLoading ? (
+                            <div className="muted detail-action-hint">Loading project files...</div>
+                          ) : builderIfcFiles.length ? (
+                            <div className="muted detail-action-hint">
+                              Select an IFC file already uploaded in Files & Photos.
+                            </div>
+                          ) : (
+                            <div className="muted detail-action-hint">
+                              No IFC files are uploaded for this project yet.
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="detail-actions-stack detail-actions-readonly">

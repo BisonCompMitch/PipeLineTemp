@@ -2140,6 +2140,17 @@ body[data-theme='light'] .testing-row select option {
   margin: 0;
 }
 
+.builder-file-select-field {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.builder-file-select-field span {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .detail-actions-readonly {
   display: grid;
   gap: 10px;

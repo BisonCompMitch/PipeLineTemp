@@ -1097,6 +1097,7 @@ export default function App() {
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
                     canUploadProjectFiles={canAccessDashboard}
+                    canAssignBuilderModel={builderCapabilities.canAssign}
                     canEditMoneySubstages={false}
                     applyAreaFilter={false}
                     allowedAreas={effectiveAreas}
@@ -1134,6 +1135,7 @@ export default function App() {
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
                     canUploadProjectFiles={canAccessDashboard}
+                    canAssignBuilderModel={builderCapabilities.canAssign}
                     canEditMoneySubstages={hasContractor || hasAdminArea || hasManagementArea}
                     dashboardMode="money"
                     applyAreaFilter={false}

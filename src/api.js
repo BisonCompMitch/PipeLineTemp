@@ -320,6 +320,13 @@ export async function listProjectFiles(projectId) {
   return apiJson(`/projects/${encodeURIComponent(projectId)}/files`);
 }
 
+export async function assignBuilderProjectFile(projectId, fileId) {
+  return apiJson(`/builder/projects/${encodeURIComponent(projectId)}/model`, {
+    method: 'PATCH',
+    body: { file_id: fileId || null }
+  });
+}
+
 export async function listProjectAreaNotes(projectId, params = '') {
   const suffix = params ? `?${params}` : '';
   return apiJson(`/projects/${encodeURIComponent(projectId)}/area-notes${suffix}`);
