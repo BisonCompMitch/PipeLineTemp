@@ -16,6 +16,7 @@ import {
   updateStage,
   updateMoneySubstage,
   updateProject,
+  uploadBuilderProjectModel,
   uploadProjectFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
@@ -576,6 +577,10 @@ function isIfcProjectFile(fileRecord) {
   return String(fileRecord?.filename || '').trim().toLowerCase().endsWith('.ifc');
 }
 
+function isIfcUploadFile(file) {
+  return String(file?.name || '').trim().toLowerCase().endsWith('.ifc');
+}
+
 function notifyBuilderAssignmentChanged(projectId, updatedProject) {
   if (typeof window === 'undefined' || !projectId) return;
   const payload = {
@@ -727,6 +732,8 @@ export default function Pipeline({
   const [photoError, setPhotoError] = useState('');
   const [fileDragActive, setFileDragActive] = useState(false);
   const [photoDragActive, setPhotoDragActive] = useState(false);
+  const [builderUploadFile, setBuilderUploadFile] = useState(null);
+  const [builderUploadDragActive, setBuilderUploadDragActive] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
@@ -742,6 +749,7 @@ export default function Pipeline({
   });
   const cardPreviewUrlRef = useRef({});
   const previewBlobCacheRef = useRef(new Map());
+  const builderUploadInputRef = useRef(null);
   const [contractorCompanies, setContractorCompanies] = useState([]);
   const [dashboardRequesterFilter, setDashboardRequesterFilter] = useState(DASHBOARD_FILTER_ALL);
   const [splitDashboardLayout, setSplitDashboardLayout] = useState(() =>
@@ -1240,6 +1248,8 @@ export default function Pipeline({
     setDetailForm(toEditForm(row.project));
     setDetailStageNoteSaving(false);
     setDetailStageNoteDraft('');
+    setBuilderUploadFile(null);
+    setBuilderUploadDragActive(false);
     setDetailLoading(true);
     try {
       const latest = await getProject(row.id);
@@ -1282,6 +1292,8 @@ export default function Pipeline({
     setPhotoError('');
     setFileDragActive(false);
     setPhotoDragActive(false);
+    setBuilderUploadFile(null);
+    setBuilderUploadDragActive(false);
     setAreaSelection('');
   };
 
@@ -1705,6 +1717,70 @@ export default function Pipeline({
       );
     } catch (err) {
       setDetailError(err?.message || 'Unable to assign Builder IFC.');
+    } finally {
+      setProjectActionBusy('');
+    }
+  };
+
+  const handleBuilderUploadFileSelect = (event) => {
+    const file = Array.from(event.target.files || [])[0] || null;
+    event.target.value = '';
+    if (!file) return;
+    if (!isIfcUploadFile(file)) {
+      setBuilderUploadFile(null);
+      setDetailError('Builder upload must be an IFC file.');
+      return;
+    }
+    setDetailError('');
+    setBuilderUploadFile(file);
+  };
+
+  const handleBuilderUploadDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setBuilderUploadDragActive(false);
+    const dropped = Array.from(event.dataTransfer?.files || []);
+    const file = dropped.find(isIfcUploadFile) || null;
+    if (!file) {
+      setBuilderUploadFile(null);
+      setDetailError('Drop an IFC file to upload for Builder.');
+      return;
+    }
+    setDetailError('');
+    setBuilderUploadFile(file);
+  };
+
+  const handleBuilderFileUpload = async (event) => {
+    event.preventDefault();
+    if (!detailProject?.id || !canAssignBuilderModel) return;
+    if (!builderUploadFile) {
+      setDetailError('Select an IFC file to upload for Builder.');
+      return;
+    }
+    if (!isIfcUploadFile(builderUploadFile)) {
+      setDetailError('Builder upload must be an IFC file.');
+      return;
+    }
+    setDetailError('');
+    setDetailStatus('');
+    setProjectActionBusy('builder_upload');
+    try {
+      const updated = await uploadBuilderProjectModel(detailProject.id, builderUploadFile);
+      const nextProject = {
+        ...detailProject,
+        builder_file_id: updated?.builder_file_id || null
+      };
+      syncDetailProjectState(nextProject);
+      setBuilderUploadFile(null);
+      await loadFiles(detailProject.id);
+      notifyBuilderAssignmentChanged(detailProject.id, updated);
+      setDetailStatus(
+        updated?.builder_file_id
+          ? `Builder IFC uploaded and assigned${updated?.builder_file_name ? `: ${updated.builder_file_name}` : ''}.`
+          : 'Builder IFC uploaded.'
+      );
+    } catch (err) {
+      setDetailError(err?.message || 'Unable to upload Builder IFC.');
     } finally {
       setProjectActionBusy('');
     }
@@ -2616,6 +2692,68 @@ export default function Pipeline({
                               No IFC files are uploaded for this project yet.
                             </div>
                           )}
+                          <form className="builder-ifc-upload-form" onSubmit={handleBuilderFileUpload}>
+                            <div
+                              className={`builder-ifc-dropzone${builderUploadDragActive ? ' drag-active' : ''}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                if (projectActionBusy !== 'builder_upload' && !saving) {
+                                  builderUploadInputRef.current?.click();
+                                }
+                              }}
+                              onKeyDown={(event) => {
+                                if ((event.key === 'Enter' || event.key === ' ') && projectActionBusy !== 'builder_upload' && !saving) {
+                                  event.preventDefault();
+                                  builderUploadInputRef.current?.click();
+                                }
+                              }}
+                              onDragOver={(event) => {
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = 'copy';
+                                setBuilderUploadDragActive(true);
+                              }}
+                              onDragEnter={(event) => {
+                                event.preventDefault();
+                                setBuilderUploadDragActive(true);
+                              }}
+                              onDragLeave={() => setBuilderUploadDragActive(false)}
+                              onDrop={handleBuilderUploadDrop}
+                            >
+                              <input
+                                ref={builderUploadInputRef}
+                                className="file-upload-input"
+                                type="file"
+                                accept=".ifc"
+                                onChange={handleBuilderUploadFileSelect}
+                                disabled={projectActionBusy === 'builder_upload' || saving}
+                              />
+                              <span className="file-drop-icon" aria-hidden="true">+</span>
+                              <span>Drop Builder IFC here</span>
+                              <span className="builder-ifc-upload-name">
+                                {builderUploadFile
+                                  ? `${builderUploadFile.name} (${formatBytes(builderUploadFile.size)})`
+                                  : 'No Builder IFC selected'}
+                              </span>
+                            </div>
+                            <div className="builder-ifc-upload-actions">
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => builderUploadInputRef.current?.click()}
+                                disabled={projectActionBusy === 'builder_upload' || saving}
+                              >
+                                Choose IFC
+                              </button>
+                              <button
+                                type="submit"
+                                className="primary"
+                                disabled={!builderUploadFile || projectActionBusy === 'builder_upload' || saving}
+                              >
+                                {projectActionBusy === 'builder_upload' ? 'Uploading...' : 'Upload & Assign IFC'}
+                              </button>
+                            </div>
+                          </form>
                         </div>
                       ) : null}
                     </div>
