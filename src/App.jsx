@@ -1241,7 +1241,7 @@ export default function App() {
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
-                  <BuilderView capabilities={builderCapabilities} theme={theme} />
+                  <BuilderView capabilities={builderCapabilities} />
                 </PageShell>
               </Protected>
             }
