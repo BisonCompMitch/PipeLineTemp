@@ -26,9 +26,10 @@ function readLatestBuilderAssignment() {
   }
 }
 
-export default function BuilderView({ capabilities = null }) {
+export default function BuilderView({ capabilities = null, theme = 'dark' }) {
   const frameRef = useRef(null);
   const builderOrigin = useMemo(() => resolveOrigin(BUILDER_APP_URL), []);
+  const builderTheme = String(theme || '').trim().toLowerCase() === 'light' ? 'light' : 'dark';
   const builderCapabilities = useMemo(() => {
     const source = capabilities && typeof capabilities === 'object' ? capabilities : {};
     const canAssign = !!source.canAssign;
@@ -51,11 +52,12 @@ export default function BuilderView({ capabilities = null }) {
         accessToken: getAccessToken(),
         canUpload: builderCapabilities.canUpload,
         projectId: latestAssignment?.projectId || '',
+        theme: builderTheme,
         capabilities: builderCapabilities
       },
       builderOrigin
     );
-  }, [builderOrigin, builderCapabilities]);
+  }, [builderOrigin, builderCapabilities, builderTheme]);
 
   const sendAssignmentUpdateToBuilder = useCallback((payload = {}) => {
     const targetWindow = frameRef.current?.contentWindow;
