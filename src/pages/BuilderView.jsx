@@ -17,15 +17,6 @@ function resolveOrigin(url) {
   }
 }
 
-function readLatestBuilderAssignment() {
-  try {
-    const raw = window.localStorage.getItem(BUILDER_ASSIGNMENT_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (_error) {
-    return null;
-  }
-}
-
 export default function BuilderView({ capabilities = null }) {
   const frameRef = useRef(null);
   const builderOrigin = useMemo(() => resolveOrigin(BUILDER_APP_URL), []);
@@ -44,13 +35,12 @@ export default function BuilderView({ capabilities = null }) {
   const sendAuthToBuilder = useCallback(() => {
     const targetWindow = frameRef.current?.contentWindow;
     if (!targetWindow) return;
-    const latestAssignment = readLatestBuilderAssignment();
     targetWindow.postMessage(
       {
         type: 'bisonworks-builder-auth',
         accessToken: getAccessToken(),
         canUpload: builderCapabilities.canUpload,
-        projectId: latestAssignment?.projectId || '',
+        projectId: '',
         theme: 'dark',
         capabilities: builderCapabilities
       },
