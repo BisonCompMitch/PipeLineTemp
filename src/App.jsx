@@ -723,6 +723,18 @@ export default function App() {
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
   const canAccessBuilderView = hasCustomer || hasBuilderRole || hasContractor || hasBison || hasAdminArea || hasManagementArea;
+  const builderCapabilities = useMemo(() => {
+    const assignedOnly = hasCustomer || hasBuilderRole;
+    const canAssign =
+      canAccessBuilderView && !assignedOnly && (hasBison || hasAdminArea || hasManagementArea);
+    return {
+      assignedOnly,
+      canUpload: canAccessBuilderView && !assignedOnly,
+      canAssign,
+      canClearAssignment: canAssign,
+      canUseProjectSelector: canAssign
+    };
+  }, [canAccessBuilderView, hasCustomer, hasBuilderRole, hasBison, hasAdminArea, hasManagementArea]);
   const customerSelectionKey = useMemo(
     () => customerProjectStorageKey(profile?.username || getStoredUsername() || ''),
     [profile?.username]
@@ -1087,6 +1099,7 @@ export default function App() {
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
                     canUploadProjectFiles={canAccessDashboard}
+                    canAssignBuilderModel={builderCapabilities.canAssign}
                     canEditMoneySubstages={false}
                     applyAreaFilter={false}
                     allowedAreas={effectiveAreas}
@@ -1124,6 +1137,7 @@ export default function App() {
                     canEditProjects={canEditProjects}
                     canEditProjectDetails={canEditProjectDetails}
                     canUploadProjectFiles={canAccessDashboard}
+                    canAssignBuilderModel={builderCapabilities.canAssign}
                     canEditMoneySubstages={hasContractor || hasAdminArea || hasManagementArea}
                     dashboardMode="money"
                     applyAreaFilter={false}
@@ -1229,7 +1243,7 @@ export default function App() {
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
-                  <BuilderView />
+                  <BuilderView capabilities={builderCapabilities} />
                 </PageShell>
               </Protected>
             }

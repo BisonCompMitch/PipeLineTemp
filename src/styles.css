@@ -2140,6 +2140,65 @@ body[data-theme='light'] .testing-row select option {
   margin: 0;
 }
 
+.builder-file-select-field {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.builder-file-select-field span {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.builder-ifc-upload-form {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.builder-ifc-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 118px;
+  padding: 16px;
+  border: 2px dashed rgba(45, 212, 191, 0.45);
+  border-radius: 12px;
+  background: rgba(45, 212, 191, 0.06);
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.builder-ifc-dropzone:hover,
+.builder-ifc-dropzone.drag-active {
+  border-color: rgba(45, 212, 191, 0.9);
+  background: rgba(45, 212, 191, 0.12);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.12) inset;
+}
+
+.builder-ifc-upload-name {
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.builder-ifc-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.builder-ifc-upload-actions button {
+  flex: 1 1 150px;
+}
+
 .detail-actions-readonly {
   display: grid;
   gap: 10px;

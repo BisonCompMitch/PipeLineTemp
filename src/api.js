@@ -158,7 +158,7 @@ export async function apiRequest(path, options = {}) {
     const nextToken = await refreshAccessTokenOnce();
     if (nextToken) {
       const retryHeaders = { ...headers, Authorization: `Bearer ${nextToken}` };
-      if (body && !(body instanceof FormData)) {
+      if (body && !isBinaryBody) {
         retryHeaders['Content-Type'] = 'application/json';
       }
       return fetch(`${apiBase}${path}`, {
@@ -318,6 +318,39 @@ export async function deleteProject(projectId) {
 
 export async function listProjectFiles(projectId) {
   return apiJson(`/projects/${encodeURIComponent(projectId)}/files`);
+}
+
+export async function assignBuilderProjectFile(projectId, fileId) {
+  return apiJson(`/builder/projects/${encodeURIComponent(projectId)}/model`, {
+    method: 'PATCH',
+    body: { file_id: fileId || null }
+  });
+}
+
+export async function uploadBuilderProjectModel(projectId, file) {
+  const filename = file?.name || 'builder_model.ifc';
+  const params = new URLSearchParams({ filename });
+  if (file?.type) {
+    params.set('content_type', file.type);
+  }
+  const response = await apiRequest(`/builder/projects/${encodeURIComponent(projectId)}/model/upload?${params.toString()}`, {
+    method: 'POST',
+    headers: file?.type ? { 'Content-Type': file.type } : {},
+    body: file
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const data = await response.json();
+      if (typeof data?.detail === 'string' && data.detail.trim()) {
+        message = data.detail.trim();
+      }
+    } catch (_error) {
+      // ignore body parsing errors on non-JSON failures
+    }
+    throw new Error(message);
+  }
+  return response.json();
 }
 
 export async function listProjectAreaNotes(projectId, params = '') {
