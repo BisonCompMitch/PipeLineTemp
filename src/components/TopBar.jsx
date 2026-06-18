@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const DEFAULT_TESTING_OVERRIDE = { rolePreset: 'auto', areas: '' };
 
@@ -81,6 +82,15 @@ export default function TopBar({
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen, testingOpen, customerOpen]);
+
+  const navigate = useNavigate();
+
+  const handleOpenMessages = () => {
+    setMenuOpen(false);
+    setTestingOpen(false);
+    setCustomerOpen(false);
+    navigate('/messages');
+  };
 
   const handleLogout = () => {
     setMenuOpen(false);
@@ -297,6 +307,9 @@ export default function TopBar({
             </button>
             {menuOpen ? (
               <div className="user-dropdown">
+                <button className="dropdown-item" type="button" onClick={handleOpenMessages}>
+                  Messages
+                </button>
                 {onOpenHelp ? (
                   <button
                     className="dropdown-item"

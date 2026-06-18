@@ -37,6 +37,7 @@ import Customer from './pages/Customer.jsx';
 import CustomerFiles from './pages/CustomerFiles.jsx';
 import CustomerPictures from './pages/CustomerPictures.jsx';
 import NotFound from './pages/NotFound.jsx';
+import Messages from './pages/Messages.jsx';
 
 const ROUTE_TITLES = {
   '/pipeline': 'Dashboard',
@@ -50,7 +51,8 @@ const ROUTE_TITLES = {
   '/customer/files': 'Files for Review',
   '/customer/pictures': 'Project Pictures',
   '/customer': 'Progress',
-  '/first-login-setup': 'Complete Setup'
+  '/first-login-setup': 'Complete Setup',
+  '/messages': 'Messages'
 };
 
 const TEST_ROLE_PRESETS = {
@@ -1357,6 +1359,27 @@ export default function App() {
                       project={selectedCustomerProject}
                       loadingProjects={customerProjectsLoading}
                     />
+                </PageShell>
+              </Protected>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <Protected authed={authed} allowed={!firstLoginRequired} fallback={fallbackRoute} loading={accessLoading}>
+                <PageShell
+                  title={pageTitle}
+                  displayName={topBarDisplayName}
+                  onSignOut={handleLogout}
+                  onOpenHelp={handleOpenHelp}
+                  theme={theme}
+                  onToggleTheme={handleToggleTheme}
+                  testingOverride={canUseTestingOverride ? testingOverride : null}
+                  onTestingOverrideChange={canUseTestingOverride ? setTestingOverride : undefined}
+                  showNavToggle={showNavToggle}
+                  onToggleNav={() => setNavOpen((open) => !open)}
+                >
+                  <Messages />
                 </PageShell>
               </Protected>
             }

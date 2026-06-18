@@ -1212,15 +1212,17 @@ export default function Pipeline({
     setDetailStageNoteDraft('');
     setDetailLoading(true);
     try {
-      const latest = await getProject(row.id);
-      setDetailProject(latest);
-      setDetailForm(toEditForm(latest));
-      setDetailStageNoteDraft('');
-      setRows((prev) =>
-        prev.map((item) =>
-          item.id === row.id ? toRow(latest, formatDisplayStageName) : item
-        )
-      );
+      if (!row.isDeleted) {
+        const latest = await getProject(row.id);
+        setDetailProject(latest);
+        setDetailForm(toEditForm(latest));
+        setDetailStageNoteDraft('');
+        setRows((prev) =>
+          prev.map((item) =>
+            item.id === row.id ? toRow(latest, formatDisplayStageName) : item
+          )
+        );
+      }
       await loadFiles(row.id);
       await loadStageNotesHistory(row.id);
     } catch (_err) {
@@ -1918,7 +1920,7 @@ export default function Pipeline({
         </div>
         {loading ? <p className="muted">Loading projects...</p> : null}
         {dashboardRows.length ? (
-          splitDashboardLayout ? (
+          splitDashboardLayout && dashboardMode !== 'money' ? (
           <div className="dashboard-columns">
             {dashboardColumns.map((columnRows, columnIdx) => (
               <div className="table-scroll dashboard-table-scroll dashboard-split-scroll" key={`dashboard-col-${columnIdx}`}>
