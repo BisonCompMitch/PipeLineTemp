@@ -34,9 +34,39 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function PreviewModal({ attachment, blobUrl, onClose }) {
+  const isImage = (attachment.content_type || '').startsWith('image/');
+  const isPdf = attachment.content_type === 'application/pdf';
+
+  useEffect(() => {
+    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <div className="msg-preview-overlay" onClick={onClose}>
+      <div className="msg-preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="msg-preview-header">
+          <span className="msg-preview-filename">{attachment.filename}</span>
+          <button type="button" className="msg-preview-close" onClick={onClose}>×</button>
+        </div>
+        <div className="msg-preview-content">
+          {isImage && <img src={blobUrl} alt={attachment.filename} className="msg-preview-img" />}
+          {isPdf && <iframe src={blobUrl} title={attachment.filename} className="msg-preview-iframe" />}
+          {!isImage && !isPdf && (
+            <div className="msg-preview-unavailable">No preview available for this file type.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AttachmentPreview({ attachment }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
   const blobRef = useRef(null);
 
   const isImage = (attachment.content_type || '').startsWith('image/');
@@ -65,7 +95,7 @@ function AttachmentPreview({ attachment }) {
   }, [attachment.id]);
 
   const handleView = () => {
-    if (blobUrl) window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    if (blobUrl) setShowPreview(true);
   };
 
   const handleDownload = () => {
@@ -79,38 +109,43 @@ function AttachmentPreview({ attachment }) {
   };
 
   return (
-    <div className="msg-attachment-card">
-      {isImage && (
-        <div className="msg-attachment-card-preview">
-          {loading ? (
-            <div className="msg-attachment-card-img-skeleton" />
-          ) : blobUrl ? (
-            <button type="button" className="msg-attachment-card-img-btn" onClick={handleView}>
-              <img className="msg-attachment-card-img" src={blobUrl} alt={attachment.filename} />
-            </button>
-          ) : (
-            <div className="msg-attachment-card-img-err">Preview unavailable</div>
-          )}
-        </div>
-      )}
-      <div className="msg-attachment-card-body">
-        {!isImage && (
-          <div className="msg-attachment-card-ext">{loading ? '…' : ext}</div>
+    <>
+      <div className="msg-attachment-card">
+        {isImage && (
+          <div className="msg-attachment-card-preview">
+            {loading ? (
+              <div className="msg-attachment-card-img-skeleton" />
+            ) : blobUrl ? (
+              <button type="button" className="msg-attachment-card-img-btn" onClick={handleView}>
+                <img className="msg-attachment-card-img" src={blobUrl} alt={attachment.filename} />
+              </button>
+            ) : (
+              <div className="msg-attachment-card-img-err">Preview unavailable</div>
+            )}
+          </div>
         )}
-        <div className="msg-attachment-card-info">
-          <div className="msg-attachment-card-name">{attachment.filename}</div>
-          <div className="msg-attachment-card-size">{formatBytes(attachment.size_bytes)}</div>
+        <div className="msg-attachment-card-body">
+          {!isImage && (
+            <div className="msg-attachment-card-ext">{loading ? '…' : ext}</div>
+          )}
+          <div className="msg-attachment-card-info">
+            <div className="msg-attachment-card-name">{attachment.filename}</div>
+            <div className="msg-attachment-card-size">{formatBytes(attachment.size_bytes)}</div>
+          </div>
+        </div>
+        <div className="msg-attachment-card-actions">
+          <button type="button" className="msg-attachment-card-btn" onClick={handleView} disabled={!blobUrl}>
+            View
+          </button>
+          <button type="button" className="msg-attachment-card-btn" onClick={handleDownload} disabled={!blobUrl}>
+            Download
+          </button>
         </div>
       </div>
-      <div className="msg-attachment-card-actions">
-        <button type="button" className="msg-attachment-card-btn" onClick={handleView} disabled={!blobUrl}>
-          View
-        </button>
-        <button type="button" className="msg-attachment-card-btn" onClick={handleDownload} disabled={!blobUrl}>
-          Download
-        </button>
-      </div>
-    </div>
+      {showPreview && blobUrl && (
+        <PreviewModal attachment={attachment} blobUrl={blobUrl} onClose={() => setShowPreview(false)} />
+      )}
+    </>
   );
 }
 
@@ -232,7 +267,7 @@ export default function Messages({ currentUsername }) {
     setPendingFiles([]);
     setUploadError('');
     try {
-      const msgBody = body || (files.length > 0 ? ' ' : '');
+      const msgBody = body;
       const newMsg = await sendMessage(selectedUser, msgBody);
       setMessages((prev) => [...prev, newMsg]);
 
