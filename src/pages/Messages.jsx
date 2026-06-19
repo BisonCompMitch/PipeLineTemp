@@ -93,7 +93,24 @@ function AttachmentPreview({ attachment }) {
     downloadMessageAttachment(attachment.id)
       .then(blob => {
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
+        // If the backend returned a generic MIME type, retype the blob from the
+        // filename so the browser can render it in an <img> or <iframe> instead
+        // of triggering a download.
+        let finalBlob = blob;
+        if (!blob.type || blob.type === 'application/octet-stream') {
+          if (isPdf) {
+            finalBlob = new Blob([blob], { type: 'application/pdf' });
+          } else if (isImage) {
+            const extMime = {
+              jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+              gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+              avif: 'image/avif', svg: 'image/svg+xml',
+            };
+            const rawExt = (attachment.filename || '').split('.').pop().toLowerCase();
+            finalBlob = new Blob([blob], { type: extMime[rawExt] || 'image/jpeg' });
+          }
+        }
+        const url = URL.createObjectURL(finalBlob);
         blobRef.current = url;
         setBlobUrl(url);
       })
