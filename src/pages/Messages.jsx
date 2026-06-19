@@ -1,33 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { listUsers } from '../api.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { listMessages, listUsers, markMessageRead, sendMessage } from '../api.js';
 import { getStoredUsername } from '../utils/authStorage.js';
 
-const STORAGE_KEY = 'bw_direct_messages';
+const POLL_INTERVAL_MS = 12000;
 
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return 'U';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
-function loadMessages() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveMessages(msgs) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
-  } catch {}
-}
-
-function newId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function timeLabel(iso) {
@@ -44,9 +25,20 @@ export default function Messages({ currentUsername }) {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState(loadMessages);
+  const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
   const threadEndRef = useRef(null);
+  const pollRef = useRef(null);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const data = await listMessages();
+      if (Array.isArray(data)) setMessages(data);
+    } catch {
+      // silently skip on poll errors
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -60,10 +52,14 @@ export default function Messages({ currentUsername }) {
       .catch(() => {
         if (active) setLoadingUsers(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [me]);
+
+  useEffect(() => {
+    fetchMessages();
+    pollRef.current = setInterval(fetchMessages, POLL_INTERVAL_MS);
+    return () => clearInterval(pollRef.current);
+  }, [fetchMessages]);
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,53 +67,57 @@ export default function Messages({ currentUsername }) {
 
   const conversation = selectedUser
     ? [...messages]
-        .filter((m) => (m.from === me && m.to === selectedUser) || (m.from === selectedUser && m.to === me))
-        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        .filter(
+          (m) =>
+            (m.from_user === me && m.to_user === selectedUser) ||
+            (m.from_user === selectedUser && m.to_user === me)
+        )
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     : [];
 
   const unreadCount = (otherUser) =>
-    messages.filter((m) => m.from === otherUser && m.to === me && !m.read).length;
+    messages.filter((m) => m.from_user === otherUser && m.to_user === me && !m.read).length;
 
   const lastMsg = (otherUser) => {
     const thread = messages
-      .filter((m) => (m.from === me && m.to === otherUser) || (m.from === otherUser && m.to === me))
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      .filter(
+        (m) =>
+          (m.from_user === me && m.to_user === otherUser) ||
+          (m.from_user === otherUser && m.to_user === me)
+      )
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return thread[0] || null;
   };
 
-  const markRead = (otherUser) => {
-    setMessages((prev) => {
-      const next = prev.map((m) =>
-        m.from === otherUser && m.to === me && !m.read ? { ...m, read: true } : m
-      );
-      saveMessages(next);
-      return next;
-    });
-  };
-
-  const handleSelect = (username) => {
+  const handleSelect = async (username) => {
     setSelectedUser(username);
-    markRead(username);
     setDraft('');
+    const unread = messages.filter(
+      (m) => m.from_user === username && m.to_user === me && !m.read
+    );
+    await Promise.all(unread.map((m) => markMessageRead(m.id).catch(() => {})));
+    if (unread.length > 0) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.from_user === username && m.to_user === me && !m.read ? { ...m, read: true } : m
+        )
+      );
+    }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const body = draft.trim();
-    if (!body || !selectedUser) return;
-    const msg = {
-      id: newId(),
-      from: me,
-      to: selectedUser,
-      body,
-      timestamp: new Date().toISOString(),
-      read: false
-    };
-    setMessages((prev) => {
-      const next = [...prev, msg];
-      saveMessages(next);
-      return next;
-    });
-    setDraft('');
+    if (!body || !selectedUser || sending) return;
+    setSending(true);
+    try {
+      const newMsg = await sendMessage(selectedUser, body);
+      setMessages((prev) => [...prev, newMsg]);
+      setDraft('');
+    } catch {
+      // leave draft intact on failure
+    } finally {
+      setSending(false);
+    }
   };
 
   const selectedUserObj = users.find((u) => u.username === selectedUser);
@@ -128,7 +128,7 @@ export default function Messages({ currentUsername }) {
     if (!la && !lb) return 0;
     if (!la) return 1;
     if (!lb) return -1;
-    return new Date(lb.timestamp) - new Date(la.timestamp);
+    return new Date(lb.created_at) - new Date(la.created_at);
   });
 
   return (
@@ -163,10 +163,10 @@ export default function Messages({ currentUsername }) {
                     {last && (
                       <div className="messages-contact-preview">
                         <span className="messages-preview-text">
-                          {last.from === me ? 'You: ' : ''}
+                          {last.from_user === me ? 'You: ' : ''}
                           {last.body}
                         </span>
-                        <span className="messages-preview-time">{timeLabel(last.timestamp)}</span>
+                        <span className="messages-preview-time">{timeLabel(last.created_at)}</span>
                       </div>
                     )}
                   </div>
@@ -207,11 +207,11 @@ export default function Messages({ currentUsername }) {
                 conversation.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`messages-bubble-row${msg.from === me ? ' outgoing' : ' incoming'}`}
+                    className={`messages-bubble-row${msg.from_user === me ? ' outgoing' : ' incoming'}`}
                   >
                     <div className="messages-bubble">
                       <span className="messages-bubble-text">{msg.body}</span>
-                      <span className="messages-bubble-time">{timeLabel(msg.timestamp)}</span>
+                      <span className="messages-bubble-time">{timeLabel(msg.created_at)}</span>
                     </div>
                   </div>
                 ))
@@ -236,9 +236,9 @@ export default function Messages({ currentUsername }) {
                 type="button"
                 className="primary messages-send-button"
                 onClick={handleSend}
-                disabled={!draft.trim()}
+                disabled={!draft.trim() || sending}
               >
-                Send
+                {sending ? '…' : 'Send'}
               </button>
             </div>
           </>

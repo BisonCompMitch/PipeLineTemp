@@ -613,3 +613,19 @@ export async function deleteContractor(email) {
 export async function sendNotification(payload) {
   return apiJson('/notifications/send', { method: 'POST', body: payload });
 }
+
+export async function listMessages() {
+  return apiJson('/messages');
+}
+
+export async function sendMessage(to, body) {
+  return apiJson('/messages', { method: 'POST', body: { to_user: to, body } });
+}
+
+export async function markMessageRead(messageId) {
+  return apiJson(`/messages/${encodeURIComponent(messageId)}/read`, { method: 'PATCH' });
+}
+
+export async function getUnreadCount() {
+  return apiJson('/messages/unread-count');
+}

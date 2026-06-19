@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getUnreadCount } from '../api.js';
 
 const DEFAULT_TESTING_OVERRIDE = { rolePreset: 'auto', areas: '' };
 
@@ -48,6 +49,7 @@ export default function TopBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [testingOpen, setTestingOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [draft, setDraft] = useState(() => normalizeTestingOverride(testingOverride || DEFAULT_TESTING_OVERRIDE));
   const menuRef = useRef(null);
   const testingRef = useRef(null);
@@ -84,6 +86,18 @@ export default function TopBar({
   }, [menuOpen, testingOpen, customerOpen]);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => {
+      getUnreadCount()
+        .then((data) => { if (!cancelled) setUnreadMessages(data?.count ?? 0); })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 12000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const handleOpenMessages = () => {
     setMenuOpen(false);
@@ -307,8 +321,11 @@ export default function TopBar({
             </button>
             {menuOpen ? (
               <div className="user-dropdown">
-                <button className="dropdown-item" type="button" onClick={handleOpenMessages}>
+                <button className="dropdown-item messages-dropdown-item" type="button" onClick={handleOpenMessages}>
                   Messages
+                  {unreadMessages > 0 && (
+                    <span className="messages-badge">{unreadMessages}</span>
+                  )}
                 </button>
                 {onOpenHelp ? (
                   <button

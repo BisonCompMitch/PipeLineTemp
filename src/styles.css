@@ -7761,6 +7761,13 @@ body[data-theme='light'] .progress-meta .muted {
   text-align: center;
 }
 
+.messages-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .messages-contact-preview {
   display: flex;
   align-items: center;
