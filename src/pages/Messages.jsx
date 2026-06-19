@@ -34,9 +34,20 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isImageType(contentType, filename) {
+  if ((contentType || '').startsWith('image/')) return true;
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'svg'].includes(ext);
+}
+
+function isPdfType(contentType, filename) {
+  if (contentType === 'application/pdf') return true;
+  return (filename || '').toLowerCase().endsWith('.pdf');
+}
+
 function PreviewModal({ attachment, blobUrl, onClose }) {
-  const isImage = (attachment.content_type || '').startsWith('image/');
-  const isPdf = attachment.content_type === 'application/pdf';
+  const isImage = isImageType(attachment.content_type, attachment.filename);
+  const isPdf = isPdfType(attachment.content_type, attachment.filename);
 
   useEffect(() => {
     const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -69,8 +80,11 @@ function AttachmentPreview({ attachment }) {
   const [showPreview, setShowPreview] = useState(false);
   const blobRef = useRef(null);
 
-  const isImage = (attachment.content_type || '').startsWith('image/');
+  const isImage = isImageType(attachment.content_type, attachment.filename);
+  const isPdf = isPdfType(attachment.content_type, attachment.filename);
+  const canPreview = isImage || isPdf;
   const ext = (attachment.filename || '').split('.').pop().slice(0, 5).toUpperCase() || 'FILE';
+  const dateLabel = attachment.created_at ? new Date(attachment.created_at).toLocaleString() : '';
 
   useEffect(() => {
     let cancelled = false;
@@ -94,11 +108,13 @@ function AttachmentPreview({ attachment }) {
     };
   }, [attachment.id]);
 
-  const handleView = () => {
-    if (blobUrl) setShowPreview(true);
+  const handleCardClick = () => {
+    if (!blobUrl) return;
+    if (canPreview) setShowPreview(true);
+    else triggerDownload();
   };
 
-  const handleDownload = () => {
+  const triggerDownload = () => {
     if (!blobUrl) return;
     const a = document.createElement('a');
     a.href = blobUrl;
@@ -108,39 +124,57 @@ function AttachmentPreview({ attachment }) {
     a.remove();
   };
 
+  const handleDlClick = (e) => {
+    e.stopPropagation();
+    triggerDownload();
+  };
+
   return (
     <>
-      <div className="msg-attachment-card">
-        {isImage && (
-          <div className="msg-attachment-card-preview">
-            {loading ? (
+      <div
+        className={`msg-attachment-card${blobUrl ? ' loaded' : ''}`}
+        onClick={handleCardClick}
+        role={blobUrl && canPreview ? 'button' : undefined}
+        tabIndex={blobUrl && canPreview ? 0 : undefined}
+        onKeyDown={blobUrl && canPreview ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } } : undefined}
+      >
+        <div className="msg-attachment-card-thumb">
+          {isImage ? (
+            loading ? (
               <div className="msg-attachment-card-img-skeleton" />
             ) : blobUrl ? (
-              <button type="button" className="msg-attachment-card-img-btn" onClick={handleView}>
-                <img className="msg-attachment-card-img" src={blobUrl} alt={attachment.filename} />
-              </button>
+              <img className="msg-attachment-card-img" src={blobUrl} alt={attachment.filename} />
             ) : (
               <div className="msg-attachment-card-img-err">Preview unavailable</div>
-            )}
-          </div>
-        )}
-        <div className="msg-attachment-card-body">
-          {!isImage && (
-            <div className="msg-attachment-card-ext">{loading ? '…' : ext}</div>
+            )
+          ) : (
+            <div className="msg-attachment-card-filetype">
+              <span className="msg-attachment-card-ext">{loading ? '…' : ext}</span>
+            </div>
           )}
-          <div className="msg-attachment-card-info">
-            <div className="msg-attachment-card-name">{attachment.filename}</div>
-            <div className="msg-attachment-card-size">{formatBytes(attachment.size_bytes)}</div>
+        </div>
+        <div className="msg-attachment-card-body">
+          <div className="msg-attachment-card-name">{attachment.filename}</div>
+          <div className="msg-attachment-card-meta">
+            <span className="msg-attachment-card-date">{dateLabel}</span>
+            <span className="msg-attachment-card-size">{formatBytes(attachment.size_bytes)}</span>
           </div>
         </div>
-        <div className="msg-attachment-card-actions">
-          <button type="button" className="msg-attachment-card-btn" onClick={handleView} disabled={!blobUrl}>
-            View
+        {blobUrl && (
+          <button
+            type="button"
+            className="msg-attachment-card-dl"
+            onClick={handleDlClick}
+            title={`Download ${attachment.filename}`}
+            aria-label={`Download ${attachment.filename}`}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
           </button>
-          <button type="button" className="msg-attachment-card-btn" onClick={handleDownload} disabled={!blobUrl}>
-            Download
-          </button>
-        </div>
+        )}
       </div>
       {showPreview && blobUrl && (
         <PreviewModal attachment={attachment} blobUrl={blobUrl} onClose={() => setShowPreview(false)} />
