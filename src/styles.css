@@ -7877,7 +7877,7 @@ body[data-theme='light'] .progress-meta .muted {
 
 .messages-compose-bar {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 10px;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -7906,7 +7906,7 @@ body[data-theme='light'] .progress-meta .muted {
 }
 
 .messages-send-button {
-  padding: 9px 18px;
+  padding: 0 18px;
   border-radius: 10px;
   flex-shrink: 0;
 }
@@ -7943,11 +7943,13 @@ body[data-theme='light'] .progress-meta .muted {
 
 .msg-attach-button {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  aspect-ratio: 1;
   border-radius: 8px;
   color: var(--muted);
   transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .msg-attach-button:hover {

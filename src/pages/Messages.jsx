@@ -231,9 +231,22 @@ export default function Messages({ currentUsername }) {
     }
   };
 
-  const selectedUserObj = users.find((u) => u.username === selectedUser);
+  // Merge listUsers() results with anyone who has messaged or been messaged by me,
+  // so contacts always appear even if the API doesn't return them for this role.
+  const contactList = React.useMemo(() => {
+    const map = new Map(users.map((u) => [u.username, u]));
+    for (const m of messages) {
+      const other = m.from_user === me ? m.to_user : m.from_user;
+      if (other && other !== me && !map.has(other)) {
+        map.set(other, { username: other, full_name: null });
+      }
+    }
+    return [...map.values()];
+  }, [users, messages, me]);
 
-  const sortedUsers = [...users].sort((a, b) => {
+  const selectedUserObj = contactList.find((u) => u.username === selectedUser);
+
+  const sortedUsers = [...contactList].sort((a, b) => {
     const la = lastMsg(a.username);
     const lb = lastMsg(b.username);
     if (!la && !lb) return 0;
