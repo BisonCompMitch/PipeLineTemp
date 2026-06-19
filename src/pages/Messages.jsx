@@ -98,6 +98,7 @@ export default function Messages({ currentUsername }) {
   const threadEndRef = useRef(null);
   const pollRef = useRef(null);
   const fileInputRef = useRef(null);
+  const sendingRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -194,18 +195,21 @@ export default function Messages({ currentUsername }) {
 
   const handleSend = async () => {
     const body = draft.trim();
-    if ((!body && pendingFiles.length === 0) || !selectedUser || sending) return;
+    const files = pendingFiles;
+    if ((!body && files.length === 0) || !selectedUser || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
+    setDraft('');
+    setPendingFiles([]);
     setUploadError('');
     try {
-      const msgBody = body || (pendingFiles.length > 0 ? ' ' : '');
+      const msgBody = body || (files.length > 0 ? ' ' : '');
       const newMsg = await sendMessage(selectedUser, msgBody);
       setMessages((prev) => [...prev, newMsg]);
-      setDraft('');
 
-      if (pendingFiles.length > 0) {
+      if (files.length > 0) {
         const uploaded = [];
-        for (const file of pendingFiles) {
+        for (const file of files) {
           try {
             const att = await uploadMessageAttachment(newMsg.id, file);
             uploaded.push(att);
@@ -222,11 +226,12 @@ export default function Messages({ currentUsername }) {
             )
           );
         }
-        setPendingFiles([]);
       }
     } catch {
-      // leave draft intact on failure
+      setDraft(body);
+      setPendingFiles(files);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
