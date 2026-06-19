@@ -1,8 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { listMessages, listUsers, markMessageRead, sendMessage } from '../api.js';
+import {
+  getMessageAttachmentUrl,
+  listMessages,
+  listUsers,
+  markMessageRead,
+  sendMessage,
+  uploadMessageAttachment
+} from '../api.js';
 import { getStoredUsername } from '../utils/authStorage.js';
 
 const POLL_INTERVAL_MS = 12000;
+const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB client-side guard
 
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -20,6 +28,63 @@ function timeLabel(iso) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function AttachmentPreview({ attachment }) {
+  const url = getMessageAttachmentUrl(attachment.id);
+  const isImage = (attachment.content_type || '').startsWith('image/');
+  if (isImage) {
+    return (
+      <a
+        className="msg-attachment-image-link"
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={attachment.filename}
+      >
+        <img
+          className="msg-attachment-image"
+          src={url}
+          alt={attachment.filename}
+          loading="lazy"
+        />
+      </a>
+    );
+  }
+  return (
+    <a
+      className="msg-attachment-chip"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      download={attachment.filename}
+    >
+      <svg className="msg-attachment-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+        <polyline
+          points="14 2 14 8 20 8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="msg-attachment-name">{attachment.filename}</span>
+      <span className="msg-attachment-size">{formatBytes(attachment.size_bytes)}</span>
+    </a>
+  );
+}
+
 export default function Messages({ currentUsername }) {
   const me = currentUsername || getStoredUsername() || '';
   const [users, setUsers] = useState([]);
@@ -27,9 +92,12 @@ export default function Messages({ currentUsername }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [pendingFiles, setPendingFiles] = useState([]);
   const [sending, setSending] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const threadEndRef = useRef(null);
   const pollRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -92,6 +160,8 @@ export default function Messages({ currentUsername }) {
   const handleSelect = async (username) => {
     setSelectedUser(username);
     setDraft('');
+    setPendingFiles([]);
+    setUploadError('');
     const unread = messages.filter(
       (m) => m.from_user === username && m.to_user === me && !m.read
     );
@@ -105,14 +175,55 @@ export default function Messages({ currentUsername }) {
     }
   };
 
+  const handleFileChange = (e) => {
+    setUploadError('');
+    const files = Array.from(e.target.files || []);
+    const oversized = files.filter((f) => f.size > MAX_FILE_BYTES);
+    if (oversized.length > 0) {
+      setUploadError(`File too large (max 50 MB): ${oversized.map((f) => f.name).join(', ')}`);
+      e.target.value = '';
+      return;
+    }
+    setPendingFiles((prev) => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removePendingFile = (index) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
     const body = draft.trim();
-    if (!body || !selectedUser || sending) return;
+    if ((!body && pendingFiles.length === 0) || !selectedUser || sending) return;
     setSending(true);
+    setUploadError('');
     try {
-      const newMsg = await sendMessage(selectedUser, body);
+      const msgBody = body || (pendingFiles.length > 0 ? ' ' : '');
+      const newMsg = await sendMessage(selectedUser, msgBody);
       setMessages((prev) => [...prev, newMsg]);
       setDraft('');
+
+      if (pendingFiles.length > 0) {
+        const uploaded = [];
+        for (const file of pendingFiles) {
+          try {
+            const att = await uploadMessageAttachment(newMsg.id, file);
+            uploaded.push(att);
+          } catch (err) {
+            setUploadError(`Failed to upload "${file.name}": ${err.message}`);
+          }
+        }
+        if (uploaded.length > 0) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === newMsg.id
+                ? { ...m, attachments: [...(m.attachments || []), ...uploaded] }
+                : m
+            )
+          );
+        }
+        setPendingFiles([]);
+      }
     } catch {
       // leave draft intact on failure
     } finally {
@@ -130,6 +241,8 @@ export default function Messages({ currentUsername }) {
     if (!lb) return -1;
     return new Date(lb.created_at) - new Date(la.created_at);
   });
+
+  const canSend = (draft.trim().length > 0 || pendingFiles.length > 0) && !sending;
 
   return (
     <div className="messages-layout">
@@ -164,7 +277,7 @@ export default function Messages({ currentUsername }) {
                       <div className="messages-contact-preview">
                         <span className="messages-preview-text">
                           {last.from_user === me ? 'You: ' : ''}
-                          {last.body}
+                          {last.body && last.body.trim() ? last.body : (last.attachments?.length > 0 ? '📎 Attachment' : '')}
                         </span>
                         <span className="messages-preview-time">{timeLabel(last.created_at)}</span>
                       </div>
@@ -210,7 +323,16 @@ export default function Messages({ currentUsername }) {
                     className={`messages-bubble-row${msg.from_user === me ? ' outgoing' : ' incoming'}`}
                   >
                     <div className="messages-bubble">
-                      <span className="messages-bubble-text">{msg.body}</span>
+                      {msg.body && msg.body.trim() ? (
+                        <span className="messages-bubble-text">{msg.body}</span>
+                      ) : null}
+                      {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                        <div className="msg-attachments">
+                          {msg.attachments.map((att) => (
+                            <AttachmentPreview key={att.id} attachment={att} />
+                          ))}
+                        </div>
+                      )}
                       <span className="messages-bubble-time">{timeLabel(msg.created_at)}</span>
                     </div>
                   </div>
@@ -218,7 +340,58 @@ export default function Messages({ currentUsername }) {
               )}
               <div ref={threadEndRef} />
             </div>
+
+            {pendingFiles.length > 0 && (
+              <div className="msg-pending-files">
+                {pendingFiles.map((file, i) => (
+                  <div key={i} className="msg-pending-chip">
+                    <span className="msg-pending-name">{file.name}</span>
+                    <span className="msg-pending-size">{formatBytes(file.size)}</span>
+                    <button
+                      type="button"
+                      className="msg-pending-remove"
+                      onClick={() => removePendingFile(i)}
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {uploadError && (
+              <div className="msg-upload-error">{uploadError}</div>
+            )}
+
             <div className="messages-compose-bar">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="msg-file-input"
+                onChange={handleFileChange}
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+              <button
+                type="button"
+                className="ghost icon-button msg-attach-button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Attach file"
+                title="Attach file"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
               <textarea
                 className="messages-compose-input"
                 placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
@@ -236,7 +409,7 @@ export default function Messages({ currentUsername }) {
                 type="button"
                 className="primary messages-send-button"
                 onClick={handleSend}
-                disabled={!draft.trim() || sending}
+                disabled={!canSend}
               >
                 {sending ? '…' : 'Send'}
               </button>

@@ -7935,6 +7935,147 @@ body[data-theme='light'] .progress-meta .muted {
   text-align: center;
 }
 
+/* Attachment button in compose bar */
+
+.msg-file-input {
+  display: none;
+}
+
+.msg-attach-button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+
+.msg-attach-button:hover {
+  color: var(--primary);
+}
+
+.msg-attach-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Pending file chips above compose */
+
+.msg-pending-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px 0;
+}
+
+.msg-pending-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  max-width: 220px;
+}
+
+.msg-pending-name {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg-pending-size {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.msg-pending-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.msg-pending-remove:hover {
+  color: var(--text);
+}
+
+/* Upload error */
+
+.msg-upload-error {
+  margin: 6px 16px 0;
+  font-size: 12px;
+  color: #f87171;
+}
+
+/* Attachments inside bubbles */
+
+.msg-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.msg-attachment-image-link {
+  display: block;
+  max-width: 260px;
+}
+
+.msg-attachment-image {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.msg-attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: background 0.15s;
+  max-width: 280px;
+}
+
+.msg-attachment-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.msg-attachment-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.msg-attachment-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.msg-attachment-size {
+  color: var(--muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 @media (max-width: 700px) {
   .messages-layout {
     grid-template-columns: 1fr;

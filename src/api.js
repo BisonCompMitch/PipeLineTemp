@@ -629,3 +629,27 @@ export async function markMessageRead(messageId) {
 export async function getUnreadCount() {
   return apiJson('/messages/unread-count');
 }
+
+export async function uploadMessageAttachment(messageId, file) {
+  const params = new URLSearchParams({
+    filename: file.name,
+    content_type: file.type || 'application/octet-stream'
+  });
+  const response = await apiRequest(
+    `/messages/${encodeURIComponent(messageId)}/attachments/upload?${params}`,
+    {
+      method: 'POST',
+      body: file,
+      headers: { 'Content-Type': file.type || 'application/octet-stream' }
+    }
+  );
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || `Upload failed (${response.status})`);
+  }
+  return response.json();
+}
+
+export function getMessageAttachmentUrl(attachmentId) {
+  return `${getApiBase()}/messages/attachments/${encodeURIComponent(attachmentId)}/download`;
+}
