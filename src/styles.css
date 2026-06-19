@@ -8026,56 +8026,126 @@ body[data-theme='light'] .progress-meta .muted {
   margin-top: 4px;
 }
 
-.msg-attachment-image-link {
-  display: block;
-  max-width: 260px;
+@keyframes msg-attachment-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
 }
 
-.msg-attachment-image {
+.msg-attachment-card {
+  min-width: 200px;
+  max-width: 280px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.msg-attachment-card-preview {
+  width: 100%;
+}
+
+.msg-attachment-card-img-skeleton {
+  width: 100%;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.08);
+  animation: msg-attachment-pulse 1.4s ease-in-out infinite;
+}
+
+.msg-attachment-card-img-err {
+  width: 100%;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.msg-attachment-card-img-btn {
   display: block;
-  max-width: 100%;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  width: 100%;
+  border: none;
+  padding: 0;
+  background: none;
   cursor: pointer;
 }
 
-.msg-attachment-chip {
+.msg-attachment-card-img {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+}
+
+.msg-attachment-card-body {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  text-decoration: none;
-  color: var(--text);
-  font-size: 13px;
-  transition: background 0.15s;
-  max-width: 280px;
+  gap: 10px;
+  padding: 8px 12px;
 }
 
-.msg-attachment-chip:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.msg-attachment-icon {
-  width: 16px;
-  height: 16px;
+.msg-attachment-card-ext {
   flex-shrink: 0;
-  color: var(--primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: inherit;
 }
 
-.msg-attachment-name {
+.msg-attachment-card-info {
   flex: 1;
+  min-width: 0;
+}
+
+.msg-attachment-card-name {
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: inherit;
 }
 
-.msg-attachment-size {
-  color: var(--muted);
+.msg-attachment-card-size {
   font-size: 11px;
-  flex-shrink: 0;
+  opacity: 0.6;
+  margin-top: 1px;
+}
+
+.msg-attachment-card-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.msg-attachment-card-btn {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.msg-attachment-card-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.msg-attachment-card-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 @media (max-width: 700px) {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  getMessageAttachmentUrl,
+  downloadMessageAttachment,
   listMessages,
   listUsers,
   markMessageRead,
@@ -35,53 +35,82 @@ function formatBytes(n) {
 }
 
 function AttachmentPreview({ attachment }) {
-  const url = getMessageAttachmentUrl(attachment.id);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const blobRef = useRef(null);
+
   const isImage = (attachment.content_type || '').startsWith('image/');
-  if (isImage) {
-    return (
-      <a
-        className="msg-attachment-image-link"
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={attachment.filename}
-      >
-        <img
-          className="msg-attachment-image"
-          src={url}
-          alt={attachment.filename}
-          loading="lazy"
-        />
-      </a>
-    );
-  }
+  const ext = (attachment.filename || '').split('.').pop().slice(0, 5).toUpperCase() || 'FILE';
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setBlobUrl(null);
+    downloadMessageAttachment(attachment.id)
+      .then(blob => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        blobRef.current = url;
+        setBlobUrl(url);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+      if (blobRef.current) {
+        URL.revokeObjectURL(blobRef.current);
+        blobRef.current = null;
+      }
+    };
+  }, [attachment.id]);
+
+  const handleView = () => {
+    if (blobUrl) window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownload = () => {
+    if (!blobUrl) return;
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = attachment.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   return (
-    <a
-      className="msg-attachment-chip"
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      download={attachment.filename}
-    >
-      <svg className="msg-attachment-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <polyline
-          points="14 2 14 8 20 8"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="msg-attachment-name">{attachment.filename}</span>
-      <span className="msg-attachment-size">{formatBytes(attachment.size_bytes)}</span>
-    </a>
+    <div className="msg-attachment-card">
+      {isImage && (
+        <div className="msg-attachment-card-preview">
+          {loading ? (
+            <div className="msg-attachment-card-img-skeleton" />
+          ) : blobUrl ? (
+            <button type="button" className="msg-attachment-card-img-btn" onClick={handleView}>
+              <img className="msg-attachment-card-img" src={blobUrl} alt={attachment.filename} />
+            </button>
+          ) : (
+            <div className="msg-attachment-card-img-err">Preview unavailable</div>
+          )}
+        </div>
+      )}
+      <div className="msg-attachment-card-body">
+        {!isImage && (
+          <div className="msg-attachment-card-ext">{loading ? '…' : ext}</div>
+        )}
+        <div className="msg-attachment-card-info">
+          <div className="msg-attachment-card-name">{attachment.filename}</div>
+          <div className="msg-attachment-card-size">{formatBytes(attachment.size_bytes)}</div>
+        </div>
+      </div>
+      <div className="msg-attachment-card-actions">
+        <button type="button" className="msg-attachment-card-btn" onClick={handleView} disabled={!blobUrl}>
+          View
+        </button>
+        <button type="button" className="msg-attachment-card-btn" onClick={handleDownload} disabled={!blobUrl}>
+          Download
+        </button>
+      </div>
+    </div>
   );
 }
 

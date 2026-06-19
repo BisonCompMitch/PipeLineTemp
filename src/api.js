@@ -653,3 +653,11 @@ export async function uploadMessageAttachment(messageId, file) {
 export function getMessageAttachmentUrl(attachmentId) {
   return `${getApiBase()}/messages/attachments/${encodeURIComponent(attachmentId)}/download`;
 }
+
+export async function downloadMessageAttachment(attachmentId) {
+  const response = await apiRequest(
+    `/messages/attachments/${encodeURIComponent(attachmentId)}/download`
+  );
+  if (!response.ok) throw new Error(`Download failed (${response.status})`);
+  return response.blob();
+}
