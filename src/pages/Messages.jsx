@@ -45,7 +45,7 @@ function isPdfType(contentType, filename) {
   return (filename || '').toLowerCase().endsWith('.pdf');
 }
 
-function PreviewModal({ attachment, blobUrl, onClose }) {
+function PreviewModal({ attachment, blobUrl, loading, onDownload, onClose }) {
   const isImage = isImageType(attachment.content_type, attachment.filename);
   const isPdf = isPdfType(attachment.content_type, attachment.filename);
 
@@ -60,12 +60,32 @@ function PreviewModal({ attachment, blobUrl, onClose }) {
       <div className="msg-preview-modal" onClick={(e) => e.stopPropagation()}>
         <div className="msg-preview-header">
           <span className="msg-preview-filename">{attachment.filename}</span>
-          <button type="button" className="msg-preview-close" onClick={onClose}>×</button>
+          <div className="msg-preview-header-actions">
+            <button
+              type="button"
+              className="msg-preview-dl-btn"
+              onClick={onDownload}
+              disabled={!blobUrl}
+              title="Download"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download
+            </button>
+            <button type="button" className="msg-preview-close" onClick={onClose}>×</button>
+          </div>
         </div>
         <div className="msg-preview-content">
-          {isImage && <img src={blobUrl} alt={attachment.filename} className="msg-preview-img" />}
-          {isPdf && <iframe src={blobUrl} title={attachment.filename} className="msg-preview-iframe" />}
-          {!isImage && !isPdf && (
+          {loading && !blobUrl ? (
+            <div className="msg-preview-loading">Loading…</div>
+          ) : isImage && blobUrl ? (
+            <img src={blobUrl} alt={attachment.filename} className="msg-preview-img" />
+          ) : isPdf && blobUrl ? (
+            <iframe src={blobUrl} title={attachment.filename} className="msg-preview-iframe" />
+          ) : (
             <div className="msg-preview-unavailable">No preview available for this file type.</div>
           )}
         </div>
@@ -126,9 +146,7 @@ function AttachmentPreview({ attachment }) {
   }, [attachment.id]);
 
   const handleCardClick = () => {
-    if (!blobUrl) return;
-    if (canPreview) setShowPreview(true);
-    else triggerDownload();
+    setShowPreview(true);
   };
 
   const triggerDownload = () => {
@@ -151,9 +169,9 @@ function AttachmentPreview({ attachment }) {
       <div
         className={`msg-attachment-card${blobUrl ? ' loaded' : ''}`}
         onClick={handleCardClick}
-        role={blobUrl && canPreview ? 'button' : undefined}
-        tabIndex={blobUrl && canPreview ? 0 : undefined}
-        onKeyDown={blobUrl && canPreview ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } } : undefined}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } }}
       >
         <div className="msg-attachment-card-thumb">
           {isImage ? (
@@ -193,8 +211,14 @@ function AttachmentPreview({ attachment }) {
           </button>
         )}
       </div>
-      {showPreview && blobUrl && (
-        <PreviewModal attachment={attachment} blobUrl={blobUrl} onClose={() => setShowPreview(false)} />
+      {showPreview && (
+        <PreviewModal
+          attachment={attachment}
+          blobUrl={blobUrl}
+          loading={loading}
+          onDownload={triggerDownload}
+          onClose={() => setShowPreview(false)}
+        />
       )}
     </>
   );
