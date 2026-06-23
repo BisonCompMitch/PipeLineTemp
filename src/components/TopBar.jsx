@@ -313,7 +313,12 @@ export default function TopBar({
                 setMenuOpen((open) => !open);
               }}
             >
-              <span className="avatar">{initialsFor(normalizedDisplayName)}</span>
+              <span className="avatar-notif-wrapper">
+                <span className="avatar">{initialsFor(normalizedDisplayName)}</span>
+                {unreadMessages > 0 && (
+                  <span className="topbar-notif-dot">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
+                )}
+              </span>
               <span>{normalizedDisplayName}</span>
               <svg className="caret" viewBox="0 0 20 20">
                 <path d="M5 7l5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

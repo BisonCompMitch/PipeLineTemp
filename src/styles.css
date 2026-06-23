@@ -7749,6 +7749,32 @@ body[data-theme='light'] .progress-meta .muted {
   white-space: nowrap;
 }
 
+.avatar-notif-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+}
+
+.topbar-notif-dot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #e53e3e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 99px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 2px solid var(--topbar-bg, #141928);
+  line-height: 1;
+  pointer-events: none;
+}
+
 .messages-badge {
   flex-shrink: 0;
   background: var(--primary);
