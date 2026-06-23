@@ -7829,14 +7829,22 @@ body[data-theme='light'] .progress-meta .muted {
 
 .messages-bubble-row {
   display: flex;
+  flex-direction: column;
 }
 
 .messages-bubble-row.outgoing {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .messages-bubble-row.incoming {
-  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.messages-read-receipt {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-top: 2px;
+  padding-right: 2px;
 }
 
 .messages-bubble {

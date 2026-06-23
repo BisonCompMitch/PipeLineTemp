@@ -273,6 +273,22 @@ export default function Messages({ currentUsername }) {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, selectedUser]);
 
+  // Auto-mark incoming messages as read whenever the selected conversation is open,
+  // including messages that arrive via polling after the conversation was opened.
+  useEffect(() => {
+    if (!selectedUser) return;
+    const unread = messages.filter(
+      (m) => m.from_user === selectedUser && m.to_user === me && !m.read
+    );
+    if (unread.length === 0) return;
+    unread.forEach((m) => markMessageRead(m.id).catch(() => {}));
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.from_user === selectedUser && m.to_user === me && !m.read ? { ...m, read: true } : m
+      )
+    );
+  }, [messages, selectedUser, me]);
+
   const conversation = selectedUser
     ? [...messages]
         .filter(
@@ -492,6 +508,9 @@ export default function Messages({ currentUsername }) {
                       )}
                       <span className="messages-bubble-time">{timeLabel(msg.created_at)}</span>
                     </div>
+                    {msg.from_user === me && msg.read && (
+                      <span className="messages-read-receipt">Seen</span>
+                    )}
                   </div>
                 ))
               )}
