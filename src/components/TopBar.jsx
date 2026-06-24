@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getUnreadCount } from '../api.js';
 
 const DEFAULT_TESTING_OVERRIDE = { rolePreset: 'auto', areas: '' };
@@ -86,18 +86,20 @@ export default function TopBar({
   }, [menuOpen, testingOpen, customerOpen]);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     let cancelled = false;
+    const onMessages = location.pathname === '/messages';
     const poll = () => {
       getUnreadCount()
         .then((data) => { if (!cancelled) setUnreadMessages(data?.count ?? 0); })
         .catch(() => {});
     };
     poll();
-    const id = setInterval(poll, 12000);
+    const id = setInterval(poll, onMessages ? 3000 : 12000);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [location.pathname]);
 
   const handleOpenMessages = () => {
     setMenuOpen(false);
