@@ -623,7 +623,7 @@ export async function sendMessage(to, body) {
 }
 
 export async function markMessageRead(messageId) {
-  return apiJson(`/messages/${encodeURIComponent(messageId)}/read`, { method: 'PATCH' });
+  return apiJson(`/messages/${encodeURIComponent(messageId)}/read`, { method: 'PATCH', body: {} });
 }
 
 export async function getUnreadCount() {
