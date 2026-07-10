@@ -13,7 +13,9 @@ import {
   uploadLeadFile
 } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import FileViewToggle from '../components/FileViewToggle.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
+import useFileViewMode from '../utils/useFileViewMode.js';
 import { REQUIRED_DOC_OPTIONS, buildEmptyRequiredDocs } from '../utils/requiredDocs.js';
 
 const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost'];
@@ -403,6 +405,7 @@ export default function Leads({ isAdminView = false }) {
   const [createFileDragActive, setCreateFileDragActive] = useState(false);
   const [editFiles, setEditFiles] = useState([]);
   const [newEditFiles, setNewEditFiles] = useState([]);
+  const [editFileDragActive, setEditFileDragActive] = useState(false);
   const [editFilesStatus, setEditFilesStatus] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
@@ -431,6 +434,7 @@ export default function Leads({ isAdminView = false }) {
     creator_company: CREATOR_COMPANY_ALL
   });
   const { alertDialog, confirmDialog, promptDialog, dialogPortal } = useSiteDialog();
+  const [fileViewMode, setFileViewMode] = useFileViewMode();
   const cardPreviewUrlRef = useRef({});
   const previewBlobCacheRef = useRef(new Map());
 
@@ -480,6 +484,14 @@ export default function Leads({ isAdminView = false }) {
 
   const removeQueuedCreateFile = useCallback((fileId) => {
     setCreateFiles((prev) => prev.filter((item) => item.id !== fileId));
+  }, []);
+
+  const handleEditFileDrop = useCallback((event) => {
+    event.preventDefault();
+    setEditFileDragActive(false);
+    const dropped = Array.from(event.dataTransfer?.files || []);
+    if (!dropped.length) return;
+    setNewEditFiles(dropped);
   }, []);
 
   const loadLeadFiles = useCallback(async (leadId) => {
@@ -1198,7 +1210,12 @@ export default function Leads({ isAdminView = false }) {
                 </div>
                 <div className="photo-gallery-panel">
                   {createFiles.length ? (
-                    <div className="photo-gallery upload-card-gallery">
+                    <div className="file-view-toggle-row">
+                      <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+                    </div>
+                  ) : null}
+                  {createFiles.length ? (
+                    <div className={`photo-gallery upload-card-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                       {createFiles.map((item) => (
                         <div key={item.id} className="photo-card file-card compact-upload-card">
                           <div className="photo-thumb-wrap file-thumb-wrap">
@@ -1649,17 +1666,61 @@ export default function Leads({ isAdminView = false }) {
 
                     {editingTab === 'files' ? (
                       <div className="lead-files-panel">
-                        <label>
-                          Upload lead files
-                          <input type="file" multiple onChange={(event) => setNewEditFiles(Array.from(event.target.files || []))} />
-                        </label>
-                        <div className="muted">
-                          {newEditFiles.length ? `${newEditFiles.length} file(s) selected` : 'No files selected'}
+                        <div className="intake-docs-title">Upload lead files</div>
+                        <div className="file-upload-form">
+                          <div
+                            className={`file-upload-row${editFileDragActive ? ' drag-active' : ''}`}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              event.dataTransfer.dropEffect = 'copy';
+                            }}
+                            onDragEnter={(event) => {
+                              event.preventDefault();
+                              setEditFileDragActive(true);
+                            }}
+                            onDragLeave={(event) => {
+                              event.preventDefault();
+                              setEditFileDragActive(false);
+                            }}
+                            onDrop={handleEditFileDrop}
+                          >
+                            <div className="file-drop-hint">
+                              <span className="file-drop-icon" aria-hidden="true">
+                                +
+                              </span>
+                              <span>{editFileDragActive ? 'Drop files to upload' : 'Drag and drop files here'}</span>
+                            </div>
+                            <span className="file-upload-name">
+                              {newEditFiles.length ? `${newEditFiles.length} file(s) selected` : 'No files selected'}
+                            </span>
+                          </div>
+                          <div className="file-upload-actions">
+                            <div className="file-upload-controls">
+                              <input
+                                id="lead-edit-file-upload"
+                                className="file-upload-input"
+                                type="file"
+                                multiple
+                                onChange={(event) => setNewEditFiles(Array.from(event.target.files || []))}
+                              />
+                              <label htmlFor="lead-edit-file-upload" className="ghost file-upload-button">
+                                Choose files
+                              </label>
+                            </div>
+                            <span className="file-upload-selected">
+                              {newEditFiles.length ? `${newEditFiles.length} file(s) selected` : 'No files selected'}
+                            </span>
+                          </div>
                         </div>
                         {editFilesStatus ? <p className="muted">{editFilesStatus}</p> : null}
                         <div className="photo-gallery-panel">
                           {editFiles.length ? (
-                            <div className="photo-gallery upload-card-gallery">
+                            <div className="file-view-toggle-row">
+                              <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+                            </div>
+                          ) : null}
+                          {editFiles.length ? (
+                            <div className={`photo-gallery upload-card-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                               {editFiles.map((file) => (
                                 <div key={file.id} className="photo-card compact-upload-card lead-file-card">
                                   <button

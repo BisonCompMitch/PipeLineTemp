@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadProjectFile, listProjectFiles } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import FileViewToggle from '../components/FileViewToggle.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
+import useFileViewMode from '../utils/useFileViewMode.js';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'];
 
@@ -51,6 +53,7 @@ export default function CustomerPictures({ project, loadingProjects = false }) {
   const blobCacheRef = useRef(new Map());
   const [reloadToken, setReloadToken] = useState(0);
   const { alertDialog, dialogPortal } = useSiteDialog();
+  const [fileViewMode, setFileViewMode] = useFileViewMode();
   const projectId = project?.id || '';
   const projectName = project?.name || '';
 
@@ -243,7 +246,12 @@ export default function CustomerPictures({ project, loadingProjects = false }) {
         <div className="photo-gallery-panel">
           {thumbLoading ? <p className="muted">Loading picture gallery...</p> : null}
           {photos.length ? (
-            <div className="photo-gallery">
+            <div className="file-view-toggle-row">
+              <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+            </div>
+          ) : null}
+          {photos.length ? (
+            <div className={`photo-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
               {photos.map((fileRecord) => (
                 <button
                   key={fileRecord.id}

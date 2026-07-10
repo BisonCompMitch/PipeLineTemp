@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadProjectFile, listProjectFiles, uploadProjectFile } from '../api.js';
 import ModalPortal from '../components/ModalPortal.jsx';
+import FileViewToggle from '../components/FileViewToggle.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
+import useFileViewMode from '../utils/useFileViewMode.js';
 
 function formatDateTime(value) {
   if (!value) return '-';
@@ -97,6 +99,7 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
   const [reloadToken, setReloadToken] = useState(0);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
   const { alertDialog, dialogPortal } = useSiteDialog();
+  const [fileViewMode, setFileViewMode] = useFileViewMode();
   const projectId = project?.id || '';
   const projectName = project?.name || '';
 
@@ -397,7 +400,12 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
           </form>
           <div className="photo-gallery-panel">
             {documentFiles.length ? (
-              <div className="photo-gallery">
+              <div className="file-view-toggle-row">
+                <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+              </div>
+            ) : null}
+            {documentFiles.length ? (
+              <div className={`photo-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                 {documentFiles.map((fileRecord) => (
                   <button
                     key={fileRecord.id}

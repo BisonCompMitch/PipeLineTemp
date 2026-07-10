@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createProject, listContractors, listProjects, uploadProjectFile } from '../api.js';
 import { buildEmptyRequiredDocs, buildProjectSummary } from '../utils/requiredDocs.js';
+import FileViewToggle from '../components/FileViewToggle.jsx';
+import useFileViewMode from '../utils/useFileViewMode.js';
 
 function todayLocalIso() {
   const now = new Date();
@@ -150,6 +152,7 @@ export default function Intake() {
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [partyOptions, setPartyOptions] = useState([]);
+  const [fileViewMode, setFileViewMode] = useFileViewMode();
   const [uploadFiles, setUploadFiles] = useState([]);
   const [photoUploads, setPhotoUploads] = useState([]);
   const [uploadAllowCustomer, setUploadAllowCustomer] = useState(false);
@@ -685,7 +688,12 @@ export default function Intake() {
             </div>
             <div className="photo-gallery-panel">
               {uploadFiles.length ? (
-                <div className="photo-gallery upload-card-gallery">
+                <div className="file-view-toggle-row">
+                  <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+                </div>
+              ) : null}
+              {uploadFiles.length ? (
+                <div className={`photo-gallery upload-card-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                   {uploadFiles.map((item) => (
                     <div key={item.id} className="photo-card file-card compact-upload-card">
                       <div className="photo-thumb-wrap file-thumb-wrap">
@@ -774,7 +782,12 @@ export default function Intake() {
             {photoError ? <p className="muted">{photoError}</p> : null}
             <div className="photo-gallery-panel">
               {photoPreviews.length ? (
-                <div className="photo-gallery upload-card-gallery">
+                <div className="file-view-toggle-row">
+                  <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+                </div>
+              ) : null}
+              {photoPreviews.length ? (
+                <div className={`photo-gallery upload-card-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                   {photoPreviews.map((item) => (
                     <div key={item.id} className="photo-card compact-upload-card">
                       <div className="photo-thumb-wrap">

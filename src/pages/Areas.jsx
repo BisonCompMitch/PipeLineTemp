@@ -14,7 +14,9 @@ import {
 import ModalPortal from '../components/ModalPortal.jsx';
 import MissingDocsDialog from '../components/MissingDocsDialog.jsx';
 import BlockingOverlay from '../components/BlockingOverlay.jsx';
+import FileViewToggle from '../components/FileViewToggle.jsx';
 import useSiteDialog from '../utils/useSiteDialog.jsx';
+import useFileViewMode from '../utils/useFileViewMode.js';
 import {
   MISSING_DOC_STAGE_IDS,
   coerceSlabWorkFlag,
@@ -365,6 +367,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   const cardPreviewUrlRef = useRef({});
   const previewBlobCacheRef = useRef(new Map());
   const { confirmDialog, promptDialog, alertDialog, dialogPortal } = useSiteDialog();
+  const [fileViewMode, setFileViewMode] = useFileViewMode();
   const photoFiles = useMemo(() => files.filter(isImageFile), [files]);
   const documentFiles = useMemo(() => files.filter((fileRecord) => !isImageFile(fileRecord)), [files]);
   const selectedAreaStageIds = useMemo(() => {
@@ -1463,7 +1466,12 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
               {filesLoading ? <p className="muted">Loading files...</p> : null}
               <div className="photo-gallery-panel">
                 {documentFiles.length ? (
-                  <div className="photo-gallery upload-card-gallery">
+                  <div className="file-view-toggle-row">
+                    <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+                  </div>
+                ) : null}
+                {documentFiles.length ? (
+                  <div className={`photo-gallery upload-card-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                     {documentFiles.map((fileRecord) => (
                       <div key={fileRecord.id} className="photo-card file-card compact-upload-card">
                         <button
@@ -1588,7 +1596,12 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
               </form>
               <div className="photo-gallery-panel">
                 {photoFiles.length ? (
-                  <div className="photo-gallery upload-card-gallery">
+                  <div className="file-view-toggle-row">
+                    <FileViewToggle viewMode={fileViewMode} onChange={setFileViewMode} />
+                  </div>
+                ) : null}
+                {photoFiles.length ? (
+                  <div className={`photo-gallery upload-card-gallery${fileViewMode === 'list' ? ' list-view' : ''}`}>
                     {photoFiles.map((fileRecord) => (
                       <div key={fileRecord.id} className="photo-card compact-upload-card">
                         <button
