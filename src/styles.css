@@ -5973,6 +5973,14 @@ body[data-theme='light'] .compact-card-switch {
   background: #f8fafc;
 }
 
+body[data-theme='light'] .photo-thumb-wrap {
+  background: #e2e8f0;
+}
+
+body[data-theme='light'] .lead-files-panel {
+  background: #f8fafc;
+}
+
 /* --- Table scrolling guardrails --- */
 .table-scroll,
 .users-table-scroll {
