@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const DEFAULT_ESTIMATE_URL = 'https://estimate.scottsdaleutah.com/';
+const DEFAULT_ESTIMATE_URL = 'https://bisoncompmitch.github.io/Estima/';
 
 function normalizeEstimateUrl(value) {
   const raw = String(value || '').trim();
