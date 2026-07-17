@@ -618,6 +618,10 @@ export async function listMessages() {
   return apiJson('/messages');
 }
 
+export async function listMessageContacts() {
+  return apiJson('/messages/contacts');
+}
+
 export async function sendMessage(to, body) {
   return apiJson('/messages', { method: 'POST', body: { to_user: to, body } });
 }

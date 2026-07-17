@@ -328,7 +328,12 @@ export default function TopBar({
             </button>
             {menuOpen ? (
               <div className="user-dropdown">
-                <button className="dropdown-item messages-dropdown-item" type="button" onClick={handleOpenMessages}>
+                <button
+                  className="dropdown-item messages-dropdown-item"
+                  type="button"
+                  data-tutorial-id="messages-button"
+                  onClick={handleOpenMessages}
+                >
                   Messages
                   {unreadMessages > 0 && (
                     <span className="messages-badge">{unreadMessages}</span>

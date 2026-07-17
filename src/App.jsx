@@ -241,6 +241,7 @@ function tutorialRoleLabel({ hasBison, hasAdminArea, hasContractor, hasCustomer 
 
 function buildTutorialSteps({
   canAccessDashboard,
+  canAccessBuilderView,
   hasBison,
   hasAdminArea,
   hasContractor,
@@ -298,7 +299,7 @@ function buildTutorialSteps({
         'Dashboard View',
         showDashboardFilters
           ? 'Dashboard shows one row per project with Project (# + name) and Current Stage. At the top you get Requester/Contractor filtering plus the Archived Showing/Hidden toggle. Rows stay ordered by project number, and you can open full project details from the table.'
-          : 'Dashboard shows one row per project with Project (# + name) and Current Stage. Rows stay ordered by project number, and you can open full project details from the table.'
+          : 'Dashboard shows only the projects available to your role with Project (# + name) and Current Stage. Rows stay ordered by project number, and you can open full project details from the table.'
       )
     );
     steps.push({
@@ -357,6 +358,22 @@ function buildTutorialSteps({
     });
   }
 
+  if (hasContractor || hasAdminArea) {
+    pushNavStep(
+      'money-status',
+      'Money Status',
+      '/money-status',
+      'Click Money Status to open the payment-focused project list.'
+    );
+    steps.push(
+      buildInfoStep(
+        'money-status-details',
+        'Money Status View',
+        'Money Status uses the same project table pattern as Dashboard but focuses on payment stages and payment status. Contractor users see their requester-scoped projects; admin users can review the broader payment queue.'
+      )
+    );
+  }
+
   if (hasBison) {
     pushNavStep(
       'areas',
@@ -385,6 +402,38 @@ function buildTutorialSteps({
         'intake-details',
         'Project Intake View',
         'Project Intake captures project name, requester, urgency, budget, slab-work required, required docs checklist, and notes. It also includes initial document/photo uploads with visibility controls so project handoff starts with complete context.'
+      )
+    );
+  }
+
+  if (hasBison) {
+    pushNavStep(
+      'create-estimate',
+      'Create Estimate',
+      '/create-estimate',
+      'Click Create Estimate to open the estimator workspace.'
+    );
+    steps.push(
+      buildInfoStep(
+        'create-estimate-details',
+        'Create Estimate View',
+        'Create Estimate embeds the estimator app inside BisonWorks so Bison users can start an estimate without leaving the workflow.'
+      )
+    );
+  }
+
+  if (canAccessBuilderView) {
+    pushNavStep(
+      'builder-view',
+      'Builder View',
+      '/builder',
+      'Click Builder View to open BisonBuilder.'
+    );
+    steps.push(
+      buildInfoStep(
+        'builder-view-details',
+        'Builder View',
+        'Builder View opens the embedded BisonBuilder experience. Internal and contractor users can work from available projects, while customer and builder accounts are limited to assigned project models.'
       )
     );
   }
@@ -462,6 +511,28 @@ function buildTutorialSteps({
       )
     );
   }
+
+  steps.push({
+    id: 'messages-open-menu',
+    title: 'Open User Menu',
+    description: 'Click your name or avatar in the top-right corner to open account actions.',
+    targetSelector: '[data-tutorial-id="user-menu-button"]',
+    requiredAction: true
+  });
+  steps.push({
+    id: 'messages-open',
+    title: 'Messages',
+    description: 'Click Messages to open direct messages.',
+    targetSelector: '[data-tutorial-id="messages-button"]',
+    requiredAction: true
+  });
+  steps.push(
+    buildInfoStep(
+      'messages-details',
+      'Messages View',
+      'Messages shows contacts on the left and the selected conversation on the right. Everyone can message Bison users, conversations poll for new messages, unread counts appear in the user menu, and messages can include file attachments.'
+    )
+  );
 
   return steps;
 }
@@ -770,12 +841,13 @@ export default function App() {
     () =>
       buildTutorialSteps({
         canAccessDashboard,
+        canAccessBuilderView,
         hasBison,
         hasAdminArea,
         hasContractor,
         hasCustomer
       }),
-    [canAccessDashboard, hasBison, hasAdminArea, hasContractor, hasCustomer]
+    [canAccessDashboard, canAccessBuilderView, hasBison, hasAdminArea, hasContractor, hasCustomer]
   );
   const accessLoading = authed && profileLoading;
   const firstLoginRequired = authed && firstLoginState.required;

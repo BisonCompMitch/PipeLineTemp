@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   downloadMessageAttachment,
+  listMessageContacts,
   listMessages,
   listUsers,
   markMessageRead,
@@ -250,7 +251,8 @@ export default function Messages({ currentUsername }) {
 
   useEffect(() => {
     let active = true;
-    listUsers()
+    listMessageContacts()
+      .catch(() => listUsers())
       .then((data) => {
         if (!active) return;
         const list = Array.isArray(data) ? data : [];
@@ -391,7 +393,7 @@ export default function Messages({ currentUsername }) {
     }
   };
 
-  // Merge listUsers() results with anyone who has messaged or been messaged by me,
+  // Merge contact API results with anyone who has messaged or been messaged by me,
   // so contacts always appear even if the API doesn't return them for this role.
   const contactList = React.useMemo(() => {
     const map = new Map(users.map((u) => [u.username, u]));
