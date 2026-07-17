@@ -796,16 +796,15 @@ export default function App() {
   const canAccessBuilderView = hasCustomer || hasBuilderRole || hasContractor || hasBison || hasAdminArea || hasManagementArea;
   const builderCapabilities = useMemo(() => {
     const assignedOnly = hasCustomer || hasBuilderRole;
-    const canAssign =
-      canAccessBuilderView && !assignedOnly && (hasBison || hasAdminArea || hasManagementArea);
+    const canManageBuilderModels = canAccessBuilderView && hasAdminArea;
     return {
       assignedOnly,
-      canUpload: canAccessBuilderView && !assignedOnly,
-      canAssign,
-      canClearAssignment: canAssign,
-      canUseProjectSelector: canAssign
+      canUpload: canManageBuilderModels,
+      canAssign: canManageBuilderModels,
+      canClearAssignment: canManageBuilderModels,
+      canUseProjectSelector: canAccessBuilderView && !assignedOnly
     };
-  }, [canAccessBuilderView, hasCustomer, hasBuilderRole, hasBison, hasAdminArea, hasManagementArea]);
+  }, [canAccessBuilderView, hasCustomer, hasBuilderRole, hasAdminArea]);
   const contractorRequesterScope = useMemo(() => {
     if (!hasContractor || hasBison) return '';
     return String(
