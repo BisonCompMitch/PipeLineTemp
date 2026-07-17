@@ -567,6 +567,10 @@ function trimOrNull(value) {
   return trimmed ? trimmed : null;
 }
 
+function normalizeRequesterScope(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function isImageUploadFile(file) {
   if (!file) return false;
   const type = String(file.type || '').toLowerCase();
@@ -696,7 +700,8 @@ export default function Pipeline({
   canViewAllAreas = false,
   showHoverNotes = false,
   showRequesterFilter = true,
-  showArchivedFilter = true
+  showArchivedFilter = true,
+  requesterScope = ''
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -771,6 +776,7 @@ export default function Pipeline({
     (name, stageId) => formatStageName(name, stageId, { audience: 'internal' }),
     []
   );
+  const requesterScopeKey = useMemo(() => normalizeRequesterScope(requesterScope), [requesterScope]);
 
   const closePreview = useCallback(() => {
     if (preview.url) {
@@ -1063,10 +1069,13 @@ export default function Pipeline({
     try {
       const data = await listProjects(showArchived ? 'include_deleted=true' : '');
       const mapped = (Array.isArray(data) ? data : []).map((project) => toRow(project, formatDisplayStageName));
+      const requesterFiltered = requesterScopeKey
+        ? mapped.filter((row) => normalizeRequesterScope(row?.project?.requester) === requesterScopeKey)
+        : mapped;
       const filtered =
         allowedStageIds === null
-          ? mapped
-          : mapped.filter((row) => row.areaId && allowedStageIds.has(row.areaId));
+          ? requesterFiltered
+          : requesterFiltered.filter((row) => row.areaId && allowedStageIds.has(row.areaId));
       setRows(filtered.sort(sortByProjectNumber));
     } catch (_err) {
       setRows([]);
@@ -1074,7 +1083,7 @@ export default function Pipeline({
     } finally {
       setLoading(false);
     }
-  }, [showArchived, allowedStageIds, formatDisplayStageName]);
+  }, [showArchived, allowedStageIds, formatDisplayStageName, requesterScopeKey]);
 
   const loadFiles = useCallback(async (projectId) => {
     if (!projectId) {

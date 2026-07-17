@@ -735,6 +735,25 @@ export default function App() {
       canUseProjectSelector: canAssign
     };
   }, [canAccessBuilderView, hasCustomer, hasBuilderRole, hasBison, hasAdminArea, hasManagementArea]);
+  const contractorRequesterScope = useMemo(() => {
+    if (!hasContractor || hasBison) return '';
+    return String(
+      profile?.company ||
+        profile?.company_name ||
+        profile?.contractor_company ||
+        profile?.requester ||
+        profile?.requester_name ||
+        ''
+    ).trim();
+  }, [
+    hasContractor,
+    hasBison,
+    profile?.company,
+    profile?.company_name,
+    profile?.contractor_company,
+    profile?.requester,
+    profile?.requester_name
+  ]);
   const customerSelectionKey = useMemo(
     () => customerProjectStorageKey(profile?.username || getStoredUsername() || ''),
     [profile?.username]
@@ -932,7 +951,7 @@ export default function App() {
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Project Intake', path: '/intake' });
     }
-    if (hasContractor || hasBison) {
+    if (hasBison) {
       items.push({ label: 'Create Estimate', path: '/create-estimate' });
     }
     if (canAccessBuilderView) {
@@ -1107,6 +1126,7 @@ export default function App() {
                     showHoverNotes={true}
                     showRequesterFilter={!hasContractor || hasBison}
                     showArchivedFilter={!hasContractor || hasBison}
+                    requesterScope={contractorRequesterScope}
                   />
                 </PageShell>
               </Protected>
@@ -1146,6 +1166,7 @@ export default function App() {
                     showHoverNotes={true}
                     showRequesterFilter={!hasContractor || hasBison}
                     showArchivedFilter={!hasContractor || hasBison}
+                    requesterScope={contractorRequesterScope}
                   />
                 </PageShell>
               </Protected>
@@ -1201,7 +1222,7 @@ export default function App() {
             element={
               <Protected
                 authed={authed}
-                allowed={!firstLoginRequired && (hasContractor || hasBison)}
+                allowed={!firstLoginRequired && hasBison}
                 fallback={fallbackRoute}
                 loading={accessLoading}
               >
