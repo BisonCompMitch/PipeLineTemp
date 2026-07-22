@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 const DEFAULT_ESTIMATE_URL = 'https://bisoncompmitch.github.io/Estima/';
+const ESTIMATE_APP_VERSION = '20260722-ifc-upload-2';
 
 function normalizeEstimateUrl(value) {
   const raw = String(value || '').trim();
@@ -8,7 +9,7 @@ function normalizeEstimateUrl(value) {
   try {
     const url = new URL(raw, window.location.origin);
     url.hash = '';
-    url.search = '';
+    url.searchParams.set('v', ESTIMATE_APP_VERSION);
     return url.toString().replace(/\/+$/, '/');
   } catch (_error) {
     return DEFAULT_ESTIMATE_URL;
