@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 const DEFAULT_ESTIMATE_URL = 'https://bisoncompmitch.github.io/Estima/';
-const ESTIMATE_APP_VERSION = '20260722-new-backend-1';
+const ESTIMATE_APP_VERSION = '20260722-local-vendor-1';
 
 function normalizeEstimateUrl(value) {
   const raw = String(value || '').trim();
