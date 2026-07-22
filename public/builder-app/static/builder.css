@@ -195,6 +195,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  row-gap: 4px;
+  flex-wrap: wrap;
+}
+
+#fileLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 180px;
 }
 
 .stats-label {
@@ -203,6 +213,16 @@
   font-size: 0.8rem;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  #fileLabel {
+    flex-basis: 100%;
+  }
+
+  .stats-label {
+    margin-left: 0;
+  }
 }
 
 /* ── Search ── */

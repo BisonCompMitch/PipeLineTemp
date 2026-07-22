@@ -1,6 +1,9 @@
 import * as THREE from "https://esm.sh/three@0.164.1";
 import { OrbitControls } from "https://esm.sh/three@0.164.1/examples/jsm/controls/OrbitControls.js";
 
+const IFC_LOADER_MODULE_URL = "https://cdn.jsdelivr.net/npm/web-ifc-three@0.0.125/IFCLoader.js/+esm";
+const CLIENT_IFC_PANEL_ID = "__client_ifc_model__";
+
 const fileInput = document.getElementById("fileInput");
 const loadBtn = document.getElementById("loadBtn");
 const dropZone = document.getElementById("dropZone");
@@ -53,6 +56,7 @@ let loadedAssignedProjectId = null;
 let loadedUploadFile = null;
 let parentAccessToken = "";
 let parentCapabilities = null;
+let ifcLoaderPromise = null;
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -130,6 +134,12 @@ function getEffectiveCapabilities() {
       !!parentCapabilities.canUseProjectSelector && (backendCanAssign || projects.length > 0),
     assignedOnly: !!parentCapabilities.assignedOnly || !!builderContext?.assigned_only,
   };
+}
+
+function canLoadLocalIfcFile() {
+  const capabilities = getEffectiveCapabilities();
+  if (capabilities.canUpload) return true;
+  return !builderContext && !parentCapabilities?.assignedOnly;
 }
 
 function isTrustedAuthOrigin(origin) {
@@ -220,6 +230,64 @@ async function parseJsonResponse(response, fallbackMessage = "Request failed.") 
     throw new Error(payload?.detail || payload?.error || fallbackMessage);
   }
   return payload;
+}
+
+async function responseErrorMessage(response, fallbackMessage = "Request failed.") {
+  let payload = null;
+  try {
+    payload = await response.clone().json();
+  } catch (_error) {
+    payload = null;
+  }
+  if (payload?.detail || payload?.error) {
+    return payload.detail || payload.error;
+  }
+  try {
+    const text = await response.text();
+    if (text && text.trim()) return text.trim();
+  } catch (_error) {
+    // Ignore unreadable error bodies.
+  }
+  return fallbackMessage;
+}
+
+function getIfcWasmPath() {
+  const explicitPath = String(window.BISON_BUILDER_IFC_WASM_PATH || "").trim();
+  if (explicitPath) {
+    return explicitPath.endsWith("/") ? explicitPath : `${explicitPath}/`;
+  }
+  return new URL("../ifc/", window.location.href).href;
+}
+
+async function getClientIfcLoader() {
+  if (!ifcLoaderPromise) {
+    ifcLoaderPromise = import(IFC_LOADER_MODULE_URL)
+      .then(async ({ IFCLoader }) => {
+        const loader = new IFCLoader();
+        const wasmPath = getIfcWasmPath();
+        if (loader.ifcManager?.ifcAPI?.SetWasmPath) {
+          loader.ifcManager.ifcAPI.SetWasmPath(wasmPath, true);
+          if (loader.ifcManager.state) loader.ifcManager.state.wasmPath = wasmPath;
+        } else {
+          await loader.ifcManager.setWasmPath(wasmPath);
+        }
+        return loader;
+      })
+      .catch((error) => {
+        ifcLoaderPromise = null;
+        throw error;
+      });
+  }
+  return ifcLoaderPromise;
+}
+
+function getBuilderFileId(project) {
+  return String(
+    project?.builder_file_id ||
+    project?.builderFileId ||
+    project?.builderFileID ||
+    ""
+  ).trim();
 }
 
 function projectLabel(project) {
@@ -351,13 +419,29 @@ function fmtIn(meters) {
   return (Number(meters) * M_TO_IN).toFixed(2);
 }
 
+function forEachMaterial(material, callback) {
+  if (!material) return;
+  const materials = Array.isArray(material) ? material : [material];
+  for (const item of materials) {
+    if (item) callback(item);
+  }
+}
+
 function setPanelHighlight(panelId, highlighted) {
   const entry = panelMap.get(panelId);
   if (!entry) return;
   for (const mesh of entry.meshes) {
-    mesh.material.emissive.setHex(highlighted ? HIGHLIGHT_EMISSIVE : 0x000000);
-    mesh.material.emissiveIntensity = highlighted ? HIGHLIGHT_INTENSITY : 0;
-    mesh.material.opacity = highlighted ? 1.0 : 0.94;
+    forEachMaterial(mesh.material, (material) => {
+      if (material.emissive?.setHex) {
+        material.emissive.setHex(highlighted ? HIGHLIGHT_EMISSIVE : 0x000000);
+        material.emissiveIntensity = highlighted ? HIGHLIGHT_INTENSITY : 0;
+      }
+      if ("opacity" in material) {
+        material.opacity = highlighted ? 1.0 : 0.94;
+        material.transparent = material.opacity < 1;
+      }
+      material.needsUpdate = true;
+    });
   }
 }
 
@@ -498,6 +582,79 @@ function buildModel(payload) {
   fitCameraToObject(group);
 }
 
+function buildClientIfcModel(ifcModel, sourceName = "IFC model") {
+  clearModel();
+
+  const meshes = [];
+  ifcModel.traverse((child) => {
+    if (!child.isMesh) return;
+    child.userData.panelId = CLIENT_IFC_PANEL_ID;
+    forEachMaterial(child.material, (material) => {
+      if ("side" in material) material.side = THREE.DoubleSide;
+      if ("opacity" in material && material.opacity > 0.96) {
+        material.opacity = 0.96;
+        material.transparent = true;
+      }
+      material.needsUpdate = true;
+    });
+    meshes.push(child);
+  });
+
+  if (!meshes.length) {
+    throw new Error("No renderable geometry found in this IFC file.");
+  }
+
+  modelGroup = ifcModel;
+  panelMap.set(CLIENT_IFC_PANEL_ID, {
+    meshes,
+    info: {
+      panelId: CLIENT_IFC_PANEL_ID,
+      panelGlobalId: null,
+      panelName: sourceName || "IFC model",
+      panelType: "IFC",
+      bucket: "Browser IFC",
+    },
+  });
+  const indexName = String(sourceName || "IFC model").toLowerCase().trim();
+  if (indexName) panelNameIndex.set(indexName, CLIENT_IFC_PANEL_ID);
+
+  scene.add(ifcModel);
+  fitCameraToObject(ifcModel);
+  return { meshCount: meshes.length };
+}
+
+async function loadIfcFileInBrowser(file, sourceName = "IFC model") {
+  const loader = await getClientIfcLoader();
+  const buffer = await file.arrayBuffer();
+  const model = await loader.parse(buffer);
+  return buildClientIfcModel(model, sourceName);
+}
+
+async function loadAssignedIfcInBrowser(project) {
+  const projectId = String(project?.id || "").trim();
+  const fileId = getBuilderFileId(project);
+  if (!projectId || !fileId) {
+    throw new Error("Assigned IFC file is not available for browser loading.");
+  }
+  const response = await builderFetch(
+    `/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/download`
+  );
+  if (!response.ok) {
+    throw new Error(await responseErrorMessage(response, "Assigned IFC download failed."));
+  }
+  const blob = await response.blob();
+  const sourceName = project.builder_file_name || "Assigned Builder model.ifc";
+  const file = new File([blob], sourceName, {
+    type: blob.type || "application/octet-stream",
+  });
+  return loadIfcFileInBrowser(file, sourceName);
+}
+
+function browserIfcStats(stats) {
+  const meshCount = Number(stats?.meshCount || 0);
+  return `${meshCount} mesh${meshCount === 1 ? "" : "es"} - browser IFC`;
+}
+
 function fitCameraToBbox(bbox) {
   if (bbox.isEmpty()) return;
   const center = bbox.getCenter(new THREE.Vector3());
@@ -541,7 +698,7 @@ function searchPanel() {
 }
 
 async function loadModel() {
-  if (!getEffectiveCapabilities().canUpload) {
+  if (!getEffectiveCapabilities().canUpload && !canLoadLocalIfcFile()) {
     setStatus("This role can only view assigned Builder models.", true);
     return;
   }
@@ -582,8 +739,19 @@ async function loadModel() {
     setStatus("Model loaded. Click any component to inspect the full panel.");
     statusCard.classList.add("hidden");
   } catch (error) {
-    console.error(error);
-    setStatus(`Load failed: ${error.message}`, true);
+    console.warn("Server IFC preview failed; falling back to browser IFC loader.", error);
+    setStatus(`Server preview unavailable. Loading ${file.name} in this browser...`);
+    try {
+      const stats = await loadIfcFileInBrowser(file, file.name);
+      loadedUploadFile = file;
+      loadedAssignedProjectId = null;
+      statsLabel.textContent = browserIfcStats(stats);
+      setStatus("Model loaded in browser. Click the IFC model to inspect its overall dimensions.");
+      statusCard.classList.add("hidden");
+    } catch (clientError) {
+      console.error(clientError);
+      setStatus(`Load failed: ${clientError.message || error.message}`, true);
+    }
   } finally {
     setViewerLoading(false);
     loadBtn.disabled = false;
@@ -693,8 +861,13 @@ async function loadBuilderContext(preferredProjectId = "") {
     }
   } catch (error) {
     console.error(error);
-    if (uploadCard) uploadCard.classList.add("hidden");
-    setStatus(`Builder setup failed: ${error.message}`, true);
+    if (canLoadLocalIfcFile()) {
+      if (uploadCard) uploadCard.classList.remove("hidden");
+      setStatus("Builder setup unavailable. Drop or choose an IFC file to view it locally.");
+    } else {
+      if (uploadCard) uploadCard.classList.add("hidden");
+      setStatus(`Builder setup failed: ${error.message}`, true);
+    }
   }
 }
 
@@ -726,8 +899,19 @@ async function loadAssignedProjectModel(projectId) {
     setStatus("Assigned model loaded. Click any component to inspect the full panel.");
     statusCard.classList.add("hidden");
   } catch (error) {
-    console.error(error);
-    setStatus(`Assigned model load failed: ${error.message}`, true);
+    console.warn("Assigned model preview failed; falling back to browser IFC loader.", error);
+    setStatus(`Server preview unavailable. Loading ${project.builder_file_name || "assigned model"} in this browser...`);
+    try {
+      const stats = await loadAssignedIfcInBrowser(project);
+      loadedAssignedProjectId = projectId;
+      loadedUploadFile = null;
+      statsLabel.textContent = browserIfcStats(stats);
+      setStatus("Assigned model loaded in browser. Click the IFC model to inspect its overall dimensions.");
+      statusCard.classList.add("hidden");
+    } catch (clientError) {
+      console.error(clientError);
+      setStatus(`Assigned model load failed: ${clientError.message || error.message}`, true);
+    }
   } finally {
     setViewerLoading(false);
   }
