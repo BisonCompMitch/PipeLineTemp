@@ -1,7 +1,7 @@
 param(
     [string]$BackendRoot = "",
     [int]$BackendPort = 8000,
-    [int]$FrontendPort = 5173,
+    [int]$FrontendPort = 5174,
     [switch]$InstallDependencies
 )
 
