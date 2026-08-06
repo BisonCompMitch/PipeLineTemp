@@ -5525,6 +5525,84 @@ body::before {
   margin-top: 2px;
 }
 
+.user-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.user-create-backdrop {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.user-create-modal {
+  width: min(880px, 100%);
+}
+
+.user-create-modal .modal-header {
+  align-items: flex-start;
+}
+
+.user-create-modal .modal-header p {
+  margin: 4px 0 0;
+}
+
+.user-type-options {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0;
+}
+
+.user-type-option {
+  min-width: 0;
+  min-height: 96px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.user-type-option span {
+  font-weight: 700;
+}
+
+.user-type-option small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.user-type-option.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+}
+
+.user-create-form--modal {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.user-create-modal .user-create-form label {
+  color: var(--text);
+}
+
+.user-create-helper {
+  margin: 8px 0 0;
+}
+
 .project-modal {
   max-width: 1200px;
 }
@@ -5551,6 +5629,10 @@ body::before {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
+  .user-type-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .area-check-grid--balanced {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
@@ -5560,6 +5642,24 @@ body::before {
   .user-create-form,
   .project-detail-form {
     grid-template-columns: 1fr;
+  }
+
+  .user-page-actions,
+  .user-type-options {
+    width: 100%;
+  }
+
+  .user-page-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-type-options {
+    grid-template-columns: 1fr;
+  }
+
+  .user-page-actions > * {
+    width: 100%;
   }
 
   .area-check-grid--balanced {

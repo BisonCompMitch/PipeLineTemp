@@ -465,7 +465,7 @@ function buildTutorialSteps({
       buildInfoStep(
         'users-details',
         'Manage Users View',
-        'Manage Users is split into Bison, Contractors, and Customers sections with create forms and editable user rows. Admins can update username, email, display name, password state, area/role assignments, and company/requester links.'
+        'Manage Users is split into Bison, Contractors, and Customers sections with editable rows. Use Add new user to choose the account type first, then complete the matching form. Admins can update username, email, display name, password state, area/role assignments, and company/requester links.'
       )
     );
   }

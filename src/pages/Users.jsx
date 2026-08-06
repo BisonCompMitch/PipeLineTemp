@@ -22,6 +22,36 @@ import useSiteDialog from '../utils/useSiteDialog.jsx';
 import { formatStageName, STAGE_FLOW } from '../utils/stageDisplay.js';
 
 const AREA_OPTIONS = [...STAGE_FLOW.map((stage) => formatStageName(stage.name, stage.id)), 'Management', 'Admin'];
+const CREATE_USER_TYPES = [
+  {
+    value: 'bison',
+    label: 'Bison',
+    description: 'Internal team account with roles and areas.'
+  },
+  {
+    value: 'contractor',
+    label: 'Contractor',
+    description: 'External contractor login tied to a company.'
+  },
+  {
+    value: 'customer',
+    label: 'Customer',
+    description: 'Project account linked to selected projects.'
+  },
+  {
+    value: 'builder',
+    label: 'Builder',
+    description: 'Builder access limited to assigned project models.'
+  }
+];
+
+const EMPTY_BISON_FORM = {
+  email: '',
+  rolesText: '',
+  areas: []
+};
+const EMPTY_CONTRACTOR_FORM = { company: '', full_name: '', email: '' };
+const EMPTY_CUSTOMER_FORM = { email: '', role: 'Customer', project_ids: [] };
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
@@ -252,6 +282,8 @@ export default function Users() {
   const [editStatus, setEditStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createUserType, setCreateUserType] = useState('');
   const [bulkResetLoading, setBulkResetLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState({
     bison: false,
@@ -259,13 +291,9 @@ export default function Users() {
     customer: false
   });
   const { confirmDialog, alertDialog, dialogPortal } = useSiteDialog();
-  const [createBisonForm, setCreateBisonForm] = useState({
-    email: '',
-    rolesText: '',
-    areas: []
-  });
-  const [createContractorForm, setCreateContractorForm] = useState({ company: '', full_name: '', email: '' });
-  const [createCustomerForm, setCreateCustomerForm] = useState({ email: '', role: 'Customer', project_ids: [] });
+  const [createBisonForm, setCreateBisonForm] = useState(() => ({ ...EMPTY_BISON_FORM, areas: [] }));
+  const [createContractorForm, setCreateContractorForm] = useState(() => ({ ...EMPTY_CONTRACTOR_FORM }));
+  const [createCustomerForm, setCreateCustomerForm] = useState(() => ({ ...EMPTY_CUSTOMER_FORM, project_ids: [] }));
 
   const loadAll = async ({ preserveStatus = false } = {}) => {
     setLoading(true);
@@ -552,6 +580,34 @@ export default function Users() {
     setPasswordVisible({ bison: false, contractor: false, customer: false });
   };
 
+  const resetCreateForms = () => {
+    setCreateBisonForm({ ...EMPTY_BISON_FORM, areas: [] });
+    setCreateContractorForm({ ...EMPTY_CONTRACTOR_FORM });
+    setCreateCustomerForm({ ...EMPTY_CUSTOMER_FORM, project_ids: [] });
+  };
+
+  const openCreateModal = () => {
+    resetCreateForms();
+    setCreateUserType('');
+    setCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setCreateModalOpen(false);
+    setCreateUserType('');
+    resetCreateForms();
+  };
+
+  const handleCreateUserTypeSelect = (type) => {
+    setCreateUserType(type);
+    if (type === 'customer' || type === 'builder') {
+      setCreateCustomerForm((prev) => ({
+        ...prev,
+        role: type === 'builder' ? 'Builder' : 'Customer'
+      }));
+    }
+  };
+
   const handleToggleArea = (area) => {
     setEditing((prev) => {
       if (!prev || prev.type !== 'bison') return prev;
@@ -786,6 +842,8 @@ export default function Users() {
         tone: 'success',
         text: 'Contractor created. Temporary password email sent when SMTP is configured.'
       });
+      setCreateModalOpen(false);
+      setCreateUserType('');
       loadAll({ preserveStatus: true });
     } catch (err) {
       setContractorStatus({ tone: 'error', text: 'Unable to create contractor.' });
@@ -814,6 +872,8 @@ export default function Users() {
         tone: 'success',
         text: 'Bison user created. Temporary password email sent when SMTP is configured.'
       });
+      setCreateModalOpen(false);
+      setCreateUserType('');
       loadAll({ preserveStatus: true });
     } catch (_err) {
       setBisonStatus({ tone: 'error', text: 'Unable to create Bison user.' });
@@ -843,23 +903,52 @@ export default function Users() {
       setCustomerStatus({ tone: 'error', text: 'Select at least one project for the customer.' });
       return;
     }
+    const selectedRole = createUserType === 'builder' ? 'Builder' : createCustomerForm.role || 'Customer';
     try {
       await createCustomer({
         email: createCustomerForm.email.trim(),
-        role: createCustomerForm.role || 'Customer',
+        role: selectedRole,
         project_id: projectIds[0],
         project_ids: projectIds
       });
       setCreateCustomerForm({ email: '', role: 'Customer', project_ids: [] });
       setCustomerStatus({
         tone: 'success',
-        text: `${createCustomerForm.role === 'Builder' ? 'Builder' : 'Customer'} created. Temporary password email sent when SMTP is configured.`
+        text: `${selectedRole === 'Builder' ? 'Builder' : 'Customer'} created. Temporary password email sent when SMTP is configured.`
       });
+      setCreateModalOpen(false);
+      setCreateUserType('');
       loadAll({ preserveStatus: true });
     } catch (err) {
       setCustomerStatus({ tone: 'error', text: 'Unable to create customer.' });
     }
   };
+
+  const handleCreateSubmit = (event) => {
+    if (createUserType === 'bison') {
+      handleCreateBison(event);
+      return;
+    }
+    if (createUserType === 'contractor') {
+      handleCreateContractor(event);
+      return;
+    }
+    if (createUserType === 'customer' || createUserType === 'builder') {
+      handleCreateCustomer(event);
+      return;
+    }
+    event.preventDefault();
+  };
+
+  const selectedCreateType = CREATE_USER_TYPES.find((option) => option.value === createUserType);
+  const createSubmitLabel =
+    createUserType === 'bison'
+      ? 'Create Bison user'
+      : createUserType === 'contractor'
+        ? 'Create contractor'
+        : createUserType === 'builder'
+          ? 'Create builder'
+          : 'Create customer';
 
   const handleDeleteBison = async (user) => {
     if (!user?.username) return;
@@ -923,9 +1012,14 @@ export default function Users() {
             <h2>Manage users</h2>
             <p className="muted">Bison, contractors, and customers.</p>
           </div>
-          <button className="ghost" type="button" onClick={loadAll}>
-            Refresh
-          </button>
+          <div className="user-page-actions">
+            <button className="primary" type="button" onClick={openCreateModal}>
+              Add new user
+            </button>
+            <button className="ghost" type="button" onClick={loadAll}>
+              Refresh
+            </button>
+          </div>
         </div>
         {loading ? <p className="muted">Loading users...</p> : null}
       </section>
@@ -950,47 +1044,6 @@ export default function Users() {
             {bulkResetLoading ? 'Resetting...' : 'Reset assigned passwords'}
           </button>
         </div>
-        <form className="form-grid user-create-form user-create-form--bison" onSubmit={handleCreateBison}>
-          <label className="span-2">
-            Email
-            <input
-              value={createBisonForm.email}
-              onChange={(event) => setCreateBisonForm({ ...createBisonForm, email: event.target.value })}
-              placeholder="user@email.com"
-            />
-          </label>
-          <label className="span-3">
-            Roles (comma separated)
-            <input
-              value={createBisonForm.rolesText}
-              onChange={(event) => setCreateBisonForm({ ...createBisonForm, rolesText: event.target.value })}
-              placeholder="Manager, Estimator"
-            />
-          </label>
-          <div className="user-create-note">
-            A temporary password is generated automatically. Full name and username are set by the user on first sign in.
-          </div>
-          <div className="area-check-section span-3">
-            <div className="muted">Areas</div>
-            <div className="area-check-grid area-check-grid--balanced">
-              {AREA_OPTIONS.map((area) => (
-                <label key={area} className="area-check">
-                  <input
-                    type="checkbox"
-                    checked={(createBisonForm.areas || []).includes(area)}
-                    onChange={() => handleCreateBisonAreaToggle(area)}
-                  />
-                  <span>{area}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="user-create-actions span-3 user-create-actions--end">
-            <button className="primary" type="submit">
-              Add Bison user
-            </button>
-          </div>
-        </form>
         <div className="table-scroll users-table-scroll">
           <table className="project-table users-table">
             <thead>
@@ -1054,45 +1107,6 @@ export default function Users() {
             <option key={option} value={option} />
           ))}
         </datalist>
-        <form className="form-grid user-create-form user-create-form--simple" onSubmit={handleCreateContractor}>
-          <label>
-            Company
-            <input
-              value={createContractorForm.company}
-              list="shared-party-options"
-              onChange={(event) =>
-                setCreateContractorForm({ ...createContractorForm, company: event.target.value })
-              }
-              placeholder="Company name"
-            />
-          </label>
-          <label>
-            Name
-            <input
-              value={createContractorForm.full_name}
-              onChange={(event) =>
-                setCreateContractorForm({ ...createContractorForm, full_name: event.target.value })
-              }
-              placeholder="Contractor name"
-            />
-          </label>
-          <label className="span-2">
-            Email
-            <input
-              value={createContractorForm.email}
-              onChange={(event) => setCreateContractorForm({ ...createContractorForm, email: event.target.value })}
-              placeholder="contractor@email.com"
-            />
-          </label>
-          <div className="user-create-note span-2">
-            A temporary password is generated automatically and reset is required on first sign in.
-          </div>
-          <div className="user-create-actions user-create-actions--end">
-            <button className="primary" type="submit">
-              Add contractor
-            </button>
-          </div>
-        </form>
         <div className="table-scroll users-table-scroll">
           <table className="project-table users-table">
             <thead>
@@ -1147,43 +1161,6 @@ export default function Users() {
             <p className="muted">External project accounts linked to one or more projects.</p>
           </div>
         </div>
-        <form className="form-grid user-create-form user-create-form--simple" onSubmit={handleCreateCustomer}>
-          <label>
-            Email
-            <input
-              value={createCustomerForm.email}
-              onChange={(event) => setCreateCustomerForm({ ...createCustomerForm, email: event.target.value })}
-              placeholder="customer@email.com"
-            />
-          </label>
-          <label>
-            Role
-            <select
-              value={createCustomerForm.role}
-              onChange={(event) => setCreateCustomerForm({ ...createCustomerForm, role: event.target.value })}
-            >
-              <option value="Customer">Customer</option>
-              <option value="Builder">Builder</option>
-            </select>
-          </label>
-          <label className="span-2">
-            Linked projects
-            <ProjectMultiSelect
-              projects={activeProjects}
-              selectedIds={createCustomerForm.project_ids}
-              onChange={(nextIds) => setCreateCustomerForm({ ...createCustomerForm, project_ids: nextIds })}
-              placeholder="Select one or more active projects"
-            />
-          </label>
-          <div className="user-create-note span-2">
-            A temporary password is generated automatically. Builder accounts only load assigned Builder models.
-          </div>
-          <div className="user-create-actions user-create-actions--end">
-            <button className="primary" type="submit">
-              Add account
-            </button>
-          </div>
-        </form>
         <div className="table-scroll users-table-scroll">
           <table className="project-table users-table">
             <thead>
@@ -1229,6 +1206,163 @@ export default function Users() {
           </table>
         </div>
       </section>
+
+      {createModalOpen ? (
+        <div className="modal-backdrop user-create-backdrop" onClick={closeCreateModal}>
+          <div className="modal user-modal user-create-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Add new user</div>
+                <p className="muted">What type of user should be created?</p>
+              </div>
+              <button className="ghost" type="button" onClick={closeCreateModal}>
+                Close
+              </button>
+            </div>
+
+            <div className="user-type-options" role="group" aria-label="User type">
+              {CREATE_USER_TYPES.map((option) => (
+                <button
+                  key={option.value}
+                  className={`user-type-option${createUserType === option.value ? ' selected' : ''}`}
+                  type="button"
+                  onClick={() => handleCreateUserTypeSelect(option.value)}
+                  aria-pressed={createUserType === option.value}
+                >
+                  <span>{option.label}</span>
+                  <small>{option.description}</small>
+                </button>
+              ))}
+            </div>
+
+            {selectedCreateType ? (
+              <form className="form-grid user-create-form user-create-form--modal" onSubmit={handleCreateSubmit}>
+                {createUserType === 'bison' ? (
+                  <>
+                    <label className="span-2">
+                      Email
+                      <input
+                        value={createBisonForm.email}
+                        onChange={(event) => setCreateBisonForm({ ...createBisonForm, email: event.target.value })}
+                        placeholder="user@email.com"
+                      />
+                    </label>
+                    <label className="span-3">
+                      Roles (comma separated)
+                      <input
+                        value={createBisonForm.rolesText}
+                        onChange={(event) =>
+                          setCreateBisonForm({ ...createBisonForm, rolesText: event.target.value })
+                        }
+                        placeholder="Manager, Estimator"
+                      />
+                    </label>
+                    <div className="user-create-note span-3">
+                      A temporary password is generated automatically. Full name and username are set by the user on first sign in.
+                    </div>
+                    <div className="area-check-section span-3">
+                      <div className="muted">Areas</div>
+                      <div className="area-check-grid area-check-grid--balanced">
+                        {AREA_OPTIONS.map((area) => (
+                          <label key={area} className="area-check">
+                            <input
+                              type="checkbox"
+                              checked={(createBisonForm.areas || []).includes(area)}
+                              onChange={() => handleCreateBisonAreaToggle(area)}
+                            />
+                            <span>{area}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {createUserType === 'contractor' ? (
+                  <>
+                    <label>
+                      Company
+                      <input
+                        value={createContractorForm.company}
+                        list="shared-party-options"
+                        onChange={(event) =>
+                          setCreateContractorForm({ ...createContractorForm, company: event.target.value })
+                        }
+                        placeholder="Company name"
+                      />
+                    </label>
+                    <label>
+                      Name
+                      <input
+                        value={createContractorForm.full_name}
+                        onChange={(event) =>
+                          setCreateContractorForm({ ...createContractorForm, full_name: event.target.value })
+                        }
+                        placeholder="Contractor name"
+                      />
+                    </label>
+                    <label className="span-2">
+                      Email
+                      <input
+                        value={createContractorForm.email}
+                        onChange={(event) =>
+                          setCreateContractorForm({ ...createContractorForm, email: event.target.value })
+                        }
+                        placeholder="contractor@email.com"
+                      />
+                    </label>
+                    <div className="user-create-note span-3">
+                      A temporary password is generated automatically and reset is required on first sign in.
+                    </div>
+                  </>
+                ) : null}
+
+                {createUserType === 'customer' || createUserType === 'builder' ? (
+                  <>
+                    <label className="span-2">
+                      Email
+                      <input
+                        value={createCustomerForm.email}
+                        onChange={(event) =>
+                          setCreateCustomerForm({ ...createCustomerForm, email: event.target.value })
+                        }
+                        placeholder={createUserType === 'builder' ? 'builder@email.com' : 'customer@email.com'}
+                      />
+                    </label>
+                    <label className="span-3">
+                      Linked projects
+                      <ProjectMultiSelect
+                        projects={activeProjects}
+                        selectedIds={createCustomerForm.project_ids}
+                        onChange={(nextIds) =>
+                          setCreateCustomerForm({ ...createCustomerForm, project_ids: nextIds })
+                        }
+                        placeholder="Select one or more active projects"
+                      />
+                    </label>
+                    <div className="user-create-note span-3">
+                      {createUserType === 'builder'
+                        ? 'A temporary password is generated automatically. Builder accounts only load assigned Builder models.'
+                        : 'A temporary password is generated automatically and the account is linked to selected projects.'}
+                    </div>
+                  </>
+                ) : null}
+
+                <div className="user-create-actions span-3 user-create-actions--end">
+                  <button className="ghost" type="button" onClick={closeCreateModal}>
+                    Cancel
+                  </button>
+                  <button className="primary" type="submit">
+                    {createSubmitLabel}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <p className="user-create-helper muted">Choose Bison, Contractor, Customer, or Builder to continue.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {editing ? (
         <div className="modal-backdrop" onClick={closeEdit}>
