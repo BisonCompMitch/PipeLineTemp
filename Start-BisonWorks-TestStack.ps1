@@ -148,6 +148,13 @@ $backendPort = Get-AvailablePort -PreferredPort $BackendPort
 $frontendPort = Get-AvailablePort -PreferredPort $FrontendPort
 $backendUrl = "http://127.0.0.1:$backendPort"
 $frontendUrl = "http://127.0.0.1:$frontendPort"
+$localAdminUsername = "admin"
+$localAdminPassword = "Admin123!"
+$seedScriptPath = Join-Path $FrontendRoot "scripts\seed_local_admin.py"
+
+if (-not (Test-Path $seedScriptPath)) {
+    throw "Local admin seed script not found at $seedScriptPath."
+}
 
 if ($InstallDependencies) {
     Write-Host "Installing frontend dependencies..."
@@ -177,6 +184,7 @@ $quotedBackendPath = ConvertTo-QuotedValue -Value $backendPath
 $quotedFrontendRoot = ConvertTo-QuotedValue -Value $FrontendRoot
 $quotedPythonPath = ConvertTo-QuotedValue -Value $pythonPath
 $quotedNpmPath = ConvertTo-QuotedValue -Value $npmCommand.Source
+$quotedSeedScriptPath = ConvertTo-QuotedValue -Value $seedScriptPath
 $localJwtSecret = "local-testing-secret-for-bisonworks-dev-only-2026"
 $corsOrigins = "http://localhost:$frontendPort,http://127.0.0.1:$frontendPort"
 
@@ -186,6 +194,11 @@ Set-Location $quotedBackendPath
 `$env:PIPELINE_DB_URL = 'sqlite:///./pipeline.db'
 `$env:PIPELINE_SKIP_SCHEMA = 'false'
 `$env:PIPELINE_CORS_ORIGINS = '$corsOrigins'
+Write-Host 'Installing local backend bcrypt compatibility pin...'
+& $quotedPythonPath -m pip install 'bcrypt==4.0.1'
+if (`$LASTEXITCODE -ne 0) { throw 'bcrypt compatibility install failed.' }
+& $quotedPythonPath $quotedSeedScriptPath --username '$localAdminUsername' --password '$localAdminPassword'
+if (`$LASTEXITCODE -ne 0) { throw 'Local admin seed failed.' }
 Write-Host 'Backend: $backendUrl'
 & $quotedPythonPath -m uvicorn app.main:app --host 127.0.0.1 --port $backendPort
 "@
@@ -223,5 +236,6 @@ Write-Host "Testing stack URLs"
 Write-Host "Frontend: $frontendUrl"
 Write-Host "Backend:  $backendUrl"
 Write-Host "API proxy: $frontendUrl/api -> $backendUrl"
+Write-Host "Local test login: $localAdminUsername / $localAdminPassword"
 Write-Host ""
 Write-Host "Close the backend and frontend PowerShell windows to stop the servers."
