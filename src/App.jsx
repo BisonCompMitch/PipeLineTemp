@@ -794,6 +794,7 @@ export default function App() {
   const canViewAllAreas = hasAdminArea || hasManagementArea;
   const canAccessDashboard = hasContractor || hasBison;
   const canAccessBuilderView = hasCustomer || hasBuilderRole || hasContractor || hasBison || hasAdminArea || hasManagementArea;
+  const canAccessAssignedProjectFiles = hasCustomer || hasBuilderRole;
   const builderCapabilities = useMemo(() => {
     const assignedOnly = hasCustomer || hasBuilderRole;
     const canManageBuilderModels = canAccessBuilderView && hasAdminArea;
@@ -866,7 +867,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!authed || profileLoading || !hasCustomer) {
+    if (!authed || profileLoading || !canAccessAssignedProjectFiles) {
       setCustomerProjects([]);
       setCustomerProjectsLoading(false);
       setCustomerProjectId('');
@@ -908,7 +909,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [authed, profileLoading, hasCustomer, customerSelectionKey]);
+  }, [authed, profileLoading, canAccessAssignedProjectFiles, customerSelectionKey]);
 
   useEffect(() => {
     if (!customerSelectionKey || !selectedCustomerProject?.id) return;
@@ -1021,6 +1022,8 @@ export default function App() {
     }
     if (hasCustomer) {
       items.push({ label: 'Progress', path: '/customer' });
+    }
+    if (canAccessAssignedProjectFiles) {
       items.push({ label: 'Files for Review', path: '/customer/files' });
       items.push({ label: 'Project Pictures', path: '/customer/pictures' });
     }
@@ -1037,7 +1040,8 @@ export default function App() {
     hasBuilderRole,
     canAccessDashboard,
     hasAdminArea,
-    canAccessBuilderView
+    canAccessBuilderView,
+    canAccessAssignedProjectFiles
   ]);
   const topBarDisplayName = String(
     profile?.full_name || getDisplayName() || profile?.username || getStoredUsername() || 'User'
@@ -1401,7 +1405,12 @@ export default function App() {
             <Route
               path="/customer/files"
               element={
-                <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
+                <Protected
+                  authed={authed}
+                  allowed={!firstLoginRequired && canAccessAssignedProjectFiles}
+                  fallback={fallbackRoute}
+                  loading={accessLoading}
+                >
                   <PageShell
                     title={pageTitle}
                     displayName={topBarDisplayName}
@@ -1420,6 +1429,8 @@ export default function App() {
                     <CustomerFiles
                       project={selectedCustomerProject}
                       loadingProjects={customerProjectsLoading}
+                      audience={hasBuilderRole && !hasCustomer ? 'builder' : 'customer'}
+                      canUpload={hasCustomer}
                     />
                 </PageShell>
               </Protected>
@@ -1428,7 +1439,12 @@ export default function App() {
             <Route
               path="/customer/pictures"
               element={
-                <Protected authed={authed} allowed={!firstLoginRequired && hasCustomer} fallback={fallbackRoute} loading={accessLoading}>
+                <Protected
+                  authed={authed}
+                  allowed={!firstLoginRequired && canAccessAssignedProjectFiles}
+                  fallback={fallbackRoute}
+                  loading={accessLoading}
+                >
                   <PageShell
                     title={pageTitle}
                     displayName={topBarDisplayName}
@@ -1447,6 +1463,7 @@ export default function App() {
                     <CustomerPictures
                       project={selectedCustomerProject}
                       loadingProjects={customerProjectsLoading}
+                      audience={hasBuilderRole && !hasCustomer ? 'builder' : 'customer'}
                     />
                 </PageShell>
               </Protected>

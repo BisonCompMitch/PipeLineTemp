@@ -84,7 +84,7 @@ function getFileTypeLabel(filename) {
   return ext.slice(0, 5).toUpperCase();
 }
 
-export default function CustomerFiles({ project, loadingProjects = false }) {
+export default function CustomerFiles({ project, loadingProjects = false, audience = 'customer', canUpload = true }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -102,6 +102,7 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
   const [fileViewMode, setFileViewMode] = useFileViewMode();
   const projectId = project?.id || '';
   const projectName = project?.name || '';
+  const isBuilderAudience = audience === 'builder';
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -287,7 +288,7 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
 
   const handleUpload = async (event) => {
     event.preventDefault();
-    if (!projectId) return;
+    if (!projectId || !canUpload) return;
     if (!uploadFiles.length) {
       setUploadError('Select files to upload.');
       return;
@@ -330,9 +331,13 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
         <div>
           <h2>Files</h2>
           <p className="muted">
-            {projectName
-              ? `Project documents shared with you for ${projectName}. Your uploads will be shared with the project team.`
-              : 'Project documents shared with you. Your uploads will be shared with the project team.'}
+            {isBuilderAudience
+              ? projectName
+                ? `Builder-visible documents for ${projectName}.`
+                : 'Builder-visible documents for the selected project.'
+              : projectName
+                ? `Project documents shared with you for ${projectName}. Your uploads will be shared with the project team.`
+                : 'Project documents shared with you. Your uploads will be shared with the project team.'}
           </p>
         </div>
         <button className="ghost" type="button" onClick={loadFiles} disabled={loading || !projectId}>
@@ -347,57 +352,59 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
         </div>
       ) : (
         <>
-          <form className="file-upload-form" onSubmit={handleUpload}>
-            <input
-              id="customer-file-upload"
-              className="file-upload-input"
-              type="file"
-              multiple
-              onChange={(event) => setUploadFiles(Array.from(event.target.files || []))}
-            />
-            <div
-              className={`file-upload-row${dragActive ? ' drag-active' : ''}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'copy';
-              }}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault();
-                setDragActive(false);
-              }}
-              onDrop={handleDrop}
-            >
-              <div className="file-drop-hint">
-                <span className="file-drop-icon" aria-hidden="true">+</span>
-                <span>{dragActive ? 'Drop files to upload' : 'Drag and drop files here'}</span>
+          {canUpload ? (
+            <form className="file-upload-form" onSubmit={handleUpload}>
+              <input
+                id="customer-file-upload"
+                className="file-upload-input"
+                type="file"
+                multiple
+                onChange={(event) => setUploadFiles(Array.from(event.target.files || []))}
+              />
+              <div
+                className={`file-upload-row${dragActive ? ' drag-active' : ''}`}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'copy';
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setDragActive(false);
+                }}
+                onDrop={handleDrop}
+              >
+                <div className="file-drop-hint">
+                  <span className="file-drop-icon" aria-hidden="true">+</span>
+                  <span>{dragActive ? 'Drop files to upload' : 'Drag and drop files here'}</span>
+                </div>
+                <span className="file-upload-name">
+                  {summarizeSelection(uploadFiles, 'Upload signed documents here', 'files')}
+                </span>
               </div>
-              <span className="file-upload-name">
-                {summarizeSelection(uploadFiles, 'Upload signed documents here', 'files')}
-              </span>
-            </div>
-            <div className="file-upload-actions">
-              <div className="file-upload-controls">
-                <label htmlFor="customer-file-upload" className="ghost file-upload-button">
-                  Choose files
-                </label>
-                <button className="primary" type="submit" disabled={!uploadFiles.length || uploading}>
-                  {uploading ? 'Uploading...' : 'Upload documents'}
-                </button>
+              <div className="file-upload-actions">
+                <div className="file-upload-controls">
+                  <label htmlFor="customer-file-upload" className="ghost file-upload-button">
+                    Choose files
+                  </label>
+                  <button className="primary" type="submit" disabled={!uploadFiles.length || uploading}>
+                    {uploading ? 'Uploading...' : 'Upload documents'}
+                  </button>
+                </div>
+                <span className="file-upload-selected">
+                  {summarizeSelection(uploadFiles, 'No files selected', 'files')}
+                </span>
               </div>
-              <span className="file-upload-selected">
-                {summarizeSelection(uploadFiles, 'No files selected', 'files')}
-              </span>
-            </div>
-            <div className="file-upload-actions">
-              <span className="muted">Uploaded files are shared with the project team.</span>
-            </div>
-            <div>
-            </div>
-          </form>
+              <div className="file-upload-actions">
+                <span className="muted">Uploaded files are shared with the project team.</span>
+              </div>
+              <div>
+              </div>
+            </form>
+          ) : null}
           <div className="photo-gallery-panel">
             {documentFiles.length ? (
               <div className="file-view-toggle-row">
@@ -432,7 +439,9 @@ export default function CustomerFiles({ project, loadingProjects = false }) {
               </div>
             ) : (
               <div className="empty-state">
-                <p className="muted">No files uploaded yet.</p>
+                <p className="muted">
+                  {isBuilderAudience ? 'No builder-visible files shared yet.' : 'No files uploaded yet.'}
+                </p>
               </div>
             )}
           </div>

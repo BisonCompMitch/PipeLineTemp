@@ -42,7 +42,7 @@ function triggerBrowserDownload(blob, filename) {
   window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
 }
 
-export default function CustomerPictures({ project, loadingProjects = false }) {
+export default function CustomerPictures({ project, loadingProjects = false, audience = 'customer' }) {
   const [photos, setPhotos] = useState([]);
   const [photoUrls, setPhotoUrls] = useState({});
   const [loading, setLoading] = useState(true);
@@ -56,6 +56,7 @@ export default function CustomerPictures({ project, loadingProjects = false }) {
   const [fileViewMode, setFileViewMode] = useFileViewMode();
   const projectId = project?.id || '';
   const projectName = project?.name || '';
+  const isBuilderAudience = audience === 'builder';
 
   const getCachedBlob = useCallback(async (projectId, fileId) => {
     const key = `${projectId}:${fileId}`;
@@ -229,7 +230,13 @@ export default function CustomerPictures({ project, loadingProjects = false }) {
         <div>
           <h2>Project Pictures</h2>
           <p className="muted">
-            {projectName ? `Customer-visible photos for ${projectName}.` : 'Customer-visible photos for the selected project.'}
+            {isBuilderAudience
+              ? projectName
+                ? `Builder-visible photos for ${projectName}.`
+                : 'Builder-visible photos for the selected project.'
+              : projectName
+                ? `Customer-visible photos for ${projectName}.`
+                : 'Customer-visible photos for the selected project.'}
           </p>
         </div>
         <button className="ghost" type="button" onClick={loadPhotos} disabled={loading || !projectId}>
@@ -281,7 +288,9 @@ export default function CustomerPictures({ project, loadingProjects = false }) {
             </div>
           ) : (
             <div className="empty-state">
-              <p className="muted">No project pictures uploaded yet.</p>
+              <p className="muted">
+                {isBuilderAudience ? 'No builder-visible pictures shared yet.' : 'No project pictures uploaded yet.'}
+              </p>
             </div>
           )}
         </div>

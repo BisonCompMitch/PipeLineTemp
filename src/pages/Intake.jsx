@@ -157,7 +157,9 @@ export default function Intake() {
   const [photoUploads, setPhotoUploads] = useState([]);
   const [uploadAllowCustomer, setUploadAllowCustomer] = useState(false);
   const [uploadAllowContractor, setUploadAllowContractor] = useState(false);
+  const [uploadAllowBuilder, setUploadAllowBuilder] = useState(false);
   const [uploadPhotoAllowContractor, setUploadPhotoAllowContractor] = useState(false);
+  const [uploadPhotoAllowBuilder, setUploadPhotoAllowBuilder] = useState(false);
   const [fileDragActive, setFileDragActive] = useState(false);
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -316,7 +318,8 @@ export default function Intake() {
               filename: item.file.name,
               content_type: item.file.type || undefined,
               customer_visible: uploadAllowCustomer,
-              contractor_visible: uploadAllowContractor
+              contractor_visible: uploadAllowContractor,
+              builder_visible: uploadAllowBuilder
             })
           ),
           ...pendingPhotos.map((item) =>
@@ -324,7 +327,8 @@ export default function Intake() {
               filename: item.file.name,
               content_type: item.file.type || undefined,
               customer_visible: true,
-              contractor_visible: uploadPhotoAllowContractor
+              contractor_visible: uploadPhotoAllowContractor,
+              builder_visible: uploadPhotoAllowBuilder
             })
           )
         ];
@@ -374,7 +378,9 @@ export default function Intake() {
       setPhotoUploads([]);
       setUploadAllowCustomer(false);
       setUploadAllowContractor(false);
+      setUploadAllowBuilder(false);
       setUploadPhotoAllowContractor(false);
+      setUploadPhotoAllowBuilder(false);
       setPhotoError('');
     } catch (err) {
       setStatus('Unable to submit the project intake.');
@@ -681,6 +687,17 @@ export default function Intake() {
                   </span>
                   <span className="switch-text">Allow contractor view</span>
                 </label>
+                <label className="switch-field">
+                  <input
+                    type="checkbox"
+                    checked={uploadAllowBuilder}
+                    onChange={(event) => setUploadAllowBuilder(event.target.checked)}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span className="switch-thumb" />
+                  </span>
+                  <span className="switch-text">Allow builder view</span>
+                </label>
                 <span className="file-upload-selected">
                   {summarizeSelection(uploadFiles, 'No files selected', 'files')}
                 </span>
@@ -772,6 +789,17 @@ export default function Intake() {
                     <span className="switch-thumb" />
                   </span>
                   <span className="switch-text">Allow contractor view</span>
+                </label>
+                <label className="switch-field">
+                  <input
+                    type="checkbox"
+                    checked={uploadPhotoAllowBuilder}
+                    onChange={(event) => setUploadPhotoAllowBuilder(event.target.checked)}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span className="switch-thumb" />
+                  </span>
+                  <span className="switch-text">Allow builder view</span>
                 </label>
                 <span className="muted">Photos are visible to the linked customer.</span>
                 <span className="file-upload-selected">

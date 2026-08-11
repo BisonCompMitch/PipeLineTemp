@@ -341,8 +341,10 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploadAllowCustomer, setUploadAllowCustomer] = useState(false);
   const [uploadAllowContractor, setUploadAllowContractor] = useState(false);
+  const [uploadAllowBuilder, setUploadAllowBuilder] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photoUploads, setPhotoUploads] = useState([]);
+  const [uploadPhotoAllowBuilder, setUploadPhotoAllowBuilder] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [fileDragActive, setFileDragActive] = useState(false);
@@ -858,13 +860,15 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
         await uploadProjectFile(selectedRow.project.id, file, {
           filename: file.name,
           customer_visible: uploadAllowCustomer,
-          contractor_visible: uploadAllowContractor
+          contractor_visible: uploadAllowContractor,
+          builder_visible: uploadAllowBuilder
         });
       }
       const uploadedCount = uploadFiles.length;
       setUploadFiles([]);
       setUploadAllowCustomer(false);
       setUploadAllowContractor(false);
+      setUploadAllowBuilder(false);
       await loadFiles(selectedRow.project.id);
       await alertDialog(uploadedCount === 1 ? 'File uploaded.' : `${uploadedCount} files uploaded.`, {
         title: 'Upload complete',
@@ -899,11 +903,13 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
         await uploadProjectFile(selectedRow.project.id, file, {
           filename: file.name,
           customer_visible: true,
+          builder_visible: uploadPhotoAllowBuilder,
           content_type: file.type || undefined
         });
       }
       const uploadedCount = photoUploads.length;
       setPhotoUploads([]);
+      setUploadPhotoAllowBuilder(false);
       await loadFiles(selectedRow.project.id);
       await alertDialog(uploadedCount === 1 ? 'Photo uploaded.' : `${uploadedCount} photos uploaded.`, {
         title: 'Upload complete',
@@ -937,7 +943,7 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
 
   const handleToggleFileVisibility = async (fileRecord, field, nextValue) => {
     if (!selectedRow?.project?.id || !fileRecord?.id) return;
-    if (!['customer_visible', 'contractor_visible'].includes(field)) return;
+    if (!['customer_visible', 'contractor_visible', 'builder_visible'].includes(field)) return;
     try {
       const updated = await setProjectFileVisibility(selectedRow.project.id, fileRecord.id, {
         [field]: nextValue
@@ -1458,6 +1464,17 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                       </span>
                       <span className="switch-text">Allow contractor view</span>
                     </label>
+                    <label className="switch-field">
+                      <input
+                        type="checkbox"
+                        checked={uploadAllowBuilder}
+                        onChange={(event) => setUploadAllowBuilder(event.target.checked)}
+                      />
+                      <span className="switch-track" aria-hidden="true">
+                        <span className="switch-thumb" />
+                      </span>
+                      <span className="switch-text">Allow builder view</span>
+                    </label>
                     <span className="file-upload-selected">
                       {summarizeSelection(uploadFiles, 'No files selected', 'files')}
                     </span>
@@ -1519,6 +1536,19 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                             <span className="switch-thumb" />
                           </span>
                           <span className="switch-text">Contractor view</span>
+                        </label>
+                        <label className="switch-field compact-card-switch">
+                          <input
+                            type="checkbox"
+                            checked={coerceBool(fileRecord.builder_visible)}
+                            onChange={(event) =>
+                              handleToggleFileVisibility(fileRecord, 'builder_visible', event.target.checked)
+                            }
+                          />
+                          <span className="switch-track" aria-hidden="true">
+                            <span className="switch-thumb" />
+                          </span>
+                          <span className="switch-text">Builder view</span>
                         </label>
                       </div>
                     ))}
@@ -1588,6 +1618,17 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                       {photoUploading ? 'Uploading...' : 'Upload photos'}
                     </button>
                   </div>
+                  <label className="switch-field">
+                    <input
+                      type="checkbox"
+                      checked={uploadPhotoAllowBuilder}
+                      onChange={(event) => setUploadPhotoAllowBuilder(event.target.checked)}
+                    />
+                    <span className="switch-track" aria-hidden="true">
+                      <span className="switch-thumb" />
+                    </span>
+                    <span className="switch-text">Allow builder view</span>
+                  </label>
                   <span className="muted">Photos are visible to the linked customer.</span>
                   <span className="file-upload-selected">
                     {summarizeSelection(photoUploads, 'No photos selected', 'photos')}
@@ -1653,6 +1694,19 @@ export default function Areas({ userAreas = [], canEditExpectedTime = false }) {
                             <span className="switch-thumb" />
                           </span>
                           <span className="switch-text">Contractor view</span>
+                        </label>
+                        <label className="switch-field compact-card-switch">
+                          <input
+                            type="checkbox"
+                            checked={coerceBool(fileRecord.builder_visible)}
+                            onChange={(event) =>
+                              handleToggleFileVisibility(fileRecord, 'builder_visible', event.target.checked)
+                            }
+                          />
+                          <span className="switch-track" aria-hidden="true">
+                            <span className="switch-thumb" />
+                          </span>
+                          <span className="switch-text">Builder view</span>
                         </label>
                       </div>
                     ))}

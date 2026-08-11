@@ -370,6 +370,9 @@ export async function uploadProjectFile(projectId, file, options = {}) {
   if (typeof options.contractor_visible === 'boolean') {
     params.set('contractor_visible', options.contractor_visible ? 'true' : 'false');
   }
+  if (typeof options.builder_visible === 'boolean') {
+    params.set('builder_visible', options.builder_visible ? 'true' : 'false');
+  }
   const response = await apiRequest(`/projects/${encodeURIComponent(projectId)}/files/upload?${params.toString()}`, {
     method: 'POST',
     body: file
@@ -407,6 +410,10 @@ export async function setProjectFileVisibility(projectId, fileId, visibilityOrCu
           contractor_visible:
             typeof visibilityOrCustomerVisible.contractor_visible === 'boolean'
               ? visibilityOrCustomerVisible.contractor_visible
+              : undefined,
+          builder_visible:
+            typeof visibilityOrCustomerVisible.builder_visible === 'boolean'
+              ? visibilityOrCustomerVisible.builder_visible
               : undefined
         }
       : {
@@ -420,6 +427,7 @@ export async function setProjectFileVisibility(projectId, fileId, visibilityOrCu
   const payload = {};
   if (typeof visibility.customer_visible === 'boolean') payload.customer_visible = visibility.customer_visible;
   if (typeof visibility.contractor_visible === 'boolean') payload.contractor_visible = visibility.contractor_visible;
+  if (typeof visibility.builder_visible === 'boolean') payload.builder_visible = visibility.builder_visible;
   if (!Object.keys(payload).length) {
     throw new Error('No visibility update provided.');
   }
