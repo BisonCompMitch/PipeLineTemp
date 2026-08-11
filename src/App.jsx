@@ -877,7 +877,7 @@ export default function App() {
     setCustomerProjectsLoading(true);
     (async () => {
       try {
-        const projects = await listProjects();
+        const projects = await listProjects('include_deleted=true');
         if (!active) return;
         const sortedProjects = Array.isArray(projects) ? [...projects].sort(sortProjectsForSelection) : [];
         setCustomerProjects(sortedProjects);

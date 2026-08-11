@@ -117,6 +117,11 @@ function projectLabel(project) {
   return projectName || projectNumber || project?.id || 'Unnamed project';
 }
 
+function projectOptionLabel(project) {
+  const label = projectLabel(project);
+  return project?.is_deleted ? `${label} (Archived)` : label;
+}
+
 function sortProjects(a, b) {
   const aNumber = String(a?.project_number || '').trim();
   const bNumber = String(b?.project_number || '').trim();
@@ -177,6 +182,7 @@ function summarizeProjectSelection(projectIds, projectMap) {
 function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No projects selected' }) {
   const [open, setOpen] = useState(false);
   const controlRef = useRef(null);
+  const listRef = useRef(null);
   const projectList = Array.isArray(projects) ? projects : [];
   const currentIds = useMemo(() => normalizeProjectIds(selectedIds), [selectedIds]);
   const selectedSet = useMemo(() => new Set(currentIds), [currentIds]);
@@ -185,7 +191,7 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
       currentIds
         .map((projectId) => projectList.find((project) => project.id === projectId))
         .filter(Boolean)
-        .map((project) => projectLabel(project)),
+        .map((project) => projectOptionLabel(project)),
     [currentIds, projectList]
   );
   const summary = useMemo(() => {
@@ -215,6 +221,7 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
   }, [open]);
 
   const toggleProject = (projectId) => {
+    const previousScrollTop = listRef.current?.scrollTop ?? 0;
     const nextSet = new Set(currentIds);
     if (nextSet.has(projectId)) {
       nextSet.delete(projectId);
@@ -225,6 +232,11 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
       .map((project) => project.id)
       .filter((projectId) => nextSet.has(projectId));
     onChange(nextIds);
+    window.requestAnimationFrame(() => {
+      if (listRef.current) {
+        listRef.current.scrollTop = previousScrollTop;
+      }
+    });
   };
 
   return (
@@ -244,21 +256,29 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
       </button>
       {open ? (
         <div className="project-multi-select-panel">
-          <div className="project-multi-select-panel-title">Select one or more projects</div>
-          <div className="area-check-grid project-check-grid">
+          <div className="project-multi-select-panel-title">
+            Select one or more projects ({projectList.length})
+          </div>
+          <div className="area-check-grid project-check-grid" ref={listRef}>
             {projectList.length ? (
-              projectList.map((project) => (
-                <label key={project.id} className="area-check project-check">
-                  <input
-                    className="project-check-input"
-                    type="checkbox"
-                    checked={selectedSet.has(project.id)}
-                    onChange={() => toggleProject(project.id)}
-                  />
-                  <span className="project-check-box" aria-hidden="true" />
-                  <span className="project-check-label">{projectLabel(project)}</span>
-                </label>
-              ))
+              projectList.map((project) => {
+                const selected = selectedSet.has(project.id);
+                return (
+                  <button
+                    key={project.id}
+                    className={`area-check project-check${selected ? ' selected' : ''}`}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={selected}
+                    title={projectOptionLabel(project)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => toggleProject(project.id)}
+                  >
+                    <span className="project-check-box" aria-hidden="true" />
+                    <span className="project-check-label">{projectOptionLabel(project)}</span>
+                  </button>
+                );
+              })
             ) : (
               <div className="muted project-multi-select-empty">No projects available.</div>
             )}
@@ -463,10 +483,7 @@ export default function Users() {
     return map;
   }, [projects]);
 
-  const activeProjects = useMemo(
-    () => projects.filter((project) => !project?.is_deleted).sort(sortProjects),
-    [projects]
-  );
+  const projectOptions = useMemo(() => [...projects].sort(sortProjects), [projects]);
 
   const sortedBison = useMemo(
     () =>
@@ -1332,12 +1349,12 @@ export default function Users() {
                     <label className="span-3">
                       Linked projects
                       <ProjectMultiSelect
-                        projects={activeProjects}
+                        projects={projectOptions}
                         selectedIds={createCustomerForm.project_ids}
                         onChange={(nextIds) =>
                           setCreateCustomerForm({ ...createCustomerForm, project_ids: nextIds })
                         }
-                        placeholder="Select one or more active projects"
+                        placeholder="Select one or more projects"
                       />
                     </label>
                     <div className="user-create-note span-3">

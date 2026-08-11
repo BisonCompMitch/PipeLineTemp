@@ -3061,10 +3061,8 @@ body[data-theme='light'] .project-multi-select-trigger.ghost:hover {
 }
 
 .project-multi-select-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
+  position: static;
+  margin-top: 8px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -3099,25 +3097,17 @@ body[data-theme='light'] .project-multi-select-panel {
   display: flex;
   align-items: center;
   gap: 10px;
+  appearance: none;
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 body[data-theme='light'] .project-check.area-check {
   background: #f8fafc;
-}
-
-.project-check-input {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  opacity: 0;
-  transform: translateY(-50%);
-  cursor: pointer;
 }
 
 .project-check-box {
@@ -3147,18 +3137,18 @@ body[data-theme='light'] .project-check.area-check {
   transform: rotate(40deg) translate(-1px, -1px);
 }
 
-.project-check-input:checked + .project-check-box {
+.project-check.area-check.selected .project-check-box {
   background: var(--primary);
   border-color: var(--primary);
   box-shadow: 0 0 0 1px rgba(79, 142, 247, 0.12);
 }
 
-.project-check-input:checked + .project-check-box::after {
+.project-check.area-check.selected .project-check-box::after {
   border-right-color: #ffffff;
   border-bottom-color: #ffffff;
 }
 
-.project-check-input:focus-visible + .project-check-box {
+.project-check.area-check:focus-visible .project-check-box {
   outline: 2px solid rgba(79, 142, 247, 0.55);
   outline-offset: 2px;
 }
@@ -3176,7 +3166,7 @@ body[data-theme='light'] .project-check-box {
   border-color: rgba(148, 163, 184, 0.95);
 }
 
-body[data-theme='light'] .project-check-input:checked + .project-check-box {
+body[data-theme='light'] .project-check.area-check.selected .project-check-box {
   background: var(--primary);
   border-color: var(--primary);
 }
