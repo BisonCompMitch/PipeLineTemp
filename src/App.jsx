@@ -990,25 +990,7 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [authed, theme, location.pathname, sessionId]);
 
-  const isCustomerPortal = useMemo(
-    () =>
-      ['/customer', '/customer/files', '/customer/pictures'].some((route) =>
-        location.pathname === route || location.pathname.startsWith(`${route}/`)
-      ),
-    [location.pathname]
-  );
-  const customerNavItems = useMemo(
-    () => [
-      { label: 'Progress', path: '/customer' },
-      { label: 'Files for Review', path: '/customer/files' },
-      { label: 'Project Pictures', path: '/customer/pictures' }
-    ],
-    []
-  );
   const navItems = useMemo(() => {
-    if (isCustomerPortal) {
-      return customerNavItems;
-    }
     const items = [];
     if (canAccessDashboard) {
       items.push({ label: 'Dashboard', path: '/pipeline' });
@@ -1024,6 +1006,9 @@ export default function App() {
     }
     if (hasBison) {
       items.push({ label: 'Create Estimate', path: '/create-estimate' });
+    }
+    if (hasCustomer) {
+      items.push({ label: 'Progress', path: '/customer' });
     }
     if (canAccessBuilderView) {
       items.push({ label: 'Builder View', path: '/builder' });
@@ -1046,8 +1031,6 @@ export default function App() {
       return true;
     });
   }, [
-    isCustomerPortal,
-    customerNavItems,
     hasBison,
     hasContractor,
     hasCustomer,
