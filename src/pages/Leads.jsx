@@ -924,6 +924,7 @@ export default function Leads({ isAdminView = false }) {
               type="button"
               aria-expanded={formOpen}
               aria-controls="lead-intake-form"
+              data-tutorial-id="lead-intake-toggle"
               onClick={() => setFormOpen((prev) => !prev)}
             >
               <span className="lead-intake-toggle-arrow">{formOpen ? '^' : 'v'}</span>

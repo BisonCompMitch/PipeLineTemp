@@ -438,18 +438,28 @@ function buildTutorialSteps({
     );
   }
 
-  if (hasContractor || hasAdminArea) {
+  if (hasBison || hasContractor || hasAdminArea) {
     pushNavStep(
       'leads',
       'Leads',
       '/leads',
-      'Click Leads to manage leads, notes, and lead uploads.'
+      'Click Leads to review the lead pipeline.'
     );
+    steps.push({
+      id: 'leads-open-intake',
+      title: 'Open Lead Intake',
+      description:
+        'The lead intake form starts collapsed. Click Add lead when you need to open the form, capture project/contact details, mark required documents, and attach intake files.',
+      targetSelector: '[data-tutorial-id="lead-intake-toggle"]',
+      requiredAction: true
+    });
     steps.push(
       buildInfoStep(
         'leads-details',
         'Leads View',
-        'Leads includes create/edit fields for name, company, email, phone, status, notes, and file uploads. The table keeps lead records together with status so users can move from intake to follow-up without losing history.'
+        hasBison || hasAdminArea
+          ? 'Bison users can view the full lead table, filter by lead details and creator company, edit lead records, add lead files, request quotes, and convert qualified leads into projects. Contractor users remain limited to leads tied to their company.'
+          : 'Contractor users can manage leads tied to their company. Double-click a lead row to edit details, add files, request a quote, or convert a qualified lead into a project.'
       )
     );
   }
