@@ -117,9 +117,28 @@ function projectLabel(project) {
   return projectName || projectNumber || project?.id || 'Unnamed project';
 }
 
+function isProjectComplete(project) {
+  const stages = Array.isArray(project?.stages) ? project.stages : [];
+  return stages.length > 0 && stages.every((stage) => normalize(stage?.status) === 'complete');
+}
+
+function projectStatusKey(project) {
+  if (project?.is_deleted) return 'archived';
+  if (isProjectComplete(project)) return 'complete';
+  return 'active';
+}
+
+function projectStatusLabel(project) {
+  const status = projectStatusKey(project);
+  if (status === 'archived') return 'Archived';
+  if (status === 'complete') return 'Complete';
+  return '';
+}
+
 function projectOptionLabel(project) {
   const label = projectLabel(project);
-  return project?.is_deleted ? `${label} (Archived)` : label;
+  const status = projectStatusLabel(project);
+  return status ? `${label} (${status})` : label;
 }
 
 function sortProjects(a, b) {
@@ -179,13 +198,42 @@ function summarizeProjectSelection(projectIds, projectMap) {
   return { text: `${labels[0]} +${labels.length - 1} more`, title };
 }
 
+const PROJECT_STATUS_FILTERS = [
+  { key: 'active', label: 'Active' },
+  { key: 'complete', label: 'Complete' },
+  { key: 'archived', label: 'Archived' }
+];
+
+const DEFAULT_PROJECT_STATUS_FILTERS = {
+  active: true,
+  complete: true,
+  archived: true
+};
+
 function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No projects selected' }) {
   const [open, setOpen] = useState(false);
+  const [statusFilters, setStatusFilters] = useState(DEFAULT_PROJECT_STATUS_FILTERS);
   const controlRef = useRef(null);
   const listRef = useRef(null);
   const projectList = Array.isArray(projects) ? projects : [];
   const currentIds = useMemo(() => normalizeProjectIds(selectedIds), [selectedIds]);
   const selectedSet = useMemo(() => new Set(currentIds), [currentIds]);
+  const statusCounts = useMemo(
+    () =>
+      projectList.reduce(
+        (counts, project) => {
+          const key = projectStatusKey(project);
+          counts[key] = (counts[key] || 0) + 1;
+          return counts;
+        },
+        { active: 0, complete: 0, archived: 0 }
+      ),
+    [projectList]
+  );
+  const visibleProjects = useMemo(
+    () => projectList.filter((project) => statusFilters[projectStatusKey(project)]),
+    [projectList, statusFilters]
+  );
   const selectedLabels = useMemo(
     () =>
       currentIds
@@ -220,8 +268,38 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
+  const restoreScrollAfterRender = () => {
+    const listScrollTop = listRef.current?.scrollTop ?? 0;
+    const modal = controlRef.current?.closest('.modal');
+    const modalScrollTop = modal?.scrollTop ?? 0;
+    const windowScrollX = window.scrollX;
+    const windowScrollY = window.scrollY;
+    return () => {
+      window.requestAnimationFrame(() => {
+        if (listRef.current) {
+          listRef.current.scrollTop = listScrollTop;
+        }
+        if (modal) {
+          modal.scrollTop = modalScrollTop;
+        }
+        window.scrollTo(windowScrollX, windowScrollY);
+      });
+    };
+  };
+
+  const toggleStatusFilter = (filterKey) => {
+    const restoreScroll = restoreScrollAfterRender();
+    setStatusFilters((current) => {
+      const next = { ...current, [filterKey]: !current[filterKey] };
+      return PROJECT_STATUS_FILTERS.some((filter) => next[filter.key])
+        ? next
+        : DEFAULT_PROJECT_STATUS_FILTERS;
+    });
+    restoreScroll();
+  };
+
   const toggleProject = (projectId) => {
-    const previousScrollTop = listRef.current?.scrollTop ?? 0;
+    const restoreScroll = restoreScrollAfterRender();
     const nextSet = new Set(currentIds);
     if (nextSet.has(projectId)) {
       nextSet.delete(projectId);
@@ -232,11 +310,7 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
       .map((project) => project.id)
       .filter((projectId) => nextSet.has(projectId));
     onChange(nextIds);
-    window.requestAnimationFrame(() => {
-      if (listRef.current) {
-        listRef.current.scrollTop = previousScrollTop;
-      }
-    });
+    restoreScroll();
   };
 
   return (
@@ -257,11 +331,26 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
       {open ? (
         <div className="project-multi-select-panel">
           <div className="project-multi-select-panel-title">
-            Select one or more projects ({projectList.length})
+            Select one or more projects ({visibleProjects.length} of {projectList.length})
+          </div>
+          <div className="project-status-filter-row" role="group" aria-label="Project status filters">
+            {PROJECT_STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.key}
+                className={`project-status-filter${statusFilters[filter.key] ? ' selected' : ''}`}
+                type="button"
+                aria-pressed={statusFilters[filter.key]}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => toggleStatusFilter(filter.key)}
+              >
+                {filter.label}
+                <span>{statusCounts[filter.key] || 0}</span>
+              </button>
+            ))}
           </div>
           <div className="area-check-grid project-check-grid" ref={listRef}>
-            {projectList.length ? (
-              projectList.map((project) => {
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => {
                 const selected = selectedSet.has(project.id);
                 return (
                   <button
@@ -280,7 +369,7 @@ function ProjectMultiSelect({ projects, selectedIds, onChange, placeholder = 'No
                 );
               })
             ) : (
-              <div className="muted project-multi-select-empty">No projects available.</div>
+              <div className="muted project-multi-select-empty">No projects match the selected filters.</div>
             )}
           </div>
         </div>
@@ -478,7 +567,7 @@ export default function Users() {
   const projectMap = useMemo(() => {
     const map = new Map();
     projects.forEach((project) => {
-      map.set(project.id, projectLabel(project));
+      map.set(project.id, projectOptionLabel(project));
     });
     return map;
   }, [projects]);
