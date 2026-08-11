@@ -662,7 +662,7 @@ export default function App() {
     });
     setProfileLoading(true);
     setAuthed(true);
-    navigate(mustResetPassword ? '/first-login-setup' : '/pipeline');
+    navigate(mustResetPassword ? '/first-login-setup' : '/');
   };
 
   const handleLogout = () => {
@@ -1473,7 +1473,10 @@ export default function App() {
               </Protected>
             }
           />
-          <Route path="/" element={<Navigate to={authed ? (accessLoading ? '/pipeline' : fallbackRoute) : '/login'} replace />} />
+          <Route
+            path="/"
+            element={authed ? (accessLoading ? null : <Navigate to={fallbackRoute} replace />) : <Navigate to="/login" replace />}
+          />
           <Route
             path="*"
             element={
