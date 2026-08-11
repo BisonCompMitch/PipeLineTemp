@@ -394,7 +394,7 @@ export default function Leads({ isAdminView = false }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [formOpen, setFormOpen] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(() => buildLeadFormState());
   const [editing, setEditing] = useState(null);
   const [editingTab, setEditingTab] = useState('lead');
@@ -923,10 +923,11 @@ export default function Leads({ isAdminView = false }) {
               className="ghost lead-intake-toggle"
               type="button"
               aria-expanded={formOpen}
+              aria-controls="lead-intake-form"
               onClick={() => setFormOpen((prev) => !prev)}
             >
               <span className="lead-intake-toggle-arrow">{formOpen ? '^' : 'v'}</span>
-              <span>{formOpen ? 'Lead intake' : 'Lead intake'}</span>
+              <span>{formOpen ? 'Hide lead intake' : 'Add lead'}</span>
             </button>
           </div>
         </div>
@@ -934,7 +935,7 @@ export default function Leads({ isAdminView = false }) {
         {message ? <p className="muted lead-message">{message}</p> : null}
 
         {formOpen ? (
-          <form className="lead-form" onSubmit={handleCreateLead}>
+          <form id="lead-intake-form" className="lead-form" onSubmit={handleCreateLead}>
             <div className="form-grid lead-create-grid">
               <div className="intake-section lead-section-span-full">
                 <div className="intake-section-title">1. Project Overview</div>

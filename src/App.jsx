@@ -1017,7 +1017,7 @@ export default function App() {
     if (hasBison && hasAdminArea) {
       items.push({ label: 'Manage Users', path: '/users' });
     }
-    if (hasContractor || hasAdminArea) {
+    if (hasBison || hasContractor || hasAdminArea) {
       items.push({ label: 'Leads', path: '/leads' });
     }
     if (hasCustomer) {
@@ -1336,7 +1336,7 @@ export default function App() {
           <Route
             path="/leads"
             element={
-              <Protected authed={authed} allowed={!firstLoginRequired && (hasContractor || hasAdminArea)} fallback={fallbackRoute} loading={accessLoading}>
+              <Protected authed={authed} allowed={!firstLoginRequired && (hasBison || hasContractor || hasAdminArea)} fallback={fallbackRoute} loading={accessLoading}>
                 <PageShell
                   title={pageTitle}
                   displayName={topBarDisplayName}
@@ -1349,7 +1349,7 @@ export default function App() {
                   showNavToggle={showNavToggle}
                   onToggleNav={() => setNavOpen((open) => !open)}
                 >
-                  <Leads isAdminView={hasAdminArea} />
+                  <Leads isAdminView={hasBison || hasAdminArea} />
                 </PageShell>
               </Protected>
             }
