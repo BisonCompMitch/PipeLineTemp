@@ -22,6 +22,8 @@ const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'proposal', 'won', 'los
 const PRIORITY_OPTIONS = ['high', 'mid', 'low'];
 const FILTER_ALL = '__all__';
 const CREATOR_COMPANY_ALL = '__all__';
+const QUOTE_REQUEST_COOLDOWN_DAYS = 3;
+const QUOTE_REQUEST_COOLDOWN_MS = QUOTE_REQUEST_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 const ARCHITECTURAL_PLAN_OPTIONS = [
   { id: 'building_elevations', label: 'Elevations (4 minimum)' },
   { id: 'framing_plans', label: 'Framing Plans' },
@@ -62,6 +64,35 @@ function formatDateTime(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '-';
   return parsed.toLocaleString();
+}
+
+function formatBudgetaryNumber(value) {
+  const text = String(value || '').trim();
+  return text || '-';
+}
+
+function formatCooldownRemaining(value) {
+  const remainingMs = Math.max(0, Number(value || 0));
+  const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
+  if (remainingHours >= 48) return `${Math.ceil(remainingHours / 24)} days`;
+  if (remainingHours >= 24) return '1 day';
+  if (remainingHours > 1) return `${remainingHours} hours`;
+  return '1 hour';
+}
+
+function getQuoteRequestCooldown(lead, nowMs = Date.now()) {
+  if (!lead?.quote_requested_at) return null;
+  const requestedAt = new Date(lead.quote_requested_at);
+  const requestedAtMs = requestedAt.getTime();
+  if (Number.isNaN(requestedAtMs)) return null;
+  const nextAvailableAtMs = requestedAtMs + QUOTE_REQUEST_COOLDOWN_MS;
+  const remainingMs = nextAvailableAtMs - nowMs;
+  if (remainingMs <= 0) return null;
+  return {
+    nextAvailableAt: new Date(nextAvailableAtMs),
+    remainingLabel: formatCooldownRemaining(remainingMs),
+    remainingMs
+  };
 }
 
 function statusClass(status) {
@@ -401,6 +432,7 @@ export default function Leads({ isAdminView = false }) {
   const [saving, setSaving] = useState(false);
   const [requestingQuote, setRequestingQuote] = useState(false);
   const [convertingLead, setConvertingLead] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [createFiles, setCreateFiles] = useState([]);
   const [createFileDragActive, setCreateFileDragActive] = useState(false);
   const [editFiles, setEditFiles] = useState([]);
@@ -422,6 +454,7 @@ export default function Leads({ isAdminView = false }) {
   const [filters, setFilters] = useState({
     name: '',
     company: '',
+    estimated_value: '',
     project_location_state: '',
     zip_code: '',
     owner: '',
@@ -454,6 +487,11 @@ export default function Leads({ isAdminView = false }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const uploadFilesToLead = useCallback(async (leadId, files) => {
     let uploaded = 0;
@@ -720,6 +758,7 @@ export default function Leads({ isAdminView = false }) {
       const name = String(lead?.name || '').trim();
       const owner = String(lead?.owner || '').trim();
       const company = String(lead?.company || '').trim();
+      const budgetaryNumber = String(lead?.estimated_value || '').trim();
       const state = String(lead?.project_location_state || '').trim();
       const zip = String(lead?.zip_code || '').trim();
       const email = String(lead?.email || '').trim();
@@ -731,6 +770,8 @@ export default function Leads({ isAdminView = false }) {
       const hasQuote = Boolean(lead?.quote_requested_at);
       if (filters.name && !name.toLowerCase().includes(filters.name.toLowerCase())) return false;
       if (filters.company && !company.toLowerCase().includes(filters.company.toLowerCase())) return false;
+      if (filters.estimated_value && !budgetaryNumber.toLowerCase().includes(filters.estimated_value.toLowerCase()))
+        return false;
       if (filters.project_location_state && !state.toLowerCase().includes(filters.project_location_state.toLowerCase()))
         return false;
       if (filters.zip_code && !zip.toLowerCase().includes(filters.zip_code.toLowerCase())) return false;
@@ -838,6 +879,14 @@ export default function Leads({ isAdminView = false }) {
 
   const handleRequestQuote = async () => {
     if (!editing?.id) return;
+    const cooldown = getQuoteRequestCooldown(editing);
+    if (cooldown) {
+      await alertDialog(
+        `A quote was already requested for this lead. You can request another quote on ${formatDateTime(cooldown.nextAvailableAt)}.`,
+        { title: 'Quote request cooldown' }
+      );
+      return;
+    }
     const enteredPriority = await promptDialog('Set quote priority (high, mid, low).', {
       title: 'Request project quote',
       defaultValue: normalizePriority(editing.priority, 'mid'),
@@ -856,7 +905,7 @@ export default function Leads({ isAdminView = false }) {
     });
     if (note === null) return;
     const acknowledgeCharges = await confirmDialog(
-      'Disclaimer: incomplete document packages may incur additional charges. Continue and request this quote?',
+      `Quote requests are limited to once every ${QUOTE_REQUEST_COOLDOWN_DAYS} days per lead. Incomplete document packages may incur additional charges. Continue and request this quote?`,
       { title: 'Quote request disclaimer', confirmText: 'I Understand' }
     );
     if (!acknowledgeCharges) return;
@@ -869,8 +918,9 @@ export default function Leads({ isAdminView = false }) {
       setEditing(normalizeLeadForEdit(updated));
       setMessage(`Quote requested (${formatPriority(priority)} priority).`);
       await refresh();
-    } catch (_error) {
-      await alertDialog('Unable to request project quote.', { title: 'Quote request' });
+    } catch (error) {
+      const errorMessage = error instanceof Error && error.message ? error.message : 'Unable to request project quote.';
+      await alertDialog(errorMessage, { title: 'Quote request' });
     } finally {
       setRequestingQuote(false);
     }
@@ -908,7 +958,14 @@ export default function Leads({ isAdminView = false }) {
     }
   };
 
-  const tableColCount = isAdminView ? 12 : 11;
+  const tableColCount = isAdminView ? 13 : 12;
+  const quoteCooldown = editing ? getQuoteRequestCooldown(editing, nowMs) : null;
+  const quoteRequestBlocked = Boolean(quoteCooldown);
+  const quoteRequestButtonLabel = requestingQuote
+    ? 'Requesting...'
+    : quoteRequestBlocked
+      ? `Available in ${quoteCooldown.remainingLabel}`
+      : 'Request project quote';
 
   return (
     <>
@@ -944,6 +1001,13 @@ export default function Leads({ isAdminView = false }) {
                   <label>
                     Project Name
                     <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+                  </label>
+                  <label className="lead-budget-field">
+                    Budgetary Number
+                    <input
+                      value={form.estimated_value}
+                      onChange={(event) => setForm((prev) => ({ ...prev, estimated_value: event.target.value }))}
+                    />
                   </label>
                   <label>
                     Project Type
@@ -989,13 +1053,6 @@ export default function Leads({ isAdminView = false }) {
                     <input
                       value={form.square_footage}
                       onChange={(event) => setForm((prev) => ({ ...prev, square_footage: event.target.value }))}
-                    />
-                  </label>
-                  <label>
-                    Estimated value
-                    <input
-                      value={form.estimated_value}
-                      onChange={(event) => setForm((prev) => ({ ...prev, estimated_value: event.target.value }))}
                     />
                   </label>
                 </div>
@@ -1261,6 +1318,7 @@ export default function Leads({ isAdminView = false }) {
               <tr>
                 <th>Name</th>
                 <th>Company</th>
+                <th>Budgetary Number</th>
                 <th>State</th>
                 <th>Zip</th>
                 <th>Owner</th>
@@ -1287,6 +1345,14 @@ export default function Leads({ isAdminView = false }) {
                     placeholder="Filter"
                     value={filters.company}
                     onChange={(event) => setFilters((prev) => ({ ...prev, company: event.target.value }))}
+                  />
+                </th>
+                <th>
+                  <input
+                    className="lead-filter-control"
+                    placeholder="Filter"
+                    value={filters.estimated_value}
+                    onChange={(event) => setFilters((prev) => ({ ...prev, estimated_value: event.target.value }))}
                   />
                 </th>
                 <th>
@@ -1396,32 +1462,45 @@ export default function Leads({ isAdminView = false }) {
             </thead>
             <tbody>
               {filteredRows.length ? (
-                filteredRows.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    onDoubleClick={async () => {
-                      const next = normalizeLeadForEdit(lead);
-                      setEditing(next);
-                      setEditingTab('lead');
-                      await loadLeadFiles(lead.id);
-                    }}
-                  >
-                    <td>{lead.name}</td>
-                    <td>{lead.company || '-'}</td>
-                    <td>{lead.project_location_state || '-'}</td>
-                    <td>{lead.zip_code || '-'}</td>
-                    <td>{lead.owner || '-'}</td>
-                    <td>{formatPriority(lead.priority)}</td>
-                    <td>
-                      <span className={statusClass(lead.status)}>{lead.status}</span>
-                    </td>
-                    <td>{lead.quote_requested_at ? formatDateTime(lead.quote_requested_at) : '-'}</td>
-                    <td>{formatDateTime(lead.created_at)}</td>
-                    <td>{lead.email || '-'}</td>
-                    <td>{lead.phone || '-'}</td>
-                    {isAdminView ? <td>{lead.created_by_company || '-'}</td> : null}
-                  </tr>
-                ))
+                filteredRows.map((lead) => {
+                  const leadQuoteCooldown = getQuoteRequestCooldown(lead, nowMs);
+                  return (
+                    <tr
+                      key={lead.id}
+                      onDoubleClick={async () => {
+                        const next = normalizeLeadForEdit(lead);
+                        setEditing(next);
+                        setEditingTab('lead');
+                        await loadLeadFiles(lead.id);
+                      }}
+                    >
+                      <td>{lead.name}</td>
+                      <td>{lead.company || '-'}</td>
+                      <td className="lead-budget-cell">{formatBudgetaryNumber(lead.estimated_value)}</td>
+                      <td>{lead.project_location_state || '-'}</td>
+                      <td>{lead.zip_code || '-'}</td>
+                      <td>{lead.owner || '-'}</td>
+                      <td>{formatPriority(lead.priority)}</td>
+                      <td>
+                        <span className={statusClass(lead.status)}>{lead.status}</span>
+                      </td>
+                      <td>
+                        <div className="lead-quote-cell">
+                          <span>{lead.quote_requested_at ? formatDateTime(lead.quote_requested_at) : '-'}</span>
+                          {leadQuoteCooldown ? (
+                            <span className="lead-quote-cooldown-inline">Available in {leadQuoteCooldown.remainingLabel}</span>
+                          ) : lead.quote_requested_at ? (
+                            <span className="lead-quote-ready-inline">Ready to request again</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>{formatDateTime(lead.created_at)}</td>
+                      <td>{lead.email || '-'}</td>
+                      <td>{lead.phone || '-'}</td>
+                      {isAdminView ? <td>{lead.created_by_company || '-'}</td> : null}
+                    </tr>
+                  );
+                })
               ) : (
                 <tr className="empty-row">
                   <td colSpan={tableColCount}>No leads match current filters.</td>
@@ -1462,19 +1541,33 @@ export default function Leads({ isAdminView = false }) {
                 <div className="pipeline-detail-body">
                   <div className="lead-edit-card lead-detail-card">
                     {editingTab === 'lead' ? (
-                      <>
-                        <div className="lead-modal-actions">
-                          <button className="primary" type="button" onClick={handleRequestQuote} disabled={requestingQuote}>
-                            {requestingQuote ? 'Requesting...' : 'Request project quote'}
+                        <>
+                          <div className="lead-modal-actions">
+                          <button
+                            className="primary"
+                            type="button"
+                            onClick={handleRequestQuote}
+                            disabled={requestingQuote || quoteRequestBlocked}
+                          >
+                            {quoteRequestButtonLabel}
                           </button>
                           <button className="ghost" type="button" onClick={handleConvertLead} disabled={convertingLead}>
                             {convertingLead ? 'Converting...' : 'Convert to project'}
                           </button>
+                          {quoteCooldown ? (
+                            <span className="lead-quote-cooldown-note">
+                              Next quote request: {formatDateTime(quoteCooldown.nextAvailableAt)}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="form-grid">
                   <label>
                     Project Name
                     <input value={editing.name} onChange={(event) => setEditing((prev) => ({ ...prev, name: event.target.value }))} />
+                  </label>
+                  <label className="lead-budget-field">
+                    Budgetary Number
+                    <input value={editing.estimated_value || ''} onChange={(event) => setEditing((prev) => ({ ...prev, estimated_value: event.target.value }))} />
                   </label>
                   <label>
                     Client
@@ -1597,10 +1690,6 @@ export default function Leads({ isAdminView = false }) {
                   <label>
                     Sqr footage
                     <input value={editing.square_footage || ''} onChange={(event) => setEditing((prev) => ({ ...prev, square_footage: event.target.value }))} />
-                  </label>
-                  <label>
-                    Estimated value
-                    <input value={editing.estimated_value || ''} onChange={(event) => setEditing((prev) => ({ ...prev, estimated_value: event.target.value }))} />
                   </label>
                   <label className="span-2">
                     Created
