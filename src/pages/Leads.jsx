@@ -1,6 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  archiveLead,
   convertLeadToProject,
   createLead,
   deleteLead,
@@ -9,6 +10,7 @@ import {
   listLeadFiles,
   listLeads,
   requestLeadQuote,
+  restoreLead,
   updateLead,
   uploadLeadFile
 } from '../api.js';
@@ -35,7 +37,7 @@ const ARCHITECTURAL_PLAN_OPTIONS = [
   { id: 'soils_report', label: 'Soils Report' }
 ];
 const SCOTTSDALE_READINESS_OPTIONS = [
-  { id: 'sdp_file', label: 'SDP File' },
+  { id: 'sdp_file', label: 'SDP File (Required for Production)' },
   { id: 'ifc_issued', label: 'IFC (Issued for Construction)' },
   { id: 'production_files', label: 'Production Files' },
   { id: 'engineering_complete', label: 'Engineering Complete' }
@@ -421,9 +423,496 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+const LEAD_REPORT_EMPTY_FIELD_DEFINITIONS = [
+  { label: 'Project Name', value: (lead) => lead.name },
+  { label: 'Client', value: (lead) => lead.company },
+  { label: 'Budgetary Number', value: (lead) => lead.estimated_value },
+  { label: 'Project Type', value: (lead) => lead.project_type },
+  { label: 'Project Location Address', value: (lead) => lead.project_location_address },
+  { label: 'Project Location State', value: (lead) => lead.project_location_state },
+  { label: 'ZIP Code', value: (lead) => lead.zip_code },
+  { label: 'GPS Coordinates', value: (lead) => lead.gps_coordinates },
+  { label: 'Sqr footage', value: (lead) => lead.square_footage },
+  { label: 'Owner Name', value: (lead) => lead.owner_name },
+  { label: 'Primary Contact Name', value: (lead) => lead.primary_contact_name },
+  { label: 'Contact Address', value: (lead) => lead.contact_address },
+  { label: 'Email', value: (lead) => lead.email },
+  { label: 'Phone', value: (lead) => lead.phone },
+  { label: 'Delivery Address', value: (lead) => lead.delivery_address },
+  { label: 'Delivery Contact Name', value: (lead) => lead.delivery_contact_name },
+  { label: 'Delivery Contact Phone/Email', value: (lead) => lead.delivery_contact_info },
+  { label: 'Lead ownership', value: (lead) => lead.owner },
+  { label: 'Notes', value: (lead) => lead.notes }
+];
+
+function isBlankReportValue(value) {
+  return String(value ?? '').trim() === '';
+}
+
+function formatReportValue(value, emptyLabel = '-') {
+  const text = String(value ?? '').trim();
+  return text || emptyLabel;
+}
+
+function escapeReportHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
+function renderReportValue(value, emptyLabel = '-') {
+  return escapeReportHtml(formatReportValue(value, emptyLabel)).replace(/\n/g, '<br />');
+}
+
+function renderReportList(items, emptyLabel) {
+  if (!items.length) {
+    return `<div class="empty-list">${escapeReportHtml(emptyLabel)}</div>`;
+  }
+  return `<ul>${items.map((item) => `<li>${escapeReportHtml(item)}</li>`).join('')}</ul>`;
+}
+
+function buildLeadReportSections(lead, isAdminView) {
+  const quoteRequestedText = lead.quote_requested_at
+    ? `${formatDateTime(lead.quote_requested_at)}${lead.quote_requested_by ? ` by ${lead.quote_requested_by}` : ''}`
+    : 'Not requested';
+  const convertedProject = lead.converted_project_id || lead.project_id || '';
+  const baseSections = [
+    {
+      title: 'Project Overview',
+      fields: [
+        ['Project Name', lead.name],
+        ['Lead ID', lead.id],
+        ['Client', lead.company],
+        ['Budgetary Number', lead.estimated_value],
+        ['Project Type', lead.project_type],
+        ['Sqr footage', lead.square_footage],
+        ['Priority', formatPriority(lead.priority)],
+        ['Status', lead.status],
+        ['Archived', lead.is_deleted ? 'Yes' : 'No'],
+        ['Converted Project ID', convertedProject]
+      ]
+    },
+    {
+      title: 'Location',
+      fields: [
+        ['Project Location Address', lead.project_location_address],
+        ['Project Location State', lead.project_location_state],
+        ['ZIP Code', lead.zip_code],
+        ['GPS Coordinates', lead.gps_coordinates]
+      ]
+    },
+    {
+      title: 'Stakeholders & Contact',
+      fields: [
+        ['Owner Name', lead.owner_name],
+        ['Primary Contact Name', lead.primary_contact_name],
+        ['Contact Address', lead.contact_address],
+        ['Email', lead.email],
+        ['Phone', lead.phone],
+        ['Lead ownership', lead.owner]
+      ]
+    },
+    {
+      title: 'Delivery',
+      fields: [
+        ['Delivery Address', lead.delivery_address],
+        ['Delivery Contact Name', lead.delivery_contact_name],
+        ['Delivery Contact Phone/Email', lead.delivery_contact_info]
+      ]
+    },
+    {
+      title: 'Workflow',
+      fields: [
+        ['Quote Requested', quoteRequestedText],
+        ['Created', formatDateTime(lead.created_at)],
+        ['Created By', lead.created_by],
+        ['Creator Company', isAdminView ? lead.created_by_company : '']
+      ]
+    }
+  ];
+  return baseSections.map((section) => ({
+    ...section,
+    fields: section.fields.filter(([, value]) => !isBlankReportValue(value))
+  }));
+}
+
+function getLeadReportMissingDocs(lead) {
+  const docs = normalizeRequiredDocs(lead.required_docs);
+  return ARCHITECTURAL_PLAN_OPTIONS.filter((option) => !Boolean(docs?.[option.id])).map((option) => option.label);
+}
+
+function getLeadReportProvidedDocs(lead) {
+  const docs = normalizeRequiredDocs(lead.required_docs);
+  return ARCHITECTURAL_PLAN_OPTIONS.filter((option) => Boolean(docs?.[option.id])).map((option) => option.label);
+}
+
+function getLeadReportEmptyFields(lead) {
+  return LEAD_REPORT_EMPTY_FIELD_DEFINITIONS.filter((field) => isBlankReportValue(field.value(lead))).map(
+    (field) => field.label
+  );
+}
+
+function renderLeadReportPage(rawLead, index, total, options) {
+  const lead = normalizeLeadForEdit(rawLead);
+  const sections = buildLeadReportSections(lead, options.isAdminView);
+  const missingDocs = getLeadReportMissingDocs(lead);
+  const providedDocs = getLeadReportProvidedDocs(lead);
+  const emptyFields = getLeadReportEmptyFields(lead);
+  const readinessRows = SCOTTSDALE_READINESS_OPTIONS.map((option) => [
+    option.label,
+    lead.scottsdale_readiness?.[option.id] ? 'Checked' : 'Missing'
+  ]);
+  const title = formatReportValue(lead.name, 'Unnamed lead');
+  return `
+    <section class="lead-report-page">
+      <header class="report-header">
+        <div>
+          <div class="report-kicker">Lead Reference Report</div>
+          <h1>${escapeReportHtml(title)}</h1>
+          <div class="report-subtitle">${escapeReportHtml(formatReportValue(lead.company, 'No client listed'))}</div>
+        </div>
+        <div class="report-meta">
+          <div>Page ${index + 1} of ${total}</div>
+          <div>${escapeReportHtml(options.scopeLabel)}</div>
+          <div>Generated ${escapeReportHtml(options.generatedAt)}</div>
+        </div>
+      </header>
+
+      ${sections
+        .map(
+          (section) => `
+            <section class="report-section">
+              <h2>${escapeReportHtml(section.title)}</h2>
+              <div class="report-field-grid">
+                ${section.fields
+                  .map(
+                    ([label, value]) => `
+                      <div class="report-field">
+                        <span>${escapeReportHtml(label)}</span>
+                        <strong>${renderReportValue(value)}</strong>
+                      </div>`
+                  )
+                  .join('')}
+              </div>
+            </section>`
+        )
+        .join('')}
+
+      <section class="report-section">
+        <h2>Documents & Gaps</h2>
+        <div class="report-list-grid">
+          <div class="report-list-card missing">
+            <h3>Missing Docs</h3>
+            ${renderReportList(missingDocs, 'No missing docs.')}
+          </div>
+          <div class="report-list-card provided">
+            <h3>Provided Docs</h3>
+            ${renderReportList(providedDocs, 'No provided docs marked.')}
+          </div>
+          <div class="report-list-card empty">
+            <h3>Empty Fields</h3>
+            ${renderReportList(emptyFields, 'No empty fields found.')}
+          </div>
+        </div>
+      </section>
+
+      <section class="report-section report-split">
+        <div>
+          <h2>Scottsdale Readiness</h2>
+          <div class="readiness-grid">
+            ${readinessRows
+              .map(
+                ([label, value]) => `
+                  <div class="readiness-row">
+                    <span>${escapeReportHtml(label)}</span>
+                    <strong>${escapeReportHtml(value)}</strong>
+                  </div>`
+              )
+              .join('')}
+          </div>
+        </div>
+        <div>
+          <h2>Notes</h2>
+          <div class="report-notes">${renderReportValue(lead.notes, 'No notes listed.')}</div>
+        </div>
+      </section>
+    </section>`;
+}
+
+function buildLeadsReportHtml(leadsForReport, options) {
+  const pages = leadsForReport
+    .map((lead, index) => renderLeadReportPage(lead, index, leadsForReport.length, options))
+    .join('');
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>&nbsp;</title>
+    <style>
+      @page {
+        size: letter portrait;
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #eef2f7;
+        color: #111827;
+        font-family: Arial, Helvetica, sans-serif;
+        line-height: 1.25;
+      }
+
+      .report-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 18px;
+        background: #111827;
+        color: #ffffff;
+      }
+
+      .report-toolbar button {
+        border: 0;
+        border-radius: 6px;
+        padding: 9px 14px;
+        background: #2563eb;
+        color: #ffffff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .lead-report-page {
+        width: 8.5in;
+        min-height: 10.3in;
+        margin: 18px auto;
+        padding: 0.18in;
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+        break-after: page;
+        page-break-after: always;
+      }
+
+      .lead-report-page:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+
+      .report-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #111827;
+      }
+
+      .report-kicker,
+      .report-meta,
+      .report-field span,
+      .readiness-row span {
+        color: #6b7280;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        margin-top: 2px;
+        font-size: 21px;
+        line-height: 1.05;
+      }
+
+      .report-subtitle {
+        margin-top: 3px;
+        color: #374151;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .report-meta {
+        min-width: 1.8in;
+        text-align: right;
+        line-height: 1.45;
+      }
+
+      .report-section {
+        margin-top: 8px;
+      }
+
+      h2 {
+        margin-bottom: 4px;
+        color: #111827;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .report-field-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+      }
+
+      .report-field,
+      .report-list-card,
+      .readiness-row,
+      .report-notes {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #f9fafb;
+      }
+
+      .report-field {
+        min-height: 38px;
+        padding: 5px 6px;
+      }
+
+      .report-field strong {
+        display: block;
+        margin-top: 2px;
+        font-size: 10.5px;
+        overflow-wrap: anywhere;
+      }
+
+      .report-list-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+      }
+
+      .report-list-card {
+        padding: 6px 8px;
+        min-height: 1.18in;
+      }
+
+      .report-list-card h3 {
+        margin-bottom: 4px;
+        font-size: 10px;
+      }
+
+      .report-list-card.missing {
+        background: #fff7ed;
+        border-color: #fdba74;
+      }
+
+      .report-list-card.provided {
+        background: #ecfdf5;
+        border-color: #86efac;
+      }
+
+      .report-list-card.empty {
+        background: #eff6ff;
+        border-color: #93c5fd;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 15px;
+      }
+
+      li,
+      .empty-list,
+      .report-notes,
+      .readiness-row {
+        font-size: 9.2px;
+      }
+
+      li {
+        margin-bottom: 2px;
+      }
+
+      .report-split {
+        display: grid;
+        grid-template-columns: 1.05fr 1.4fr;
+        gap: 8px;
+      }
+
+      .readiness-grid {
+        display: grid;
+        gap: 4px;
+      }
+
+      .readiness-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 5px 6px;
+      }
+
+      .readiness-row strong {
+        white-space: nowrap;
+      }
+
+      .report-notes {
+        min-height: 1.1in;
+        padding: 7px 8px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .report-toolbar {
+          display: none;
+        }
+
+        .lead-report-page {
+          width: auto;
+          min-height: 0;
+          margin: 0;
+          padding: 0.35in;
+          border: 0;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="report-toolbar">
+      <div>Leads report (${escapeReportHtml(String(leadsForReport.length))} project${leadsForReport.length === 1 ? '' : 's'})</div>
+      <button type="button" onclick="window.print()">Print / Save PDF</button>
+    </div>
+    ${pages}
+  </body>
+</html>`;
+}
+
 export default function Leads({ isAdminView = false }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [message, setMessage] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(() => buildLeadFormState());
@@ -474,7 +963,7 @@ export default function Leads({ isAdminView = false }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listLeads();
+      const data = await listLeads(showArchived ? 'include_deleted=true' : '');
       setLeads(Array.isArray(data) ? data : []);
       setMessage('');
     } catch (_error) {
@@ -482,7 +971,7 @@ export default function Leads({ isAdminView = false }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => {
     refresh();
@@ -877,6 +1366,30 @@ export default function Leads({ isAdminView = false }) {
     }
   };
 
+  const handleArchiveLead = async (leadId) => {
+    const ok = await confirmDialog('Archive this lead?', { title: 'Archive lead', confirmText: 'Archive' });
+    if (!ok) return;
+    try {
+      await archiveLead(leadId);
+      setEditing(null);
+      setMessage('Lead archived.');
+      await refresh();
+    } catch (_error) {
+      setMessage('Unable to archive lead.');
+    }
+  };
+
+  const handleRestoreLead = async (leadId) => {
+    try {
+      await restoreLead(leadId);
+      setEditing(null);
+      setMessage('Lead restored.');
+      await refresh();
+    } catch (_error) {
+      setMessage('Unable to restore lead.');
+    }
+  };
+
   const handleRequestQuote = async () => {
     if (!editing?.id) return;
     const cooldown = getQuoteRequestCooldown(editing);
@@ -958,6 +1471,43 @@ export default function Leads({ isAdminView = false }) {
     }
   };
 
+  const handleExportLeadReport = useCallback(async () => {
+    if (!filteredRows.length) {
+      await alertDialog('No leads match the current filters.', { title: 'Leads report' });
+      return;
+    }
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) {
+      await alertDialog('Allow popups for this site to open the leads report.', { title: 'Leads report' });
+      return;
+    }
+    const scopeLabel =
+      filteredRows.length === leads.length
+        ? `${filteredRows.length} loaded lead${filteredRows.length === 1 ? '' : 's'}${
+            showArchived ? ' including archived' : ''
+          }`
+        : `${filteredRows.length} filtered of ${leads.length} loaded leads${showArchived ? ', archived included' : ''}`;
+    reportWindow.document.open();
+    reportWindow.document.write(
+      buildLeadsReportHtml(filteredRows, {
+        generatedAt: formatDateTime(new Date()),
+        isAdminView,
+        scopeLabel
+      })
+    );
+    reportWindow.document.close();
+    reportWindow.opener = null;
+    reportWindow.focus();
+    setMessage('Leads report opened. Use Print / Save PDF to export it.');
+    window.setTimeout(() => {
+      try {
+        reportWindow.print();
+      } catch (_error) {
+        // The report window still includes its own print button.
+      }
+    }, 350);
+  }, [alertDialog, filteredRows, isAdminView, leads.length, showArchived]);
+
   const tableColCount = isAdminView ? 13 : 12;
   const quoteCooldown = editing ? getQuoteRequestCooldown(editing, nowMs) : null;
   const quoteRequestBlocked = Boolean(quoteCooldown);
@@ -976,6 +1526,25 @@ export default function Leads({ isAdminView = false }) {
             <p className="muted">Track client leads.</p>
           </div>
           <div className="detail-header-actions lead-toolbar">
+            <label className="switch-field switch-field--pill">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(event) => setShowArchived(event.target.checked)}
+              />
+              <span className="switch-track" aria-hidden="true">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-text">{showArchived ? 'Archived Showing' : 'Archived Hidden'}</span>
+            </label>
+            <button
+              className="ghost lead-intake-toggle"
+              type="button"
+              onClick={handleExportLeadReport}
+              disabled={loading || !filteredRows.length}
+            >
+              <span>Export report</span>
+            </button>
             <button
               className="ghost lead-intake-toggle"
               type="button"
@@ -1001,13 +1570,6 @@ export default function Leads({ isAdminView = false }) {
                   <label>
                     Project Name
                     <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
-                  </label>
-                  <label className="lead-budget-field">
-                    Budgetary Number
-                    <input
-                      value={form.estimated_value}
-                      onChange={(event) => setForm((prev) => ({ ...prev, estimated_value: event.target.value }))}
-                    />
                   </label>
                   <label>
                     Project Type
@@ -1467,6 +2029,7 @@ export default function Leads({ isAdminView = false }) {
                   return (
                     <tr
                       key={lead.id}
+                      className={lead.is_deleted ? 'row-archived' : undefined}
                       onDoubleClick={async () => {
                         const next = normalizeLeadForEdit(lead);
                         setEditing(next);
@@ -1882,6 +2445,15 @@ export default function Leads({ isAdminView = false }) {
                   <button className="ghost" type="button" onClick={() => setEditing(null)}>
                     Cancel
                   </button>
+                  {editing?.is_deleted ? (
+                    <button className="ghost" type="button" onClick={() => handleRestoreLead(editing.id)}>
+                      Unarchive
+                    </button>
+                  ) : (
+                    <button className="ghost" type="button" onClick={() => handleArchiveLead(editing.id)}>
+                      Archive
+                    </button>
+                  )}
                   <button className="danger" type="button" onClick={() => handleDeleteLead(editing.id)}>
                     Delete
                   </button>

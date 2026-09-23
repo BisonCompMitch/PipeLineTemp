@@ -501,8 +501,9 @@ export async function handoffStage(projectId, stageId) {
   return apiJson(`/projects/${projectId}/handoff/${stageId}`, { method: 'POST' });
 }
 
-export async function listLeads() {
-  return apiJson('/leads');
+export async function listLeads(params = '') {
+  const suffix = params ? `?${params}` : '';
+  return apiJson(`/leads${suffix}`);
 }
 
 export async function createLead(payload) {
@@ -511,6 +512,18 @@ export async function createLead(payload) {
 
 export async function updateLead(leadId, payload) {
   return apiJson(`/leads/${leadId}`, { method: 'PATCH', body: payload });
+}
+
+export async function archiveLead(leadId) {
+  return apiJson(`/leads/${encodeURIComponent(leadId)}/delete`, {
+    method: 'POST'
+  });
+}
+
+export async function restoreLead(leadId) {
+  return apiJson(`/leads/${encodeURIComponent(leadId)}/restore`, {
+    method: 'POST'
+  });
 }
 
 export async function requestLeadQuote(leadId, payload) {
