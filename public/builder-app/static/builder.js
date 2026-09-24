@@ -630,11 +630,6 @@ async function loadIfcFileInBrowser(file, sourceName = "IFC model") {
   return buildClientIfcModel(model, sourceName);
 }
 
-function isLocalBuilderDevHost() {
-  const host = window.location.hostname.toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" || host === "::1";
-}
-
 async function downloadAssignedIfcFile(project) {
   const projectId = String(project?.id || "").trim();
   const fileId = getBuilderFileId(project);
@@ -1098,14 +1093,9 @@ async function exportPdf() {
   setStatus("Generating PDF...");
   try {
     let response;
-    if (project?.has_builder_model && isLocalBuilderDevHost()) {
+    if (project?.has_builder_model) {
       const assignedFile = file || await downloadAssignedIfcFile(project);
       response = await requestPdfExport(assignedFile, jobName);
-    } else if (project?.has_builder_model) {
-      const params = new URLSearchParams({ job_name: jobName });
-      response = await builderFetch(
-        `/builder/projects/${encodeURIComponent(project.id)}/model/export-pdf?${params.toString()}`
-      );
     } else {
       response = await requestPdfExport(file, jobName);
     }
