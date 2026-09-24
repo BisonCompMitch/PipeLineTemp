@@ -526,6 +526,14 @@ export async function restoreLead(leadId) {
   });
 }
 
+export async function getLeadReportMarker() {
+  return apiJson('/leads/report-marker');
+}
+
+export async function markLeadReportGenerated() {
+  return apiJson('/leads/report-marker', { method: 'POST' });
+}
+
 export async function requestLeadQuote(leadId, payload) {
   return apiJson(`/leads/${encodeURIComponent(leadId)}/request-quote`, {
     method: 'POST',

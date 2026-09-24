@@ -7,8 +7,10 @@ import {
   deleteLead,
   deleteLeadFile,
   downloadLeadFile,
+  getLeadReportMarker,
   listLeadFiles,
   listLeads,
+  markLeadReportGenerated,
   requestLeadQuote,
   restoreLead,
   updateLead,
@@ -914,6 +916,8 @@ export default function Leads({ isAdminView = false }) {
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [message, setMessage] = useState('');
+  const [exportingReport, setExportingReport] = useState(false);
+  const [lastReportAt, setLastReportAt] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(() => buildLeadFormState());
   const [editing, setEditing] = useState(null);
@@ -976,6 +980,20 @@ export default function Leads({ isAdminView = false }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLeadReportMarker()
+      .then((marker) => {
+        if (!cancelled) setLastReportAt(marker?.last_generated_at || null);
+      })
+      .catch(() => {
+        // Marker is informational only; the export still works without it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 60 * 1000);
@@ -1472,24 +1490,55 @@ export default function Leads({ isAdminView = false }) {
   };
 
   const handleExportLeadReport = useCallback(async () => {
-    if (!filteredRows.length) {
-      await alertDialog('No leads match the current filters.', { title: 'Leads report' });
-      return;
-    }
+    // Open synchronously so the popup is tied to the click and not blocked.
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) {
       await alertDialog('Allow popups for this site to open the leads report.', { title: 'Leads report' });
       return;
     }
-    const scopeLabel =
-      filteredRows.length === leads.length
-        ? `${filteredRows.length} loaded lead${filteredRows.length === 1 ? '' : 's'}${
-            showArchived ? ' including archived' : ''
-          }`
-        : `${filteredRows.length} filtered of ${leads.length} loaded leads${showArchived ? ', archived included' : ''}`;
+    reportWindow.document.write('<p style="font-family:sans-serif;padding:24px">Preparing leads report...</p>');
+    setExportingReport(true);
+    let previousAt = null;
+    let changedLeads = [];
+    try {
+      // Advance the marker first, then fetch: anything edited in between shows up
+      // again next time rather than being skipped.
+      const marker = await markLeadReportGenerated();
+      previousAt = marker?.previous_generated_at || null;
+      setLastReportAt(marker?.last_generated_at || null);
+      const data = await listLeads('include_deleted=true');
+      const allLeads = Array.isArray(data) ? data : [];
+      const previousMs = previousAt ? new Date(previousAt).getTime() : null;
+      changedLeads = previousMs
+        ? allLeads.filter((lead) => {
+            const updatedMs = new Date(lead?.updated_at || lead?.created_at || 0).getTime();
+            return Number.isFinite(updatedMs) && updatedMs > previousMs;
+          })
+        : allLeads;
+    } catch (_error) {
+      reportWindow.close();
+      setExportingReport(false);
+      await alertDialog('Unable to generate the leads report.', { title: 'Leads report' });
+      return;
+    }
+    setExportingReport(false);
+    if (!changedLeads.length) {
+      reportWindow.close();
+      await alertDialog(
+        previousAt
+          ? `No leads have changed since your last report (${formatDateTime(previousAt)}).`
+          : 'There are no leads to report yet.',
+        { title: 'Leads report' }
+      );
+      return;
+    }
+    const countLabel = `${changedLeads.length} lead${changedLeads.length === 1 ? '' : 's'}`;
+    const scopeLabel = previousAt
+      ? `${countLabel} changed since ${formatDateTime(previousAt)}`
+      : `${countLabel} (first report - all leads included)`;
     reportWindow.document.open();
     reportWindow.document.write(
-      buildLeadsReportHtml(filteredRows, {
+      buildLeadsReportHtml(changedLeads, {
         generatedAt: formatDateTime(new Date()),
         isAdminView,
         scopeLabel
@@ -1506,7 +1555,7 @@ export default function Leads({ isAdminView = false }) {
         // The report window still includes its own print button.
       }
     }, 350);
-  }, [alertDialog, filteredRows, isAdminView, leads.length, showArchived]);
+  }, [alertDialog, isAdminView]);
 
   const tableColCount = isAdminView ? 13 : 12;
   const quoteCooldown = editing ? getQuoteRequestCooldown(editing, nowMs) : null;
@@ -1541,9 +1590,14 @@ export default function Leads({ isAdminView = false }) {
               className="ghost lead-intake-toggle"
               type="button"
               onClick={handleExportLeadReport}
-              disabled={loading || !filteredRows.length}
+              disabled={loading || exportingReport}
+              title={
+                lastReportAt
+                  ? `Includes leads changed since your last report (${formatDateTime(lastReportAt)})`
+                  : 'First report includes all leads'
+              }
             >
-              <span>Export report</span>
+              <span>{exportingReport ? 'Preparing...' : 'Export changes report'}</span>
             </button>
             <button
               className="ghost lead-intake-toggle"
