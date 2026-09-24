@@ -7,13 +7,17 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/builder-app': {
+      '/builder/export-pdf': {
         target: process.env.VITE_BISON_BUILDER_TARGET || 'http://127.0.0.1:5001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/builder-app/, '') || '/'
+        rewrite: (path) => path.replace(/^\/builder\/export-pdf/, '/api/builder/export-pdf')
       },
-      '/static': {
-        target: process.env.VITE_BISON_BUILDER_TARGET || 'http://127.0.0.1:5001',
+      '^/builder(?:/|$)': {
+        target: process.env.VITE_LOCAL_API_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '^/projects(?:/|$)': {
+        target: process.env.VITE_LOCAL_API_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true
       },
       '/api': {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { getAccessToken } from '../utils/authStorage.js';
 
 function defaultBuilderAppUrl() {
-  return '/builder-app/';
+  return '/builder-app/index.html';
 }
 
 const BUILDER_APP_URL = import.meta.env.VITE_BISON_BUILDER_URL || defaultBuilderAppUrl();
